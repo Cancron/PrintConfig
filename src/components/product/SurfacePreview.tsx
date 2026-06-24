@@ -1,4 +1,5 @@
 import type { ProductSurface } from '../../types';
+import { toPixels } from '../../lib/validation';
 
 interface Props {
   surface: ProductSurface;
@@ -6,28 +7,26 @@ interface Props {
 }
 
 export function SurfacePreview({ surface, size = 200 }: Props) {
-  const { width, height, dpi, bleed, safeArea, backgroundColor, allowTransparency } = surface;
+  const { width, height, unit, dpi, bleed, safeArea, backgroundColor, allowTransparency } = surface;
 
-  // Calculate pixel dimensions
-  const widthPx = width * dpi;
-  const heightPx = height * dpi;
-  const bleedTopPx = bleed.top * dpi;
-  const bleedRightPx = bleed.right * dpi;
-  const bleedBottomPx = bleed.bottom * dpi;
-  const bleedLeftPx = bleed.left * dpi;
-  const safeTopPx = safeArea.top * dpi;
-  const safeRightPx = safeArea.right * dpi;
-  const safeBottomPx = safeArea.bottom * dpi;
-  const safeLeftPx = safeArea.left * dpi;
+  const widthPx = toPixels(width, unit, dpi);
+  const heightPx = toPixels(height, unit, dpi);
+  const bleedTopPx = toPixels(bleed.top, bleed.unit, dpi);
+  const bleedRightPx = toPixels(bleed.right, bleed.unit, dpi);
+  const bleedBottomPx = toPixels(bleed.bottom, bleed.unit, dpi);
+  const bleedLeftPx = toPixels(bleed.left, bleed.unit, dpi);
+  const safeTopPx = toPixels(safeArea.top, safeArea.unit, dpi);
+  const safeRightPx = toPixels(safeArea.right, safeArea.unit, dpi);
+  const safeBottomPx = toPixels(safeArea.bottom, safeArea.unit, dpi);
+  const safeLeftPx = toPixels(safeArea.left, safeArea.unit, dpi);
 
   const totalWidthPx = widthPx + bleedLeftPx + bleedRightPx;
   const totalHeightPx = heightPx + bleedTopPx + bleedBottomPx;
+  const hasValidSize = totalWidthPx > 0 && totalHeightPx > 0;
+  const scale = hasValidSize ? Math.min(size / totalWidthPx, size / totalHeightPx) : 1;
 
-  // Scale to fit within the preview box
-  const scale = Math.min(size / totalWidthPx, size / totalHeightPx);
-
-  const previewW = totalWidthPx * scale;
-  const previewH = totalHeightPx * scale;
+  const previewW = hasValidSize ? totalWidthPx * scale : size;
+  const previewH = hasValidSize ? totalHeightPx * scale : size;
 
   const bleedLeftS = bleedLeftPx * scale;
   const bleedTopS = bleedTopPx * scale;
@@ -54,7 +53,6 @@ export function SurfacePreview({ surface, size = 200 }: Props) {
         className="rounded-sm"
         style={{ backgroundColor: '#f3f4f6' }}
       >
-        {/* Background (bleed area) */}
         <rect
           x={0}
           y={0}
@@ -63,7 +61,6 @@ export function SurfacePreview({ surface, size = 200 }: Props) {
           fill={allowTransparency ? '#e5e7eb' : backgroundColor}
           opacity={allowTransparency ? 0.5 : 1}
         />
-        {/* Transparent checkered pattern if allowed */}
         {allowTransparency && (
           <>
             <defs>
@@ -83,22 +80,20 @@ export function SurfacePreview({ surface, size = 200 }: Props) {
           </>
         )}
 
-        {/* Trim area fill */}
         <rect
           x={bleedLeftS}
           y={bleedTopS}
-          width={trimW}
-          height={trimH}
-          fill={allowTransparency ? 'url(#checker-' + surface.id + ')' : backgroundColor}
+          width={Math.max(trimW, 0)}
+          height={Math.max(trimH, 0)}
+          fill={allowTransparency ? `url(#checker-${surface.id})` : backgroundColor}
           opacity={allowTransparency ? 0.8 : 1}
         />
 
-        {/* Bleed border (outer dashed) */}
         <rect
           x={0.5}
           y={0.5}
-          width={previewW - 1}
-          height={previewH - 1}
+          width={Math.max(previewW - 1, 0)}
+          height={Math.max(previewH - 1, 0)}
           fill="none"
           stroke="#ef4444"
           strokeWidth={1}
@@ -106,18 +101,16 @@ export function SurfacePreview({ surface, size = 200 }: Props) {
           opacity={0.7}
         />
 
-        {/* Trim border (solid) */}
         <rect
           x={bleedLeftS + 0.5}
           y={bleedTopS + 0.5}
-          width={trimW - 1}
-          height={trimH - 1}
+          width={Math.max(trimW - 1, 0)}
+          height={Math.max(trimH - 1, 0)}
           fill="none"
           stroke="#10b981"
           strokeWidth={1}
         />
 
-        {/* Safe area border (inner dashed) */}
         {safeW > 0 && safeH > 0 && (
           <rect
             x={bleedLeftS + safeLeftS + 0.5}
@@ -132,7 +125,6 @@ export function SurfacePreview({ surface, size = 200 }: Props) {
         )}
       </svg>
 
-      {/* Legend */}
       <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
         <span className="flex items-center gap-1">
           <span className="inline-block w-3 h-3 border border-red-400 border-dashed rounded-sm" />

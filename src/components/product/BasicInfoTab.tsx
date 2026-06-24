@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Save } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Textarea } from '../ui/Textarea';
+import { validateProductBasicInfo } from '../../lib/validation';
 import type { Product, ProductType, ProductStatus } from '../../types';
 
 interface Props {
@@ -35,8 +36,15 @@ export function BasicInfoTab({ product, onSave }: Props) {
   const [thumbnailUrl, setThumbnailUrl] = useState(product.thumbnailUrl);
   const [saved, setSaved] = useState(false);
 
+  const errors = useMemo(
+    () => validateProductBasicInfo({ name, slug, productType, basePrice }),
+    [basePrice, name, productType, slug]
+  );
+  const isValid = Object.keys(errors).length === 0;
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!isValid) return;
     onSave({
       ...product,
       name: name.trim(),
@@ -57,6 +65,7 @@ export function BasicInfoTab({ product, onSave }: Props) {
         label="Product Name"
         value={name}
         onChange={(e) => setName(e.target.value)}
+        error={errors.name}
         placeholder="e.g. Canvas Print"
       />
 
@@ -64,6 +73,7 @@ export function BasicInfoTab({ product, onSave }: Props) {
         label="Slug"
         value={slug}
         onChange={(e) => setSlug(e.target.value)}
+        error={errors.slug}
         placeholder="e.g. canvas-print"
       />
 
@@ -72,6 +82,7 @@ export function BasicInfoTab({ product, onSave }: Props) {
         value={productType}
         onChange={(e) => setProductType(e.target.value as ProductType)}
         options={productTypeOptions}
+        error={errors.productType}
       />
 
       <Textarea
@@ -96,6 +107,7 @@ export function BasicInfoTab({ product, onSave }: Props) {
         min="0"
         value={basePrice}
         onChange={(e) => setBasePrice(e.target.value)}
+        error={errors.basePrice}
         placeholder="0.00"
       />
 
@@ -110,7 +122,8 @@ export function BasicInfoTab({ product, onSave }: Props) {
       <div className="flex items-center gap-3 pt-2">
         <button
           type="submit"
-          className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
+          disabled={!isValid}
+          className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           <Save className="h-4 w-4" />
           Save Changes
