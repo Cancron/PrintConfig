@@ -74,6 +74,34 @@ export interface ExportRules {
   colorMode: ColorMode;
 }
 
+export type TemplateElementType = 'photo' | 'text';
+
+export interface TemplateElement {
+  id: string;
+  name: string;
+  type: TemplateElementType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  required: boolean;
+  locked: boolean;
+  editable: boolean;
+}
+
+export interface ProductTemplate {
+  id: string;
+  productId: string;
+  name: string;
+  status: ProductStatus;
+  variantId: string;
+  surfaceId: string;
+  thumbnailUrl: string;
+  elements: TemplateElement[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ProductVariant {
   id: string;
   productId: string;
@@ -99,8 +127,10 @@ export interface Product {
   thumbnailUrl: string;
   editorRules: EditorRules;
   exportRules: ExportRules;
+  templates: ProductTemplate[];
   variants: ProductVariant[];
   createdAt: string;
   updatedAt: string;
 }
+
 

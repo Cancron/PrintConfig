@@ -69,6 +69,7 @@ export function CreateProduct() {
       thumbnailUrl: thumbnailUrl.trim(),
       editorRules: createDefaultEditorRules(),
       exportRules: createDefaultExportRules(),
+      templates: [],
       variants: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -169,6 +170,7 @@ export function CreateProduct() {
     </div>
   );
 }
+
 
 
 

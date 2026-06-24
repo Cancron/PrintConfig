@@ -49,6 +49,7 @@ export function normalizeProduct(product: Product): Product {
       ...defaultExportRules,
       ...(product.exportRules ?? {}),
     },
+    templates: product.templates ?? [],
   };
 }
 
@@ -85,6 +86,7 @@ function seedProducts(): Product[] {
       thumbnailUrl: 'https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg?auto=compress&cs=tinysrgb&w=400',
       editorRules: createDefaultEditorRules(),
       exportRules: createDefaultExportRules(),
+      templates: [],
       createdAt: now,
       updatedAt: now,
       variants: [
@@ -138,6 +140,7 @@ function seedProducts(): Product[] {
       thumbnailUrl: 'https://images.pexels.com/photos/1287145/pexels-photo-1287145.jpeg?auto=compress&cs=tinysrgb&w=400',
       editorRules: createDefaultEditorRules(),
       exportRules: createDefaultExportRules(),
+      templates: [],
       createdAt: now,
       updatedAt: now,
       variants: [
@@ -179,6 +182,7 @@ function seedProducts(): Product[] {
       thumbnailUrl: 'https://images.pexels.com/photos/991509/pexels-photo-991509.jpeg?auto=compress&cs=tinysrgb&w=400',
       editorRules: createDefaultEditorRules(),
       exportRules: createDefaultExportRules(),
+      templates: [],
       createdAt: now,
       updatedAt: now,
       variants: [
@@ -225,5 +229,6 @@ function seedProducts(): Product[] {
   saveProducts(products);
   return products;
 }
+
 
 

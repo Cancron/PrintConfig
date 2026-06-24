@@ -12,6 +12,7 @@ import { SurfacesTab } from '../components/product/SurfacesTab';
 import { EditorRulesTab } from '../components/product/EditorRulesTab';
 import { ExportRulesTab } from '../components/product/ExportRulesTab';
 import { PreviewTab } from '../components/product/PreviewTab';
+import { TemplatesTab } from '../components/product/TemplatesTab';
 
 export function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -62,6 +63,11 @@ export function ProductDetail() {
       id: 'export-rules',
       label: 'Export Rules',
       content: <ExportRulesTab product={product} onSave={updateProduct} />,
+    },
+    {
+      id: 'templates',
+      label: 'Templates',
+      content: <TemplatesTab product={product} onSave={updateProduct} />,
     },
     {
       id: 'preview',
@@ -185,6 +191,7 @@ function JsonPreviewTab({ product }: { product: Product }) {
     </div>
   );
 }
+
 
 
 
