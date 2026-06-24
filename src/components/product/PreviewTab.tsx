@@ -1,0 +1,279 @@
+import { useMemo, useState } from 'react';
+import { AlertTriangle, FileJson } from 'lucide-react';
+import { SurfacePreview } from './SurfacePreview';
+import { Select } from '../ui/Select';
+import { toPixels } from '../../lib/validation';
+import type { Product, ProductSurface, ProductVariant } from '../../types';
+
+interface Props {
+  product: Product;
+}
+
+export function PreviewTab({ product }: Props) {
+  const activeVariants = product.variants.filter((variant) => variant.status === 'Active');
+  const variantsForSelection = activeVariants.length > 0 ? activeVariants : product.variants;
+  const [selectedVariantId, setSelectedVariantId] = useState(variantsForSelection[0]?.id ?? '');
+  const selectedVariant = variantsForSelection.find((variant) => variant.id === selectedVariantId) ?? variantsForSelection[0];
+  const [selectedSurfaceId, setSelectedSurfaceId] = useState(selectedVariant?.surfaces[0]?.id ?? '');
+  const selectedSurface = selectedVariant?.surfaces.find((surface) => surface.id === selectedSurfaceId) ?? selectedVariant?.surfaces[0];
+  const [testConfig, setTestConfig] = useState<object | null>(null);
+
+  const dimensions = useMemo(
+    () => (selectedSurface ? calculateDimensions(selectedSurface) : null),
+    [selectedSurface]
+  );
+  const warnings = useMemo(
+    () => getWarnings(product, activeVariants, selectedSurface),
+    [activeVariants, product, selectedSurface]
+  );
+
+  function handleVariantChange(variantId: string) {
+    const nextVariant = variantsForSelection.find((variant) => variant.id === variantId);
+    setSelectedVariantId(variantId);
+    setSelectedSurfaceId(nextVariant?.surfaces[0]?.id ?? '');
+    setTestConfig(null);
+  }
+
+  function handleSurfaceChange(surfaceId: string) {
+    setSelectedSurfaceId(surfaceId);
+    setTestConfig(null);
+  }
+
+  function generateTestConfiguration() {
+    const generated = {
+      note: 'This is a configuration test only. It is not a real print export.',
+      product: summarizeProduct(product),
+      selectedVariant: selectedVariant ? summarizeVariant(selectedVariant) : null,
+      selectedSurface: selectedSurface ?? null,
+      editorRules: product.editorRules ?? null,
+      exportRules: product.exportRules ?? null,
+      calculatedDimensions: dimensions,
+    };
+    setTestConfig(generated);
+  }
+
+  return (
+    <div className="space-y-6 pb-6">
+      <div>
+        <h2 className="text-lg font-medium text-gray-900">Configuration Preview</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Test how this product setup will behave before publishing it.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Select
+          label="Variant"
+          value={selectedVariant?.id ?? ''}
+          onChange={(event) => handleVariantChange(event.target.value)}
+          options={variantsForSelection.length > 0
+            ? variantsForSelection.map((variant) => ({ value: variant.id, label: `${variant.name} (${variant.sku})` }))
+            : [{ value: '', label: 'No variants available' }]}
+          disabled={variantsForSelection.length === 0}
+        />
+        <Select
+          label="Surface"
+          value={selectedSurface?.id ?? ''}
+          onChange={(event) => handleSurfaceChange(event.target.value)}
+          options={selectedVariant?.surfaces.length
+            ? selectedVariant.surfaces.map((surface) => ({ value: surface.id, label: `${surface.name} (${surface.code})` }))
+            : [{ value: '', label: 'No surfaces available' }]}
+          disabled={!selectedVariant || selectedVariant.surfaces.length === 0}
+        />
+      </div>
+
+      {warnings.length > 0 && (
+        <div className="space-y-2">
+          {warnings.map((warning) => (
+            <div key={warning} className="flex gap-2 rounded-md bg-amber-50 p-3 text-sm text-amber-800 ring-1 ring-inset ring-amber-200">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
+              <span>{warning}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <div className="rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200 xl:col-span-2">
+          <h3 className="text-sm font-semibold text-gray-900">Surface Preview</h3>
+          <p className="mt-1 text-sm text-gray-500">Bleed, trim, and safe area are shown with the configured surface ratio.</p>
+          <div className="mt-6 flex min-h-80 items-center justify-center overflow-auto rounded-lg bg-white p-4 ring-1 ring-gray-200">
+            {selectedSurface ? (
+              <SurfacePreview surface={selectedSurface} size={420} />
+            ) : (
+              <p className="text-sm text-gray-500">No surface selected.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <SummaryPanel title="Production Dimensions">
+            {dimensions ? (
+              <dl className="space-y-2 text-sm">
+                <SummaryRow label="Trim" value={`${dimensions.trimWidthPx} x ${dimensions.trimHeightPx} px`} />
+                <SummaryRow label="With bleed" value={`${dimensions.totalWidthPx} x ${dimensions.totalHeightPx} px`} />
+                <SummaryRow label="Safe area" value={`${dimensions.safeWidthPx} x ${dimensions.safeHeightPx} px`} />
+                <SummaryRow label="Surface DPI" value={`${selectedSurface?.dpi ?? 0}`} />
+              </dl>
+            ) : (
+              <p className="text-sm text-gray-500">No dimensions available.</p>
+            )}
+          </SummaryPanel>
+
+          <SummaryPanel title="Export Settings">
+            {product.exportRules ? (
+              <dl className="space-y-2 text-sm">
+                <SummaryRow label="Format" value={product.exportRules.format} />
+                <SummaryRow label="DPI" value={`${product.exportRules.dpi}`} />
+                <SummaryRow label="Include bleed" value={yesNo(product.exportRules.includeBleed)} />
+                <SummaryRow label="Flatten output" value={yesNo(product.exportRules.flattenOutput)} />
+                <SummaryRow label="Transparent background" value={yesNo(product.exportRules.transparentBackground)} />
+                <SummaryRow label="Background" value={product.exportRules.backgroundColor} />
+                <SummaryRow label="Color mode" value={product.exportRules.colorMode} />
+              </dl>
+            ) : (
+              <p className="text-sm text-gray-500">Export rules are missing.</p>
+            )}
+          </SummaryPanel>
+
+          <SummaryPanel title="Editor Rules">
+            {product.editorRules ? (
+              <dl className="space-y-2 text-sm">
+                <SummaryRow label="Image upload" value={yesNo(product.editorRules.allowImageUpload)} />
+                <SummaryRow label="Add text" value={yesNo(product.editorRules.allowAddText)} />
+                <SummaryRow label="Clipart" value={yesNo(product.editorRules.allowClipart)} />
+                <SummaryRow label="Crop" value={yesNo(product.editorRules.allowCrop)} />
+                <SummaryRow label="Rotate" value={yesNo(product.editorRules.allowRotate)} />
+                <SummaryRow label="Max images" value={`${product.editorRules.maxImageCount}`} />
+                <SummaryRow label="Max text" value={`${product.editorRules.maxTextCount}`} />
+              </dl>
+            ) : (
+              <p className="text-sm text-gray-500">Editor rules are missing.</p>
+            )}
+          </SummaryPanel>
+        </div>
+      </div>
+
+      <div className="rounded-lg bg-slate-50 p-4 ring-1 ring-slate-200">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Test Configuration</h3>
+            <p className="mt-1 text-sm text-slate-600">This is only a configuration test, not a real print export.</p>
+          </div>
+          <button
+            type="button"
+            onClick={generateTestConfiguration}
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
+          >
+            <FileJson className="h-4 w-4" />
+            Generate Test Configuration
+          </button>
+        </div>
+
+        {testConfig && (
+          <pre className="mt-4 max-h-96 overflow-auto rounded-lg bg-slate-900 p-4 text-sm leading-relaxed text-slate-50">
+            <code>{JSON.stringify(testConfig, null, 2)}</code>
+          </pre>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SummaryPanel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-lg bg-white p-4 ring-1 ring-gray-200">
+      <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+      <div className="mt-3">{children}</div>
+    </section>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <dt className="text-gray-500">{label}</dt>
+      <dd className="text-right font-medium text-gray-900">{value}</dd>
+    </div>
+  );
+}
+
+function calculateDimensions(surface: ProductSurface) {
+  const trimWidth = toPixels(surface.width, surface.unit, surface.dpi);
+  const trimHeight = toPixels(surface.height, surface.unit, surface.dpi);
+  const bleedLeft = toPixels(surface.bleed.left, surface.bleed.unit, surface.dpi);
+  const bleedRight = toPixels(surface.bleed.right, surface.bleed.unit, surface.dpi);
+  const bleedTop = toPixels(surface.bleed.top, surface.bleed.unit, surface.dpi);
+  const bleedBottom = toPixels(surface.bleed.bottom, surface.bleed.unit, surface.dpi);
+  const safeLeft = toPixels(surface.safeArea.left, surface.safeArea.unit, surface.dpi);
+  const safeRight = toPixels(surface.safeArea.right, surface.safeArea.unit, surface.dpi);
+  const safeTop = toPixels(surface.safeArea.top, surface.safeArea.unit, surface.dpi);
+  const safeBottom = toPixels(surface.safeArea.bottom, surface.safeArea.unit, surface.dpi);
+
+  return {
+    trimWidthPx: Math.round(trimWidth),
+    trimHeightPx: Math.round(trimHeight),
+    totalWidthPx: Math.round(trimWidth + bleedLeft + bleedRight),
+    totalHeightPx: Math.round(trimHeight + bleedTop + bleedBottom),
+    safeWidthPx: Math.max(Math.round(trimWidth - safeLeft - safeRight), 0),
+    safeHeightPx: Math.max(Math.round(trimHeight - safeTop - safeBottom), 0),
+    bleedPx: {
+      top: Math.round(bleedTop),
+      right: Math.round(bleedRight),
+      bottom: Math.round(bleedBottom),
+      left: Math.round(bleedLeft),
+    },
+    safeAreaPx: {
+      top: Math.round(safeTop),
+      right: Math.round(safeRight),
+      bottom: Math.round(safeBottom),
+      left: Math.round(safeLeft),
+    },
+  };
+}
+
+function getWarnings(product: Product, activeVariants: ProductVariant[], surface?: ProductSurface) {
+  const warnings: string[] = [];
+
+  if (activeVariants.length === 0) warnings.push('No active variant exists. Activate a variant before publishing.');
+  if (!surface) warnings.push('No surface exists for the selected variant. Add a surface before publishing.');
+  if (!product.exportRules) warnings.push('Export rules are missing. Configure export rules before publishing.');
+  if (surface && surface.dpi < 150) warnings.push('DPI is below 150. Production quality may be too low.');
+  if (surface && hasTightSafeArea(surface)) {
+    warnings.push('Image/text may go outside safe area. Review the safe area margins for this surface.');
+  }
+
+  return warnings;
+}
+
+function hasTightSafeArea(surface: ProductSurface) {
+  const safeHorizontal = surface.safeArea.left + surface.safeArea.right;
+  const safeVertical = surface.safeArea.top + surface.safeArea.bottom;
+  return safeHorizontal <= 0 || safeVertical <= 0 || safeHorizontal >= surface.width || safeVertical >= surface.height;
+}
+
+function summarizeProduct(product: Product) {
+  return {
+    id: product.id,
+    name: product.name,
+    slug: product.slug,
+    productType: product.productType,
+    status: product.status,
+    basePrice: product.basePrice,
+  };
+}
+
+function summarizeVariant(variant: ProductVariant) {
+  return {
+    id: variant.id,
+    name: variant.name,
+    sku: variant.sku,
+    status: variant.status,
+    price: variant.price,
+    options: variant.options,
+  };
+}
+
+function yesNo(value: boolean) {
+  return value ? 'Yes' : 'No';
+}

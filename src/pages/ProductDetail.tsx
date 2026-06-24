@@ -11,6 +11,7 @@ import { VariantsTab } from '../components/product/VariantsTab';
 import { SurfacesTab } from '../components/product/SurfacesTab';
 import { EditorRulesTab } from '../components/product/EditorRulesTab';
 import { ExportRulesTab } from '../components/product/ExportRulesTab';
+import { PreviewTab } from '../components/product/PreviewTab';
 
 export function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -65,7 +66,7 @@ export function ProductDetail() {
     {
       id: 'preview',
       label: 'Preview',
-      content: <PlaceholderPanel title="Preview" />,
+      content: <PreviewTab product={product} />,
     },
     {
       id: 'json',
@@ -174,15 +175,6 @@ function ProductReadinessPanel({ product }: { product: Product }) {
   );
 }
 
-function PlaceholderPanel({ title }: { title: string }) {
-  return (
-    <div className="text-center py-16">
-      <h3 className="text-lg font-medium text-gray-900">{title}</h3>
-      <p className="mt-2 text-sm text-gray-500">Coming soon.</p>
-    </div>
-  );
-}
-
 function JsonPreviewTab({ product }: { product: Product }) {
   const json = JSON.stringify(product, null, 2);
   return (
@@ -193,5 +185,7 @@ function JsonPreviewTab({ product }: { product: Product }) {
     </div>
   );
 }
+
+
 
 
