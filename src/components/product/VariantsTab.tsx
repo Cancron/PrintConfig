@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Plus, Pencil, Trash2, X, Check } from 'lucide-react';
+import { Table, TableHead, TableBody, TableHeader, TableCell } from '../ui/Table';
 import { Badge } from '../ui/Badge';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { EmptyState } from '../ui/EmptyState';
-import { validateVariant } from '../../lib/validation';
 import type { Product, ProductVariant, ProductStatus } from '../../types';
 
 interface Props {
@@ -34,19 +34,6 @@ export function VariantsTab({ product, onSave }: Props) {
     status: 'Draft',
     options: [{ key: '', value: '' }],
   });
-
-  const errors = useMemo(
-    () =>
-      validateVariant({
-        id: editingId,
-        name: form.name,
-        sku: form.sku,
-        price: form.price,
-        existingSkus: product.variants.map((variant) => ({ id: variant.id, sku: variant.sku })),
-      }),
-    [editingId, form.name, form.price, form.sku, product.variants]
-  );
-  const isValid = Object.keys(errors).length === 0;
 
   function resetForm() {
     setForm({
@@ -104,8 +91,6 @@ export function VariantsTab({ product, onSave }: Props) {
   }
 
   function handleSave() {
-    if (!isValid) return;
-
     const options: Record<string, string> = {};
     for (const opt of form.options) {
       if (opt.key.trim()) {
@@ -173,14 +158,12 @@ export function VariantsTab({ product, onSave }: Props) {
               label="Variant Name"
               value={form.name}
               onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-              error={errors.name}
               placeholder="e.g. Small Portrait"
             />
             <Input
               label="SKU"
               value={form.sku}
               onChange={(e) => setForm((p) => ({ ...p, sku: e.target.value }))}
-              error={errors.sku}
               placeholder="e.g. CP-S-P"
             />
             <Input
@@ -190,7 +173,6 @@ export function VariantsTab({ product, onSave }: Props) {
               min="0"
               value={form.price}
               onChange={(e) => setForm((p) => ({ ...p, price: e.target.value }))}
-              error={errors.price}
               placeholder="0.00"
             />
             <Select
@@ -244,8 +226,7 @@ export function VariantsTab({ product, onSave }: Props) {
           <div className="flex items-center gap-3">
             <button
               onClick={handleSave}
-              disabled={!isValid}
-              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
             >
               <Check className="h-4 w-4" />
               Save Variant

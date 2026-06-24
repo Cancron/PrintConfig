@@ -1,11 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Plus, Pencil, Trash2, X, Check, ChevronDown } from 'lucide-react';
 import { SurfacePreview } from './SurfacePreview';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { EmptyState } from '../ui/EmptyState';
-import { toPixels, validateSurface } from '../../lib/validation';
-import type { Product, ProductSurface, BleedSettings, SafeAreaSettings } from '../../types';
+import type { Product, ProductVariant, ProductSurface, BleedSettings, SafeAreaSettings } from '../../types';
 
 interface Props {
   product: Product;
@@ -64,15 +63,12 @@ export function SurfacesTab({ product, onSave }: Props) {
 
   const selectedVariant = product.variants.find((v) => v.id === selectedVariantId);
   const surfaces = selectedVariant?.surfaces ?? [];
-  const errors = useMemo(() => validateSurface(form), [form]);
-  const isValid = Object.keys(errors).length === 0;
 
   function resetForm() {
     setForm(defaultSurface(selectedVariantId));
   }
 
   function startAdd() {
-    if (!selectedVariant) return;
     resetForm();
     setIsAdding(true);
     setEditingId(null);
@@ -109,12 +105,10 @@ export function SurfacesTab({ product, onSave }: Props) {
   }
 
   function handleSave() {
-    if (!selectedVariant || !isValid) return;
+    if (!selectedVariant) return;
     const now = new Date().toISOString();
     const surface: ProductSurface = {
       ...form,
-      name: form.name.trim(),
-      code: form.code.trim(),
       id: editingId ?? `s-${Date.now()}`,
       variantId: selectedVariant.id,
       updatedAt: now,
@@ -159,13 +153,16 @@ export function SurfacesTab({ product, onSave }: Props) {
   }
 
   const isFormOpen = isAdding || editingId !== null;
-  const widthPx = toPixels(form.width, form.unit, form.dpi);
-  const heightPx = toPixels(form.height, form.unit, form.dpi);
-  const totalWidthWithBleedPx = widthPx + toPixels(form.bleed.left, form.bleed.unit, form.dpi) + toPixels(form.bleed.right, form.bleed.unit, form.dpi);
-  const totalHeightWithBleedPx = heightPx + toPixels(form.bleed.top, form.bleed.unit, form.dpi) + toPixels(form.bleed.bottom, form.bleed.unit, form.dpi);
+
+  // Computed pixel dimensions
+  const widthPx = form.width * form.dpi;
+  const heightPx = form.height * form.dpi;
+  const totalWidthWithBleedPx = widthPx + (form.bleed.left + form.bleed.right) * form.dpi;
+  const totalHeightWithBleedPx = heightPx + (form.bleed.top + form.bleed.bottom) * form.dpi;
 
   return (
     <div>
+      {/* Variant selector */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">Select Variant</label>
         <div className="relative max-w-sm">
@@ -173,22 +170,15 @@ export function SurfacesTab({ product, onSave }: Props) {
             value={selectedVariantId}
             onChange={(e) => {
               setSelectedVariantId(e.target.value);
-              setForm(defaultSurface(e.target.value));
-              setEditingId(null);
-              setIsAdding(false);
+              cancelEdit();
             }}
-            disabled={product.variants.length === 0}
-            className="block w-full appearance-none rounded-md border-0 py-2 pl-3 pr-10 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-400 sm:text-sm"
+            className="block w-full appearance-none rounded-md border-0 py-2 pl-3 pr-10 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm"
           >
-            {product.variants.length === 0 ? (
-              <option value="">No variants available</option>
-            ) : (
-              product.variants.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name} ({v.sku})
-                </option>
-              ))
-            )}
+            {product.variants.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name} ({v.sku})
+              </option>
+            ))}
           </select>
           <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
         </div>
@@ -197,17 +187,15 @@ export function SurfacesTab({ product, onSave }: Props) {
       {!selectedVariant || surfaces.length === 0 ? (
         <EmptyState
           title="No surfaces yet"
-          description={selectedVariant ? 'Add your first surface to this variant.' : 'Add a variant before configuring surfaces.'}
+          description="Select a variant and add your first surface."
           action={
-            selectedVariant && (
-              <button
-                onClick={startAdd}
-                className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                Add Surface
-              </button>
-            )
+            <button
+              onClick={startAdd}
+              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Add Surface
+            </button>
           }
         />
       ) : (
@@ -237,7 +225,7 @@ export function SurfacesTab({ product, onSave }: Props) {
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{surface.dpi}</td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                    {Math.round(toPixels(surface.width, surface.unit, surface.dpi))} x {Math.round(toPixels(surface.height, surface.unit, surface.dpi))} px
+                    {Math.round(surface.width * surface.dpi)} x {Math.round(surface.height * surface.dpi)} px
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -281,20 +269,19 @@ export function SurfacesTab({ product, onSave }: Props) {
           </h3>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Form */}
             <div className="lg:col-span-2 space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
                   label="Surface Name"
                   value={form.name}
                   onChange={(e) => updateForm('name', e.target.value)}
-                  error={errors.name}
                   placeholder="e.g. Front"
                 />
                 <Input
                   label="Surface Code"
                   value={form.code}
                   onChange={(e) => updateForm('code', e.target.value)}
-                  error={errors.code}
                   placeholder="e.g. front"
                 />
               </div>
@@ -307,7 +294,6 @@ export function SurfacesTab({ product, onSave }: Props) {
                   min="0"
                   value={form.width}
                   onChange={(e) => updateForm('width', Number(e.target.value))}
-                  error={errors.width}
                 />
                 <Input
                   label="Height"
@@ -316,14 +302,12 @@ export function SurfacesTab({ product, onSave }: Props) {
                   min="0"
                   value={form.height}
                   onChange={(e) => updateForm('height', Number(e.target.value))}
-                  error={errors.height}
                 />
                 <Select
                   label="Unit"
                   value={form.unit}
                   onChange={(e) => updateForm('unit', e.target.value as ProductSurface['unit'])}
                   options={unitOptions}
-                  error={errors.unit}
                 />
                 <Input
                   label="DPI"
@@ -331,7 +315,6 @@ export function SurfacesTab({ product, onSave }: Props) {
                   min="1"
                   value={form.dpi}
                   onChange={(e) => updateForm('dpi', Number(e.target.value))}
-                  error={errors.dpi}
                 />
               </div>
 
@@ -343,7 +326,6 @@ export function SurfacesTab({ product, onSave }: Props) {
                   min="0"
                   value={form.bleed.top}
                   onChange={(e) => updateBleed('top', Number(e.target.value))}
-                  error={errors['bleed.top']}
                 />
                 <Input
                   label="Bleed Right"
@@ -352,7 +334,6 @@ export function SurfacesTab({ product, onSave }: Props) {
                   min="0"
                   value={form.bleed.right}
                   onChange={(e) => updateBleed('right', Number(e.target.value))}
-                  error={errors['bleed.right']}
                 />
                 <Input
                   label="Bleed Bottom"
@@ -361,7 +342,6 @@ export function SurfacesTab({ product, onSave }: Props) {
                   min="0"
                   value={form.bleed.bottom}
                   onChange={(e) => updateBleed('bottom', Number(e.target.value))}
-                  error={errors['bleed.bottom']}
                 />
                 <Input
                   label="Bleed Left"
@@ -370,7 +350,6 @@ export function SurfacesTab({ product, onSave }: Props) {
                   min="0"
                   value={form.bleed.left}
                   onChange={(e) => updateBleed('left', Number(e.target.value))}
-                  error={errors['bleed.left']}
                 />
               </div>
 
@@ -382,7 +361,6 @@ export function SurfacesTab({ product, onSave }: Props) {
                   min="0"
                   value={form.safeArea.top}
                   onChange={(e) => updateSafeArea('top', Number(e.target.value))}
-                  error={errors['safeArea.top']}
                 />
                 <Input
                   label="Safe Area Right"
@@ -391,7 +369,6 @@ export function SurfacesTab({ product, onSave }: Props) {
                   min="0"
                   value={form.safeArea.right}
                   onChange={(e) => updateSafeArea('right', Number(e.target.value))}
-                  error={errors['safeArea.right']}
                 />
                 <Input
                   label="Safe Area Bottom"
@@ -400,7 +377,6 @@ export function SurfacesTab({ product, onSave }: Props) {
                   min="0"
                   value={form.safeArea.bottom}
                   onChange={(e) => updateSafeArea('bottom', Number(e.target.value))}
-                  error={errors['safeArea.bottom']}
                 />
                 <Input
                   label="Safe Area Left"
@@ -409,7 +385,6 @@ export function SurfacesTab({ product, onSave }: Props) {
                   min="0"
                   value={form.safeArea.left}
                   onChange={(e) => updateSafeArea('left', Number(e.target.value))}
-                  error={errors['safeArea.left']}
                 />
               </div>
 
@@ -440,6 +415,7 @@ export function SurfacesTab({ product, onSave }: Props) {
               </div>
             </div>
 
+            {/* Preview + Calculations */}
             <div className="space-y-4">
               <div className="bg-white rounded-lg ring-1 ring-gray-200 p-4 flex flex-col items-center">
                 <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Live Preview</h4>
@@ -469,8 +445,7 @@ export function SurfacesTab({ product, onSave }: Props) {
           <div className="flex items-center gap-3 mt-6">
             <button
               onClick={handleSave}
-              disabled={!isValid}
-              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
             >
               <Check className="h-4 w-4" />
               Save Surface

@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { PageHeader } from '../components/PageHeader';
 import { Table, TableHead, TableBody, TableHeader, TableCell } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
+import { Input } from '../components/ui/Input';
+import { Select } from '../components/ui/Select';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useProducts } from '../hooks/useProducts';
 import type { ProductType } from '../types';

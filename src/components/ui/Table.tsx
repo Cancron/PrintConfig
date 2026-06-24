@@ -27,11 +27,11 @@ export function TableBody({ children }: { children: ReactNode }) {
   return <tbody className="divide-y divide-gray-200 bg-white">{children}</tbody>;
 }
 
-export function TableHeader({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function TableHeader({ children }: { children: ReactNode }) {
   return (
     <th
       scope="col"
-      className={`px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider ${className}`}
+      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
     >
       {children}
     </th>

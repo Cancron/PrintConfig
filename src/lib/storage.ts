@@ -1,64 +1,12 @@
-import type { EditorRules, ExportRules, Product } from '../types';
+import type { Product } from '../types';
 
 const STORAGE_KEY = 'print-config-products';
-
-export const defaultEditorRules: EditorRules = {
-  allowImageUpload: true,
-  allowAddText: true,
-  allowClipart: false,
-  allowBackgroundColor: true,
-  allowBackgroundImage: false,
-  allowCrop: true,
-  allowRotate: true,
-  allowDeleteObjects: true,
-  allowLayersPanel: true,
-  maxImageCount: 10,
-  maxTextCount: 20,
-  minimumDpiWarning: 150,
-  minimumDpiBlock: 72,
-  requirePlaceholdersFilled: true,
-};
-
-export function createDefaultEditorRules(): EditorRules {
-  return { ...defaultEditorRules };
-}
-
-export const defaultExportRules: ExportRules = {
-  format: 'PDF',
-  dpi: 300,
-  includeBleed: true,
-  flattenOutput: true,
-  transparentBackground: false,
-  backgroundColor: '#ffffff',
-  filenameTemplate: '{orderId}_{sku}_{surface}',
-  colorMode: 'RGB',
-};
-
-export function createDefaultExportRules(): ExportRules {
-  return { ...defaultExportRules };
-}
-
-export function normalizeProduct(product: Product): Product {
-  return {
-    ...product,
-    editorRules: {
-      ...defaultEditorRules,
-      ...(product.editorRules ?? {}),
-    },
-    exportRules: {
-      ...defaultExportRules,
-      ...(product.exportRules ?? {}),
-    },
-    templates: product.templates ?? [],
-  };
-}
 
 export function loadProducts(): Product[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const products = JSON.parse(raw) as Product[];
-      return products.map(normalizeProduct);
+      return JSON.parse(raw);
     }
   } catch {
     // ignore
@@ -67,7 +15,7 @@ export function loadProducts(): Product[] {
 }
 
 export function saveProducts(products: Product[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(products.map(normalizeProduct)));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
 }
 
 function seedProducts(): Product[] {
@@ -84,9 +32,6 @@ function seedProducts(): Product[] {
       status: 'Active',
       basePrice: 49.99,
       thumbnailUrl: 'https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg?auto=compress&cs=tinysrgb&w=400',
-      editorRules: createDefaultEditorRules(),
-      exportRules: createDefaultExportRules(),
-      templates: [],
       createdAt: now,
       updatedAt: now,
       variants: [
@@ -138,9 +83,6 @@ function seedProducts(): Product[] {
       status: 'Active',
       basePrice: 19.99,
       thumbnailUrl: 'https://images.pexels.com/photos/1287145/pexels-photo-1287145.jpeg?auto=compress&cs=tinysrgb&w=400',
-      editorRules: createDefaultEditorRules(),
-      exportRules: createDefaultExportRules(),
-      templates: [],
       createdAt: now,
       updatedAt: now,
       variants: [
@@ -180,9 +122,6 @@ function seedProducts(): Product[] {
       status: 'Draft',
       basePrice: 24.99,
       thumbnailUrl: 'https://images.pexels.com/photos/991509/pexels-photo-991509.jpeg?auto=compress&cs=tinysrgb&w=400',
-      editorRules: createDefaultEditorRules(),
-      exportRules: createDefaultExportRules(),
-      templates: [],
       createdAt: now,
       updatedAt: now,
       variants: [
@@ -229,6 +168,3 @@ function seedProducts(): Product[] {
   saveProducts(products);
   return products;
 }
-
-
-

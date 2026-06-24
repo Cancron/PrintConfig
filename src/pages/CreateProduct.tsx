@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
@@ -6,8 +6,6 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { useProducts } from '../hooks/useProducts';
-import { createDefaultEditorRules, createDefaultExportRules } from '../lib/storage';
-import { validateProductBasicInfo } from '../lib/validation';
 import type { Product, ProductType, ProductStatus } from '../types';
 
 const productTypeOptions: { value: ProductType; label: ProductType }[] = [
@@ -36,12 +34,7 @@ export function CreateProduct() {
   const [status, setStatus] = useState<ProductStatus>('Draft');
   const [basePrice, setBasePrice] = useState('');
   const [thumbnailUrl, setThumbnailUrl] = useState('');
-
-  const errors = useMemo(
-    () => validateProductBasicInfo({ name, slug, productType, basePrice }),
-    [basePrice, name, productType, slug]
-  );
-  const isValid = Object.keys(errors).length === 0;
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   function handleNameChange(value: string) {
     setName(value);
@@ -53,9 +46,18 @@ export function CreateProduct() {
     );
   }
 
+  function validate() {
+    const next: Record<string, string> = {};
+    if (!name.trim()) next.name = 'Name is required';
+    if (!slug.trim()) next.slug = 'Slug is required';
+    if (!basePrice || isNaN(Number(basePrice))) next.basePrice = 'Valid price is required';
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!isValid) return;
+    if (!validate()) return;
 
     const product: Product = {
       id: `p-${Date.now()}`,
@@ -67,9 +69,6 @@ export function CreateProduct() {
       status,
       basePrice: Number(basePrice),
       thumbnailUrl: thumbnailUrl.trim(),
-      editorRules: createDefaultEditorRules(),
-      exportRules: createDefaultExportRules(),
-      templates: [],
       variants: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -113,7 +112,6 @@ export function CreateProduct() {
           value={productType}
           onChange={(e) => setProductType(e.target.value as ProductType)}
           options={productTypeOptions}
-          error={errors.productType}
         />
 
         <Textarea
@@ -153,8 +151,7 @@ export function CreateProduct() {
         <div className="flex items-center gap-3 pt-2">
           <button
             type="submit"
-            disabled={!isValid}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
           >
             Create Product
           </button>
@@ -170,8 +167,3 @@ export function CreateProduct() {
     </div>
   );
 }
-
-
-
-
-

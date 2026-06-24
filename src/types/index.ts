@@ -44,60 +44,28 @@ export interface ProductSurface {
 }
 
 export interface EditorRules {
-  allowImageUpload: boolean;
-  allowAddText: boolean;
-  allowClipart: boolean;
-  allowBackgroundColor: boolean;
-  allowBackgroundImage: boolean;
-  allowCrop: boolean;
-  allowRotate: boolean;
-  allowDeleteObjects: boolean;
-  allowLayersPanel: boolean;
-  maxImageCount: number;
-  maxTextCount: number;
-  minimumDpiWarning: number;
-  minimumDpiBlock: number;
-  requirePlaceholdersFilled: boolean;
-}
-
-export type ExportFormat = 'PNG' | 'JPG' | 'PDF' | 'SVG';
-export type ColorMode = 'RGB' | 'CMYK';
-
-export interface ExportRules {
-  format: ExportFormat;
-  dpi: number;
-  includeBleed: boolean;
-  flattenOutput: boolean;
-  transparentBackground: boolean;
-  backgroundColor: string;
-  filenameTemplate: string;
-  colorMode: ColorMode;
-}
-
-export type TemplateElementType = 'photo' | 'text';
-
-export interface TemplateElement {
-  id: string;
-  name: string;
-  type: TemplateElementType;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  required: boolean;
-  locked: boolean;
-  editable: boolean;
-}
-
-export interface ProductTemplate {
   id: string;
   productId: string;
-  name: string;
-  status: ProductStatus;
-  variantId: string;
-  surfaceId: string;
-  thumbnailUrl: string;
-  elements: TemplateElement[];
+  minZoom: number;
+  maxZoom: number;
+  allowRotation: boolean;
+  allowText: boolean;
+  allowImages: boolean;
+  allowShapes: boolean;
+  defaultTextColor: string;
+  defaultFontFamily: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExportRules {
+  id: string;
+  productId: string;
+  outputFormat: 'pdf' | 'png' | 'tiff';
+  colorSpace: 'rgb' | 'cmyk';
+  resolution: number;
+  includeBleed: boolean;
+  includeSafeArea: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -125,12 +93,7 @@ export interface Product {
   status: ProductStatus;
   basePrice: number;
   thumbnailUrl: string;
-  editorRules: EditorRules;
-  exportRules: ExportRules;
-  templates: ProductTemplate[];
   variants: ProductVariant[];
   createdAt: string;
   updatedAt: string;
 }
-
-
