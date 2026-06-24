@@ -60,16 +60,18 @@ export interface EditorRules {
   requirePlaceholdersFilled: boolean;
 }
 
+export type ExportFormat = 'PNG' | 'JPG' | 'PDF' | 'SVG';
+export type ColorMode = 'RGB' | 'CMYK';
+
 export interface ExportRules {
-  id: string;
-  productId: string;
-  outputFormat: 'pdf' | 'png' | 'tiff';
-  colorSpace: 'rgb' | 'cmyk';
-  resolution: number;
+  format: ExportFormat;
+  dpi: number;
   includeBleed: boolean;
-  includeSafeArea: boolean;
-  createdAt: string;
-  updatedAt: string;
+  flattenOutput: boolean;
+  transparentBackground: boolean;
+  backgroundColor: string;
+  filenameTemplate: string;
+  colorMode: ColorMode;
 }
 
 export interface ProductVariant {
@@ -96,7 +98,9 @@ export interface Product {
   basePrice: number;
   thumbnailUrl: string;
   editorRules: EditorRules;
+  exportRules: ExportRules;
   variants: ProductVariant[];
   createdAt: string;
   updatedAt: string;
 }
+

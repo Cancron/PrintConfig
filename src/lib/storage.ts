@@ -1,4 +1,4 @@
-import type { EditorRules, Product } from '../types';
+import type { EditorRules, ExportRules, Product } from '../types';
 
 const STORAGE_KEY = 'print-config-products';
 
@@ -23,12 +23,31 @@ export function createDefaultEditorRules(): EditorRules {
   return { ...defaultEditorRules };
 }
 
+export const defaultExportRules: ExportRules = {
+  format: 'PDF',
+  dpi: 300,
+  includeBleed: true,
+  flattenOutput: true,
+  transparentBackground: false,
+  backgroundColor: '#ffffff',
+  filenameTemplate: '{orderId}_{sku}_{surface}',
+  colorMode: 'RGB',
+};
+
+export function createDefaultExportRules(): ExportRules {
+  return { ...defaultExportRules };
+}
+
 export function normalizeProduct(product: Product): Product {
   return {
     ...product,
     editorRules: {
       ...defaultEditorRules,
       ...(product.editorRules ?? {}),
+    },
+    exportRules: {
+      ...defaultExportRules,
+      ...(product.exportRules ?? {}),
     },
   };
 }
@@ -65,6 +84,7 @@ function seedProducts(): Product[] {
       basePrice: 49.99,
       thumbnailUrl: 'https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg?auto=compress&cs=tinysrgb&w=400',
       editorRules: createDefaultEditorRules(),
+      exportRules: createDefaultExportRules(),
       createdAt: now,
       updatedAt: now,
       variants: [
@@ -117,6 +137,7 @@ function seedProducts(): Product[] {
       basePrice: 19.99,
       thumbnailUrl: 'https://images.pexels.com/photos/1287145/pexels-photo-1287145.jpeg?auto=compress&cs=tinysrgb&w=400',
       editorRules: createDefaultEditorRules(),
+      exportRules: createDefaultExportRules(),
       createdAt: now,
       updatedAt: now,
       variants: [
@@ -157,6 +178,7 @@ function seedProducts(): Product[] {
       basePrice: 24.99,
       thumbnailUrl: 'https://images.pexels.com/photos/991509/pexels-photo-991509.jpeg?auto=compress&cs=tinysrgb&w=400',
       editorRules: createDefaultEditorRules(),
+      exportRules: createDefaultExportRules(),
       createdAt: now,
       updatedAt: now,
       variants: [
@@ -203,3 +225,5 @@ function seedProducts(): Product[] {
   saveProducts(products);
   return products;
 }
+
+

@@ -10,6 +10,7 @@ import { BasicInfoTab } from '../components/product/BasicInfoTab';
 import { VariantsTab } from '../components/product/VariantsTab';
 import { SurfacesTab } from '../components/product/SurfacesTab';
 import { EditorRulesTab } from '../components/product/EditorRulesTab';
+import { ExportRulesTab } from '../components/product/ExportRulesTab';
 
 export function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -59,7 +60,7 @@ export function ProductDetail() {
     {
       id: 'export-rules',
       label: 'Export Rules',
-      content: <PlaceholderPanel title="Export Rules" />,
+      content: <ExportRulesTab product={product} onSave={updateProduct} />,
     },
     {
       id: 'preview',
@@ -192,4 +193,5 @@ function JsonPreviewTab({ product }: { product: Product }) {
     </div>
   );
 }
+
 

@@ -6,7 +6,7 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { useProducts } from '../hooks/useProducts';
-import { createDefaultEditorRules } from '../lib/storage';
+import { createDefaultEditorRules, createDefaultExportRules } from '../lib/storage';
 import { validateProductBasicInfo } from '../lib/validation';
 import type { Product, ProductType, ProductStatus } from '../types';
 
@@ -68,6 +68,7 @@ export function CreateProduct() {
       basePrice: Number(basePrice),
       thumbnailUrl: thumbnailUrl.trim(),
       editorRules: createDefaultEditorRules(),
+      exportRules: createDefaultExportRules(),
       variants: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -168,6 +169,7 @@ export function CreateProduct() {
     </div>
   );
 }
+
 
 
 
