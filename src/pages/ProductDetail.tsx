@@ -9,6 +9,7 @@ import { getProductReadiness } from '../lib/validation';
 import { BasicInfoTab } from '../components/product/BasicInfoTab';
 import { VariantsTab } from '../components/product/VariantsTab';
 import { SurfacesTab } from '../components/product/SurfacesTab';
+import { EditorRulesTab } from '../components/product/EditorRulesTab';
 
 export function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -53,7 +54,7 @@ export function ProductDetail() {
     {
       id: 'editor-rules',
       label: 'Editor Rules',
-      content: <PlaceholderPanel title="Editor Rules" />,
+      content: <EditorRulesTab product={product} onSave={updateProduct} />,
     },
     {
       id: 'export-rules',
@@ -191,3 +192,4 @@ function JsonPreviewTab({ product }: { product: Product }) {
     </div>
   );
 }
+

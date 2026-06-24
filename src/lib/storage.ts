@@ -1,12 +1,44 @@
-import type { Product } from '../types';
+import type { EditorRules, Product } from '../types';
 
 const STORAGE_KEY = 'print-config-products';
+
+export const defaultEditorRules: EditorRules = {
+  allowImageUpload: true,
+  allowAddText: true,
+  allowClipart: false,
+  allowBackgroundColor: true,
+  allowBackgroundImage: false,
+  allowCrop: true,
+  allowRotate: true,
+  allowDeleteObjects: true,
+  allowLayersPanel: true,
+  maxImageCount: 10,
+  maxTextCount: 20,
+  minimumDpiWarning: 150,
+  minimumDpiBlock: 72,
+  requirePlaceholdersFilled: true,
+};
+
+export function createDefaultEditorRules(): EditorRules {
+  return { ...defaultEditorRules };
+}
+
+export function normalizeProduct(product: Product): Product {
+  return {
+    ...product,
+    editorRules: {
+      ...defaultEditorRules,
+      ...(product.editorRules ?? {}),
+    },
+  };
+}
 
 export function loadProducts(): Product[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      return JSON.parse(raw);
+      const products = JSON.parse(raw) as Product[];
+      return products.map(normalizeProduct);
     }
   } catch {
     // ignore
@@ -15,7 +47,7 @@ export function loadProducts(): Product[] {
 }
 
 export function saveProducts(products: Product[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(products.map(normalizeProduct)));
 }
 
 function seedProducts(): Product[] {
@@ -32,6 +64,7 @@ function seedProducts(): Product[] {
       status: 'Active',
       basePrice: 49.99,
       thumbnailUrl: 'https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg?auto=compress&cs=tinysrgb&w=400',
+      editorRules: createDefaultEditorRules(),
       createdAt: now,
       updatedAt: now,
       variants: [
@@ -83,6 +116,7 @@ function seedProducts(): Product[] {
       status: 'Active',
       basePrice: 19.99,
       thumbnailUrl: 'https://images.pexels.com/photos/1287145/pexels-photo-1287145.jpeg?auto=compress&cs=tinysrgb&w=400',
+      editorRules: createDefaultEditorRules(),
       createdAt: now,
       updatedAt: now,
       variants: [
@@ -122,6 +156,7 @@ function seedProducts(): Product[] {
       status: 'Draft',
       basePrice: 24.99,
       thumbnailUrl: 'https://images.pexels.com/photos/991509/pexels-photo-991509.jpeg?auto=compress&cs=tinysrgb&w=400',
+      editorRules: createDefaultEditorRules(),
       createdAt: now,
       updatedAt: now,
       variants: [

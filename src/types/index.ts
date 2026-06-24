@@ -44,18 +44,20 @@ export interface ProductSurface {
 }
 
 export interface EditorRules {
-  id: string;
-  productId: string;
-  minZoom: number;
-  maxZoom: number;
-  allowRotation: boolean;
-  allowText: boolean;
-  allowImages: boolean;
-  allowShapes: boolean;
-  defaultTextColor: string;
-  defaultFontFamily: string;
-  createdAt: string;
-  updatedAt: string;
+  allowImageUpload: boolean;
+  allowAddText: boolean;
+  allowClipart: boolean;
+  allowBackgroundColor: boolean;
+  allowBackgroundImage: boolean;
+  allowCrop: boolean;
+  allowRotate: boolean;
+  allowDeleteObjects: boolean;
+  allowLayersPanel: boolean;
+  maxImageCount: number;
+  maxTextCount: number;
+  minimumDpiWarning: number;
+  minimumDpiBlock: number;
+  requirePlaceholdersFilled: boolean;
 }
 
 export interface ExportRules {
@@ -93,6 +95,7 @@ export interface Product {
   status: ProductStatus;
   basePrice: number;
   thumbnailUrl: string;
+  editorRules: EditorRules;
   variants: ProductVariant[];
   createdAt: string;
   updatedAt: string;
