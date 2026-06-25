@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { Product } from '../types';
 import { loadProducts, saveProducts } from '../lib/storage';
+import { cloneProductConfiguration } from '../lib/productConfig';
 
 export function useProducts() {
   const [products, setProducts] = useState<Product[]>(() => loadProducts());
@@ -23,43 +24,16 @@ export function useProducts() {
     setProducts((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
-  const duplicateProduct = useCallback((id: string) => {
-    setProducts((prev) => {
-      const source = prev.find((p) => p.id === id);
-      if (!source) return prev;
-
-      const now = new Date().toISOString();
-      const productId = `p-${Date.now()}`;
-      const copy: Product = {
-        ...source,
-        id: productId,
-        name: `${source.name} (Copy)`,
-        slug: `${source.slug}-copy`,
-        status: 'Draft',
-        createdAt: now,
-        updatedAt: now,
-        variants: source.variants.map((variant) => {
-          const variantId = `v-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-          return {
-            ...variant,
-            id: variantId,
-            productId,
-            status: 'Draft',
-            createdAt: now,
-            updatedAt: now,
-            surfaces: variant.surfaces.map((surface) => ({
-              ...surface,
-              id: `s-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-              variantId,
-              createdAt: now,
-              updatedAt: now,
-            })),
-          };
-        }),
-      };
-      return [...prev, copy];
-    });
-  }, []);
+  const duplicateProduct = useCallback(
+    (id: string) => {
+      const source = products.find((p) => p.id === id);
+      if (!source) return null;
+      const copy = cloneProductConfiguration(source, true);
+      setProducts((prev) => [...prev, copy]);
+      return copy.id;
+    },
+    [products]
+  );
 
   return { products, addProduct, updateProduct, deleteProduct, duplicateProduct };
 }
