@@ -8,6 +8,27 @@ export type ProductType =
   | 'Sticker';
 
 export type ProductStatus = 'Draft' | 'Active';
+export type MerchantStatus = 'Draft' | 'Active';
+export type ProductScope = 'shared' | 'merchant';
+
+export interface Account {
+  id: string;
+  name: string;
+}
+
+export interface Merchant {
+  id: string;
+  accountId: string;
+  name: string;
+  slug: string;
+  logoUrl: string;
+  status: MerchantStatus;
+  editorPrimaryColor: string;
+  editorSecondaryColor: string;
+  editorAccentColor: string;
+  customCss: string;
+  customJavascript: string;
+}
 
 export interface BleedSettings {
   top: number;
@@ -117,7 +138,9 @@ export interface ProductVariant {
 
 export interface Product {
   id: string;
-  merchantId: string;
+  accountId: string;
+  merchantId?: string | null;
+  scope: ProductScope;
   name: string;
   slug: string;
   description: string;
@@ -132,5 +155,3 @@ export interface Product {
   createdAt: string;
   updatedAt: string;
 }
-
-

@@ -4,6 +4,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Products } from './pages/Products';
 import { CreateProduct } from './pages/CreateProduct';
 import { ProductDetail } from './pages/ProductDetail';
+import { MerchantSettings } from './pages/MerchantSettings';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
           <Route path="/products" element={<Products />} />
           <Route path="/products/new" element={<CreateProduct />} />
           <Route path="/products/:id" element={<ProductDetail />} />
+          <Route path="/merchant-settings" element={<MerchantSettings />} />
         </Routes>
       </Layout>
     </BrowserRouter>

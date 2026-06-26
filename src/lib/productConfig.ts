@@ -1,6 +1,7 @@
 import { createDefaultEditorRules, createDefaultExportRules } from './storage';
 import type {
   Product,
+  ProductScope,
   ProductStatus,
   ProductSurface,
   ProductTemplate,
@@ -19,7 +20,7 @@ const PRODUCT_TYPES: ProductType[] = [
   'Sticker',
 ];
 
-export function cloneProductConfiguration(source: Product, addCopySuffix = false): Product {
+export function cloneProductConfiguration(source: Product, options: { addCopySuffix?: boolean; accountId?: string; scope?: ProductScope; merchantId?: string | null } = {}): Product {
   const now = new Date().toISOString();
   const productId = createId('p');
   const variantMap = new Map<string, string>();
@@ -27,13 +28,17 @@ export function cloneProductConfiguration(source: Product, addCopySuffix = false
 
   const variants = source.variants.map((variant) => cloneVariant(variant, productId, now, variantMap, surfaceMap));
   const templates = (source.templates ?? []).map((template) => cloneTemplate(template, productId, now, variantMap, surfaceMap));
-  const name = addCopySuffix ? `${source.name} Copy` : source.name;
+  const name = options.addCopySuffix ? `${source.name} Copy` : source.name;
+  const scope = options.scope ?? source.scope ?? 'merchant';
 
   return {
     ...source,
     id: productId,
     name,
     slug: createSlug(name),
+    accountId: options.accountId ?? source.accountId,
+    scope,
+    merchantId: scope === 'shared' ? null : options.merchantId ?? source.merchantId ?? null,
     status: 'Draft',
     editorRules: { ...createDefaultEditorRules(), ...(source.editorRules ?? {}) },
     exportRules: { ...createDefaultExportRules(), ...(source.exportRules ?? {}) },
@@ -44,7 +49,7 @@ export function cloneProductConfiguration(source: Product, addCopySuffix = false
   };
 }
 
-export function parseImportedProduct(json: string): { product?: Product; error?: string } {
+export function parseImportedProduct(json: string, options: { accountId: string; scope: ProductScope; merchantId?: string | null }): { product?: Product; error?: string } {
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
@@ -59,7 +64,7 @@ export function parseImportedProduct(json: string): { product?: Product; error?:
   }
   if (!Array.isArray(parsed.variants)) return { error: 'Variants are required.' };
 
-  return { product: cloneProductConfiguration(buildImportCandidate(parsed)) };
+  return { product: cloneProductConfiguration(buildImportCandidate(parsed), options) };
 }
 
 function cloneVariant(
@@ -113,6 +118,8 @@ function buildImportCandidate(input: Record<string, unknown>): Product {
 
   return {
     id,
+    accountId: typeof input.accountId === 'string' ? input.accountId : 'acct-1',
+    scope: input.scope === 'shared' ? 'shared' : 'merchant',
     merchantId: typeof input.merchantId === 'string' ? input.merchantId : 'm1',
     name: input.name as string,
     slug: typeof input.slug === 'string' ? input.slug : createSlug(input.name as string),
@@ -230,3 +237,7 @@ function createSlug(value: string) {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+
+
+
+
