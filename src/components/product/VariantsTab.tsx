@@ -1,50 +1,60 @@
 import { useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, X, Check } from 'lucide-react';
+import { Check, Eye, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { SurfacePreview } from './SurfacePreview';
 import { Badge } from '../ui/Badge';
+import { EmptyState } from '../ui/EmptyState';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
-import { EmptyState } from '../ui/EmptyState';
-import { validateVariant } from '../../lib/validation';
-import type { Product, ProductVariant, ProductStatus } from '../../types';
+import { toPixels, validateVariant } from '../../lib/validation';
+import type { Product, ProductStatus, ProductUnit, ProductVariant } from '../../types';
 
 interface Props {
   product: Product;
   onSave: (product: Product) => void;
 }
 
-const statusOptions = [
+const statusOptions: { value: ProductStatus; label: string }[] = [
   { value: 'Draft', label: 'Draft' },
   { value: 'Active', label: 'Active' },
+];
+
+const unitOptions: { value: ProductUnit; label: string }[] = [
+  { value: 'inch', label: 'inch' },
+  { value: 'mm', label: 'mm' },
+  { value: 'px', label: 'px' },
 ];
 
 export function VariantsTab({ product, onSave }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-
-  const [form, setForm] = useState<{
-    name: string;
-    sku: string;
-    price: string;
-    status: ProductStatus;
-    options: { key: string; value: string }[];
-  }>({
+  const [previewVariant, setPreviewVariant] = useState<ProductVariant | null>(null);
+  const [form, setForm] = useState({
     name: '',
     sku: '',
     price: '',
-    status: 'Draft',
+    status: 'Draft' as ProductStatus,
+    width: '',
+    height: '',
+    unit: 'inch' as ProductUnit,
+    dpi: '300',
+    previewImageUrl: '',
+    thumbnailImageUrl: '',
     options: [{ key: '', value: '' }],
   });
 
   const errors = useMemo(
-    () =>
-      validateVariant({
-        id: editingId,
-        name: form.name,
-        sku: form.sku,
-        price: form.price,
-        existingSkus: product.variants.map((variant) => ({ id: variant.id, sku: variant.sku })),
-      }),
-    [editingId, form.name, form.price, form.sku, product.variants]
+    () => validateVariant({
+      id: editingId,
+      name: form.name,
+      sku: form.sku,
+      price: form.price,
+      width: form.width,
+      height: form.height,
+      unit: form.unit,
+      dpi: form.dpi,
+      existingSkus: product.variants.map((variant) => ({ id: variant.id, sku: variant.sku })),
+    }),
+    [editingId, form.dpi, form.height, form.name, form.price, form.sku, form.unit, form.width, product.variants]
   );
   const isValid = Object.keys(errors).length === 0;
 
@@ -54,6 +64,12 @@ export function VariantsTab({ product, onSave }: Props) {
       sku: '',
       price: '',
       status: 'Draft',
+      width: '',
+      height: '',
+      unit: 'inch',
+      dpi: '300',
+      previewImageUrl: '',
+      thumbnailImageUrl: '',
       options: [{ key: '', value: '' }],
     });
   }
@@ -70,7 +86,13 @@ export function VariantsTab({ product, onSave }: Props) {
       sku: variant.sku,
       price: String(variant.price),
       status: variant.status,
-      options: Object.entries(variant.options).map(([key, value]) => ({ key, value })),
+      width: String(variant.width),
+      height: String(variant.height),
+      unit: variant.unit,
+      dpi: String(variant.dpi),
+      previewImageUrl: variant.previewImageUrl,
+      thumbnailImageUrl: variant.thumbnailImageUrl,
+      options: Object.entries(variant.options).length > 0 ? Object.entries(variant.options).map(([key, value]) => ({ key, value })) : [{ key: '', value: '' }],
     });
     setEditingId(variant.id);
     setIsAdding(false);
@@ -83,37 +105,26 @@ export function VariantsTab({ product, onSave }: Props) {
   }
 
   function addOptionField() {
-    setForm((prev) => ({
-      ...prev,
-      options: [...prev.options, { key: '', value: '' }],
-    }));
+    setForm((prev) => ({ ...prev, options: [...prev.options, { key: '', value: '' }] }));
   }
 
   function removeOptionField(index: number) {
-    setForm((prev) => ({
-      ...prev,
-      options: prev.options.filter((_, i) => i !== index),
-    }));
+    setForm((prev) => ({ ...prev, options: prev.options.filter((_, i) => i !== index) }));
   }
 
   function updateOption(index: number, field: 'key' | 'value', value: string) {
-    setForm((prev) => ({
-      ...prev,
-      options: prev.options.map((opt, i) => (i === index ? { ...opt, [field]: value } : opt)),
-    }));
+    setForm((prev) => ({ ...prev, options: prev.options.map((opt, i) => (i === index ? { ...opt, [field]: value } : opt)) }));
   }
 
   function handleSave() {
     if (!isValid) return;
-
     const options: Record<string, string> = {};
     for (const opt of form.options) {
-      if (opt.key.trim()) {
-        options[opt.key.trim()] = opt.value.trim();
-      }
+      if (opt.key.trim()) options[opt.key.trim()] = opt.value.trim();
     }
 
     const now = new Date().toISOString();
+    const existing = product.variants.find((variant) => variant.id === editingId);
     const variant: ProductVariant = {
       id: editingId ?? `v-${Date.now()}`,
       productId: product.id,
@@ -122,209 +133,111 @@ export function VariantsTab({ product, onSave }: Props) {
       price: Number(form.price),
       status: form.status,
       options,
-      surfaces: editingId ? product.variants.find((v) => v.id === editingId)?.surfaces ?? [] : [],
-      createdAt: editingId ? (product.variants.find((v) => v.id === editingId)?.createdAt ?? now) : now,
+      width: Number(form.width),
+      height: Number(form.height),
+      unit: form.unit,
+      dpi: Number(form.dpi),
+      previewImageUrl: form.previewImageUrl.trim(),
+      thumbnailImageUrl: form.thumbnailImageUrl.trim(),
+      createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
 
-    let nextVariants: ProductVariant[];
-    if (editingId) {
-      nextVariants = product.variants.map((v) => (v.id === editingId ? variant : v));
-    } else {
-      nextVariants = [...product.variants, variant];
-    }
-
-    onSave({ ...product, variants: nextVariants });
+    const variants = editingId ? product.variants.map((item) => (item.id === editingId ? variant : item)) : [...product.variants, variant];
+    onSave({ ...product, variants, updatedAt: now });
     cancelEdit();
   }
 
   function handleDelete(id: string) {
     if (!confirm('Are you sure you want to delete this variant?')) return;
-    onSave({
-      ...product,
-      variants: product.variants.filter((v) => v.id !== id),
-    });
+    const now = new Date().toISOString();
+    onSave({ ...product, variants: product.variants.filter((variant) => variant.id !== id), updatedAt: now });
   }
 
   const isFormOpen = isAdding || editingId !== null;
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
+    <div className="space-y-6 pb-6">
+      <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium text-gray-900">Variants</h2>
         {!isFormOpen && (
-          <button
-            onClick={startAdd}
-            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            Add Variant
+          <button onClick={startAdd} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800">
+            <Plus className="h-4 w-4" /> Add Variant
           </button>
         )}
       </div>
 
       {isFormOpen && (
-        <div className="bg-gray-50 rounded-lg p-4 mb-6 ring-1 ring-gray-200">
-          <h3 className="text-sm font-medium text-gray-900 mb-4">
-            {editingId ? 'Edit Variant' : 'New Variant'}
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <Input
-              label="Variant Name"
-              value={form.name}
-              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-              error={errors.name}
-              placeholder="e.g. Small Portrait"
-            />
-            <Input
-              label="SKU"
-              value={form.sku}
-              onChange={(e) => setForm((p) => ({ ...p, sku: e.target.value }))}
-              error={errors.sku}
-              placeholder="e.g. CP-S-P"
-            />
-            <Input
-              label="Price"
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.price}
-              onChange={(e) => setForm((p) => ({ ...p, price: e.target.value }))}
-              error={errors.price}
-              placeholder="0.00"
-            />
-            <Select
-              label="Status"
-              value={form.status}
-              onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as ProductStatus }))}
-              options={statusOptions}
-            />
+        <div className="rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200">
+          <h3 className="mb-4 text-sm font-medium text-gray-900">{editingId ? 'Edit Variant' : 'New Variant'}</h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Input label="Variant Name" value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} error={errors.name} placeholder="e.g. 16x20 Canvas" />
+            <Input label="SKU" value={form.sku} onChange={(event) => setForm((prev) => ({ ...prev, sku: event.target.value }))} error={errors.sku} placeholder="e.g. CANVAS-16X20" />
+            <Input label="Price" type="number" step="0.01" min="0" value={form.price} onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))} error={errors.price} placeholder="0.00" />
+            <Select label="Status" value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value as ProductStatus }))} options={statusOptions} />
+            <Input label="Width" type="number" step="0.01" min="0" value={form.width} onChange={(event) => setForm((prev) => ({ ...prev, width: event.target.value }))} error={errors.width} />
+            <Input label="Height" type="number" step="0.01" min="0" value={form.height} onChange={(event) => setForm((prev) => ({ ...prev, height: event.target.value }))} error={errors.height} />
+            <Select label="Unit" value={form.unit} onChange={(event) => setForm((prev) => ({ ...prev, unit: event.target.value as ProductUnit }))} options={unitOptions} error={errors.unit} />
+            <Input label="DPI" type="number" min="1" value={form.dpi} onChange={(event) => setForm((prev) => ({ ...prev, dpi: event.target.value }))} error={errors.dpi} />
+            <Input label="Preview Image URL" type="url" value={form.previewImageUrl} onChange={(event) => setForm((prev) => ({ ...prev, previewImageUrl: event.target.value }))} placeholder="https://..." />
+            <Input label="Thumbnail Image URL" type="url" value={form.thumbnailImageUrl} onChange={(event) => setForm((prev) => ({ ...prev, thumbnailImageUrl: event.target.value }))} placeholder="https://..." />
           </div>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Options</label>
+          <div className="mt-5">
+            <label className="mb-2 block text-sm font-medium text-gray-700">Options</label>
             <div className="space-y-2">
-              {form.options.map((opt, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    placeholder="Key (e.g. size)"
-                    value={opt.key}
-                    onChange={(e) => updateOption(idx, 'key', e.target.value)}
-                    className="flex-1 rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Value (e.g. 16x20)"
-                    value={opt.value}
-                    onChange={(e) => updateOption(idx, 'value', e.target.value)}
-                    className="flex-1 rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm"
-                  />
-                  {form.options.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeOptionField(idx)}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
+              {form.options.map((opt, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <input type="text" placeholder="Key (e.g. size)" value={opt.key} onChange={(event) => updateOption(index, 'key', event.target.value)} className="flex-1 rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm" />
+                  <input type="text" placeholder="Value (e.g. 16x20)" value={opt.value} onChange={(event) => updateOption(index, 'value', event.target.value)} className="flex-1 rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm" />
+                  {form.options.length > 1 && <button type="button" onClick={() => removeOptionField(index)} className="rounded-md p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>}
                 </div>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={addOptionField}
-              className="mt-2 text-sm text-slate-700 hover:text-slate-900 font-medium"
-            >
-              + Add option
-            </button>
+            <button type="button" onClick={addOptionField} className="mt-2 text-sm font-medium text-slate-700 hover:text-slate-900">+ Add option</button>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleSave}
-              disabled={!isValid}
-              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              <Check className="h-4 w-4" />
-              Save Variant
-            </button>
-            <button
-              onClick={cancelEdit}
-              className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors"
-            >
-              <X className="h-4 w-4" />
-              Cancel
-            </button>
+          <div className="mt-5 flex items-center gap-3">
+            <button onClick={handleSave} disabled={!isValid} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"><Check className="h-4 w-4" /> Save Variant</button>
+            <button onClick={cancelEdit} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 transition-colors hover:bg-gray-50"><X className="h-4 w-4" /> Cancel</button>
           </div>
         </div>
       )}
 
       {product.variants.length === 0 ? (
-        <EmptyState
-          title="No variants yet"
-          description="Add your first variant to this product."
-          action={
-            <button
-              onClick={startAdd}
-              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Add Variant
-            </button>
-          }
-        />
+        <EmptyState title="No variants yet" description="Add your first variant to this product." action={<button onClick={startAdd} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"><Plus className="h-4 w-4" /> Add Variant</button>} />
       ) : (
-        <div className="overflow-x-auto ring-1 ring-gray-200 rounded-lg">
+        <div className="overflow-x-auto rounded-lg ring-1 ring-gray-200">
           <table className="min-w-full divide-y divide-gray-200 text-left">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">SKU</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Price</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Options</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Image</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Name</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">SKU</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Price</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Size</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Pixels</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Options</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
               {product.variants.map((variant) => (
                 <tr key={variant.id}>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{variant.name}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{variant.sku}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">${variant.price.toFixed(2)}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                    <Badge status={variant.status} />
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">
-                    <div className="flex flex-wrap gap-1">
-                      {Object.entries(variant.options).map(([key, value]) => (
-                        <span
-                          key={key}
-                          className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10"
-                        >
-                          {key}: {value}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
+                  <td className="px-4 py-3">{variant.thumbnailImageUrl ? <img src={variant.thumbnailImageUrl} alt={variant.name} className="h-10 w-10 rounded-md object-cover ring-1 ring-gray-200" /> : <div className="h-10 w-10 rounded-md bg-gray-100 ring-1 ring-gray-200" />}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">{variant.name}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{variant.sku}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">${variant.price.toFixed(2)}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700"><Badge status={variant.status} /></td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{variant.width} x {variant.height} {variant.unit} at {variant.dpi} DPI</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{Math.round(toPixels(variant.width, variant.unit, variant.dpi))} x {Math.round(toPixels(variant.height, variant.unit, variant.dpi))} px</td>
+                  <td className="px-4 py-3 text-sm text-gray-700"><div className="flex flex-wrap gap-1">{Object.entries(variant.options).map(([key, value]) => <span key={key} className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">{key}: {value}</span>)}</div></td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
                     <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => startEdit(variant)}
-                        className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
-                        title="Edit"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(variant.id)}
-                        className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <button onClick={() => setPreviewVariant(variant)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900" title="Preview"><Eye className="h-4 w-4" /></button>
+                      <button onClick={() => startEdit(variant)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900" title="Edit"><Pencil className="h-4 w-4" /></button>
+                      <button onClick={() => handleDelete(variant.id)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Delete"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   </td>
                 </tr>
@@ -333,6 +246,45 @@ export function VariantsTab({ product, onSave }: Props) {
           </table>
         </div>
       )}
+
+      {previewVariant && <VariantPreviewModal product={product} variant={previewVariant} onClose={() => setPreviewVariant(null)} />}
     </div>
   );
+}
+
+function VariantPreviewModal({ product, variant, onClose }: { product: Product; variant: ProductVariant; onClose: () => void }) {
+  const trimWidthPx = Math.round(toPixels(variant.width, variant.unit, variant.dpi));
+  const trimHeightPx = Math.round(toPixels(variant.height, variant.unit, variant.dpi));
+  const bleed = product.surface?.bleed;
+  const totalWidthPx = Math.round(trimWidthPx + (bleed ? toPixels(bleed.left + bleed.right, bleed.unit, variant.dpi) : 0));
+  const totalHeightPx = Math.round(trimHeightPx + (bleed ? toPixels(bleed.top + bleed.bottom, bleed.unit, variant.dpi) : 0));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-lg bg-white shadow-xl ring-1 ring-gray-200">
+        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+          <div><h3 className="text-lg font-semibold text-gray-900">{variant.name}</h3><p className="mt-1 text-sm text-gray-500">{variant.sku} · {variant.width} x {variant.height} {variant.unit} · {variant.dpi} DPI</p></div>
+          <button type="button" onClick={onClose} className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-2">
+          <div className="flex min-h-80 items-center justify-center rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200">
+            <SurfacePreview surface={product.surface} variant={variant} size={320} />
+          </div>
+          <div className="space-y-4">
+            {!product.surface && <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-800 ring-1 ring-inset ring-amber-200">Surface configuration is missing, so bleed and safe area cannot be previewed.</div>}
+            {variant.previewImageUrl && <img src={variant.previewImageUrl} alt={variant.name} className="max-h-52 w-full rounded-lg object-cover ring-1 ring-gray-200" />}
+            <dl className="space-y-2 text-sm">
+              <SummaryRow label="Trim area" value={`${trimWidthPx} x ${trimHeightPx} px`} />
+              <SummaryRow label="Export with bleed" value={`${totalWidthPx} x ${totalHeightPx} px`} />
+              <SummaryRow label="Surface" value={product.surface ? `${product.surface.name} (${product.surface.code})` : 'Missing'} />
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return <div className="flex justify-between gap-3"><dt className="text-gray-500">{label}</dt><dd className="text-right font-medium text-gray-900">{value}</dd></div>;
 }

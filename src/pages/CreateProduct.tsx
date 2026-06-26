@@ -76,6 +76,7 @@ export function CreateProduct() {
       thumbnailUrl: thumbnailUrl.trim(),
       editorRules: createDefaultEditorRules(),
       exportRules: createDefaultExportRules(),
+      surface: null,
       optionGroups: [],
       templates: [],
       variants: [],
@@ -114,5 +115,6 @@ export function CreateProduct() {
     </div>
   );
 }
+
 
 

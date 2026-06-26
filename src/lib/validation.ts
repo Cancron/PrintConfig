@@ -1,9 +1,10 @@
-import type { Product, ProductSurface, ProductType } from '../types';
+import type { Product, ProductSurface, ProductType, ProductUnit, ProductVariant } from '../types';
 
 export type ValidationErrors = Record<string, string>;
 
 const PRODUCT_TYPES: ProductType[] = [
   'Canvas Print',
+  'Metal Print',
   'Poster Print',
   'Framed Poster',
   'T-Shirt',
@@ -13,6 +14,7 @@ const PRODUCT_TYPES: ProductType[] = [
 ];
 
 const URL_SAFE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 export function validateProductBasicInfo(input: {
   name: string;
@@ -44,82 +46,78 @@ export function validateVariant(input: {
   name: string;
   sku: string;
   price: string | number;
+  width: string | number;
+  height: string | number;
+  unit: string;
+  dpi: string | number;
   existingSkus: { id: string; sku: string }[];
 }): ValidationErrors {
   const errors: ValidationErrors = {};
   const price = Number(input.price);
+  const width = Number(input.width);
+  const height = Number(input.height);
+  const dpi = Number(input.dpi);
   const sku = input.sku.trim().toLowerCase();
 
   if (!input.name.trim()) errors.name = 'Variant name is required.';
   if (!input.sku.trim()) {
     errors.sku = 'SKU is required.';
-  } else if (
-    input.existingSkus.some((item) => item.id !== input.id && item.sku.trim().toLowerCase() === sku)
-  ) {
+  } else if (input.existingSkus.some((item) => item.id !== input.id && item.sku.trim().toLowerCase() === sku)) {
     errors.sku = 'SKU must be unique within this product.';
   }
-  if (input.price === '' || Number.isNaN(price) || price < 0) {
-    errors.price = 'Price must be zero or greater.';
-  }
+  if (input.price === '' || Number.isNaN(price) || price < 0) errors.price = 'Price must be zero or greater.';
+  if (input.width === '' || Number.isNaN(width) || width <= 0) errors.width = 'Width must be greater than zero.';
+  if (input.height === '' || Number.isNaN(height) || height <= 0) errors.height = 'Height must be greater than zero.';
+  if (!isProductUnit(input.unit)) errors.unit = 'Unit is required.';
+  if (input.dpi === '' || Number.isNaN(dpi) || dpi <= 0) errors.dpi = 'DPI must be greater than zero.';
 
   return errors;
 }
 
-export function validateSurface(surface: ProductSurface): ValidationErrors {
+export function validateSurface(surface: ProductSurface, previewVariant?: Pick<ProductVariant, 'width' | 'height'> | null): ValidationErrors {
   const errors: ValidationErrors = {};
 
   if (!surface.name.trim()) errors.name = 'Surface name is required.';
-  if (!surface.code.trim()) errors.code = 'Surface code is required.';
-  if (!surface.unit) errors.unit = 'Unit is required.';
-  if (!Number.isFinite(surface.width) || surface.width <= 0) {
-    errors.width = 'Width must be greater than zero.';
+  if (!surface.code.trim()) {
+    errors.code = 'Surface code is required.';
+  } else if (!URL_SAFE_SLUG.test(surface.code.trim())) {
+    errors.code = 'Use lowercase letters, numbers, and hyphens only.';
   }
-  if (!Number.isFinite(surface.height) || surface.height <= 0) {
-    errors.height = 'Height must be greater than zero.';
-  }
-  if (!Number.isFinite(surface.dpi) || surface.dpi <= 0) {
-    errors.dpi = 'DPI must be greater than zero.';
-  }
+  if (!HEX_COLOR.test(surface.backgroundColor)) errors.backgroundColor = 'Use a valid hex color, like #ffffff.';
 
   const bleedEntries = Object.entries(surface.bleed) as [keyof ProductSurface['bleed'], number | string][];
   for (const [key, value] of bleedEntries) {
-    if (key !== 'unit' && Number(value) < 0) {
-      errors[`bleed.${key}`] = 'Bleed cannot be negative.';
-    }
+    if (key === 'unit') continue;
+    if (!Number.isFinite(Number(value)) || Number(value) < 0) errors[`bleed.${key}`] = 'Bleed cannot be negative.';
   }
 
   const safeEntries = Object.entries(surface.safeArea) as [keyof ProductSurface['safeArea'], number | string][];
   for (const [key, value] of safeEntries) {
-    if (key !== 'unit' && Number(value) < 0) {
-      errors[`safeArea.${key}`] = 'Safe area cannot be negative.';
-    }
+    if (key === 'unit') continue;
+    if (!Number.isFinite(Number(value)) || Number(value) < 0) errors[`safeArea.${key}`] = 'Safe area cannot be negative.';
   }
 
-  if (surface.width > 0) {
-    const maxHorizontal = surface.width / 2;
-    if (surface.safeArea.left > maxHorizontal) {
-      errors['safeArea.left'] = 'Safe area cannot exceed half the width.';
-    }
-    if (surface.safeArea.right > maxHorizontal) {
-      errors['safeArea.right'] = 'Safe area cannot exceed half the width.';
-    }
+  if (previewVariant?.width && previewVariant.width > 0) {
+    const maxHorizontal = previewVariant.width / 2;
+    if (surface.safeArea.left > maxHorizontal) errors['safeArea.left'] = 'Safe area cannot exceed half the selected variant width.';
+    if (surface.safeArea.right > maxHorizontal) errors['safeArea.right'] = 'Safe area cannot exceed half the selected variant width.';
   }
 
-  if (surface.height > 0) {
-    const maxVertical = surface.height / 2;
-    if (surface.safeArea.top > maxVertical) {
-      errors['safeArea.top'] = 'Safe area cannot exceed half the height.';
-    }
-    if (surface.safeArea.bottom > maxVertical) {
-      errors['safeArea.bottom'] = 'Safe area cannot exceed half the height.';
-    }
+  if (previewVariant?.height && previewVariant.height > 0) {
+    const maxVertical = previewVariant.height / 2;
+    if (surface.safeArea.top > maxVertical) errors['safeArea.top'] = 'Safe area cannot exceed half the selected variant height.';
+    if (surface.safeArea.bottom > maxVertical) errors['safeArea.bottom'] = 'Safe area cannot exceed half the selected variant height.';
   }
 
   return errors;
 }
 
-export function surfaceHasValidDimensions(surface: ProductSurface) {
-  return Object.keys(validateSurface(surface)).length === 0;
+export function surfaceHasValidSettings(surface: ProductSurface | null, previewVariant?: Pick<ProductVariant, 'width' | 'height'> | null) {
+  return !!surface && Object.keys(validateSurface(surface, previewVariant)).length === 0;
+}
+
+export function variantHasValidDimensions(variant: ProductVariant) {
+  return variant.width > 0 && variant.height > 0 && isProductUnit(variant.unit) && variant.dpi > 0;
 }
 
 export function getProductReadiness(product: Product) {
@@ -131,28 +129,46 @@ export function getProductReadiness(product: Product) {
     basePrice: product.basePrice,
   });
   const activeVariants = product.variants.filter((variant) => variant.status === 'Active');
-  const activeVariantsHaveSurfaces = activeVariants.every((variant) => variant.surfaces.length > 0);
-  const allSurfacesValid = product.variants.every((variant) =>
-    variant.surfaces.every(surfaceHasValidDimensions)
-  );
+  const activeVariantsHaveDimensions = activeVariants.every(variantHasValidDimensions);
+  const previewVariant = activeVariants[0] ?? product.variants[0] ?? null;
+  const hasSurface = !!product.surface;
+  const surfaceValid = hasSurface && surfaceHasValidSettings(product.surface, previewVariant);
+  const hasExportRules = !!product.exportRules;
+  const hasEditorRules = !!product.editorRules;
 
   if (Object.keys(basicErrors).length > 0) missing.push('Complete valid product name, slug, type, and base price.');
   if (activeVariants.length === 0) missing.push('Add at least one active variant.');
-  if (!activeVariantsHaveSurfaces) missing.push('Add at least one surface to every active variant.');
-  if (!allSurfacesValid) missing.push('Fix invalid surface dimensions, DPI, bleed, or safe area values.');
+  if (!activeVariantsHaveDimensions) missing.push('Add width, height, unit, and DPI to every active variant.');
+  if (!hasSurface) missing.push('Add a product surface configuration.');
+  if (hasSurface && !surfaceValid) missing.push('Fix invalid surface bleed, safe area, code, or background color settings.');
+  if (!hasExportRules) missing.push('Configure export rules.');
+  if (!hasEditorRules) missing.push('Configure editor rules.');
 
   return {
     hasBasicInfo: Object.keys(basicErrors).length === 0,
     hasActiveVariant: activeVariants.length > 0,
-    activeVariantsHaveSurfaces,
-    allSurfacesValid,
+    activeVariantsHaveDimensions,
+    hasSurface,
+    surfaceValid,
+    hasExportRules,
+    hasEditorRules,
     ready: missing.length === 0,
     missing,
   };
 }
 
-export function toPixels(value: number, unit: ProductSurface['unit'], dpi: number) {
+export function toPixels(value: number, unit: ProductUnit, dpi: number) {
   if (unit === 'px') return value;
   if (unit === 'mm') return (value / 25.4) * dpi;
   return value * dpi;
+}
+
+export function isProductUnit(value: string): value is ProductUnit {
+  return value === 'inch' || value === 'mm' || value === 'px';
+}
+
+export function normalizeUnit(value: unknown): ProductUnit {
+  if (value === 'in' || value === 'inch') return 'inch';
+  if (value === 'mm' || value === 'px') return value;
+  return 'inch';
 }

@@ -175,8 +175,11 @@ function ProductReadinessPanel({ product }: { product: Product }) {
   const checks = [
     { label: 'Has basic info', value: readiness.hasBasicInfo },
     { label: 'Has at least one active variant', value: readiness.hasActiveVariant },
-    { label: 'Each active variant has at least one surface', value: readiness.activeVariantsHaveSurfaces },
-    { label: 'All surfaces have valid dimensions', value: readiness.allSurfacesValid },
+    { label: 'Active variants have width, height, unit, and DPI', value: readiness.activeVariantsHaveDimensions },
+    { label: 'Product surface exists', value: readiness.hasSurface },
+    { label: 'Surface settings are valid', value: readiness.surfaceValid },
+    { label: 'Export rules exist', value: readiness.hasExportRules },
+    { label: 'Editor rules exist', value: readiness.hasEditorRules },
   ];
 
   return (
@@ -197,6 +200,8 @@ function JsonPreviewTab({ product }: { product: Product }) {
   const json = JSON.stringify(product, null, 2);
   return <div className="relative"><pre className="bg-slate-900 text-slate-50 rounded-lg p-4 overflow-x-auto text-sm font-mono leading-relaxed"><code>{json}</code></pre></div>;
 }
+
+
 
 
 

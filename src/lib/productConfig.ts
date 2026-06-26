@@ -1,6 +1,8 @@
 import { createDefaultEditorRules, createDefaultExportRules } from './storage';
+import { normalizeUnit } from './validation';
 import type {
   Product,
+  ProductOptionDisplayType,
   ProductOptionGroup,
   ProductOptionValue,
   ProductScope,
@@ -27,11 +29,10 @@ export function cloneProductConfiguration(source: Product, options: { addCopySuf
   const now = new Date().toISOString();
   const productId = createId('p');
   const variantMap = new Map<string, string>();
-  const surfaceMap = new Map<string, string>();
-
+  const surface = source.surface ? cloneSurface(source.surface, productId, now) : null;
   const optionGroups = (source.optionGroups ?? []).map((group) => cloneOptionGroup(group, productId, now));
-  const variants = source.variants.map((variant) => cloneVariant(variant, productId, now, variantMap, surfaceMap));
-  const templates = (source.templates ?? []).map((template) => cloneTemplate(template, productId, now, variantMap, surfaceMap));
+  const variants = source.variants.map((variant) => cloneVariant(variant, productId, now, variantMap));
+  const templates = (source.templates ?? []).map((template) => cloneTemplate(template, productId, now, variantMap, surface?.id ?? ''));
   const name = options.addCopySuffix ? `${source.name} Copy` : source.name;
   const scope = options.scope ?? source.scope ?? 'merchant';
 
@@ -44,6 +45,7 @@ export function cloneProductConfiguration(source: Product, options: { addCopySuf
     scope,
     merchantId: scope === 'shared' ? null : options.merchantId ?? source.merchantId ?? null,
     status: 'Draft',
+    surface,
     editorRules: { ...createDefaultEditorRules(), ...(source.editorRules ?? {}) },
     exportRules: { ...createDefaultExportRules(), ...(source.exportRules ?? {}) },
     optionGroups,
@@ -64,12 +66,20 @@ export function parseImportedProduct(json: string, options: { accountId: string;
 
   if (!isRecord(parsed)) return { error: 'JSON must describe a product object.' };
   if (typeof parsed.name !== 'string' || !parsed.name.trim()) return { error: 'Product name is required.' };
-  if (typeof parsed.productType !== 'string' || !PRODUCT_TYPES.includes(parsed.productType as ProductType)) {
-    return { error: 'Product type is required and must be valid.' };
-  }
+  if (typeof parsed.productType !== 'string' || !PRODUCT_TYPES.includes(parsed.productType as ProductType)) return { error: 'Product type is required and must be valid.' };
   if (!Array.isArray(parsed.variants)) return { error: 'Variants are required.' };
 
   return { product: cloneProductConfiguration(buildImportCandidate(parsed), options) };
+}
+
+function cloneSurface(surface: ProductSurface, productId: string, now: string): ProductSurface {
+  return {
+    ...surface,
+    id: createId('s'),
+    productId,
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 function cloneOptionGroup(group: ProductOptionGroup, productId: string, now: string): ProductOptionGroup {
@@ -90,44 +100,26 @@ function cloneOptionGroup(group: ProductOptionGroup, productId: string, now: str
   };
 }
 
-function cloneVariant(
-  variant: ProductVariant,
-  productId: string,
-  now: string,
-  variantMap: Map<string, string>,
-  surfaceMap: Map<string, string>
-): ProductVariant {
+function cloneVariant(variant: ProductVariant, productId: string, now: string, variantMap: Map<string, string>): ProductVariant {
   const variantId = createId('v');
   variantMap.set(variant.id, variantId);
-
   return {
     ...variant,
     id: variantId,
     productId,
     status: 'Draft',
-    surfaces: variant.surfaces.map((surface) => {
-      const surfaceId = createId('s');
-      surfaceMap.set(surface.id, surfaceId);
-      return { ...surface, id: surfaceId, variantId, createdAt: now, updatedAt: now };
-    }),
     createdAt: now,
     updatedAt: now,
   };
 }
 
-function cloneTemplate(
-  template: ProductTemplate,
-  productId: string,
-  now: string,
-  variantMap: Map<string, string>,
-  surfaceMap: Map<string, string>
-): ProductTemplate {
+function cloneTemplate(template: ProductTemplate, productId: string, now: string, variantMap: Map<string, string>, surfaceId: string): ProductTemplate {
   return {
     ...template,
     id: createId('tpl'),
     productId,
     variantId: variantMap.get(template.variantId) ?? '',
-    surfaceId: surfaceMap.get(template.surfaceId) ?? '',
+    surfaceId,
     status: 'Draft',
     elements: template.elements.map((element) => ({ ...element, id: createId('el') })),
     createdAt: now,
@@ -138,6 +130,9 @@ function cloneTemplate(
 function buildImportCandidate(input: Record<string, unknown>): Product {
   const now = new Date().toISOString();
   const id = typeof input.id === 'string' ? input.id : createId('import');
+  const variants = (input.variants as unknown[]).filter(isRecord);
+  const surfaceSource = isRecord(input.surface) ? input.surface : findLegacySurface(variants);
+  const surface = surfaceSource ? normalizeSurface(surfaceSource, id, now, 0) : null;
 
   return {
     id,
@@ -151,11 +146,37 @@ function buildImportCandidate(input: Record<string, unknown>): Product {
     status: 'Draft',
     basePrice: typeof input.basePrice === 'number' ? input.basePrice : 0,
     thumbnailUrl: typeof input.thumbnailUrl === 'string' ? input.thumbnailUrl : '',
+    surface,
     editorRules: isRecord(input.editorRules) ? { ...createDefaultEditorRules(), ...input.editorRules } : createDefaultEditorRules(),
     exportRules: isRecord(input.exportRules) ? { ...createDefaultExportRules(), ...input.exportRules } : createDefaultExportRules(),
     optionGroups: Array.isArray(input.optionGroups) ? input.optionGroups.filter(isRecord).map((group, index) => normalizeOptionGroup(group, id, now, index)) : [],
-    templates: Array.isArray(input.templates) ? input.templates.filter(isRecord).map((template, index) => normalizeTemplate(template, id, now, index)) : [],
-    variants: (input.variants as unknown[]).filter(isRecord).map((variant, index) => normalizeVariant(variant, id, now, index)),
+    templates: Array.isArray(input.templates) ? input.templates.filter(isRecord).map((template, index) => normalizeTemplate(template, id, surface?.id ?? '', now, index)) : [],
+    variants: variants.map((variant, index) => normalizeVariant(variant, id, now, index)),
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function findLegacySurface(variants: Record<string, unknown>[]) {
+  for (const variant of variants) {
+    if (Array.isArray(variant.surfaces)) {
+      const surface = variant.surfaces.find(isRecord);
+      if (surface) return surface;
+    }
+  }
+  return null;
+}
+
+function normalizeSurface(input: Record<string, unknown>, productId: string, now: string, index: number): ProductSurface {
+  return {
+    id: typeof input.id === 'string' ? input.id : `import-s-${index}`,
+    productId,
+    name: typeof input.name === 'string' ? input.name : `Surface ${index + 1}`,
+    code: typeof input.code === 'string' ? input.code : 'front',
+    backgroundColor: typeof input.backgroundColor === 'string' ? input.backgroundColor : '#ffffff',
+    allowTransparency: input.allowTransparency === true,
+    bleed: normalizeBox(input.bleed, 0),
+    safeArea: normalizeBox(input.safeArea, 0),
     createdAt: now,
     updatedAt: now,
   };
@@ -203,12 +224,13 @@ function normalizeOptionValue(input: Record<string, unknown>, optionGroupId: str
   };
 }
 
-function normalizeDisplayType(value: unknown) {
+function normalizeDisplayType(value: unknown): ProductOptionDisplayType {
   return value === 'Radio Buttons' || value === 'Color Swatches' || value === 'Image Swatches' || value === 'Text Buttons' ? value : 'Dropdown';
 }
 
 function normalizeVariant(input: Record<string, unknown>, productId: string, now: string, index: number): ProductVariant {
   const id = typeof input.id === 'string' ? input.id : `import-v-${index}`;
+  const legacySurface = Array.isArray(input.surfaces) ? input.surfaces.find(isRecord) : null;
   return {
     id,
     productId,
@@ -217,40 +239,25 @@ function normalizeVariant(input: Record<string, unknown>, productId: string, now
     price: typeof input.price === 'number' ? input.price : 0,
     status: normalizeStatus(input.status),
     options: isRecord(input.options) ? stringRecord(input.options) : {},
-    surfaces: Array.isArray(input.surfaces) ? input.surfaces.filter(isRecord).map((surface, surfaceIndex) => normalizeSurface(surface, id, now, surfaceIndex)) : [],
+    width: numberOr(input.width, isRecord(legacySurface) ? numberOr(legacySurface.width, 1) : 1),
+    height: numberOr(input.height, isRecord(legacySurface) ? numberOr(legacySurface.height, 1) : 1),
+    unit: normalizeUnit(input.unit ?? (isRecord(legacySurface) ? legacySurface.unit : undefined)),
+    dpi: numberOr(input.dpi, isRecord(legacySurface) ? numberOr(legacySurface.dpi, 300) : 300),
+    previewImageUrl: typeof input.previewImageUrl === 'string' ? input.previewImageUrl : '',
+    thumbnailImageUrl: typeof input.thumbnailImageUrl === 'string' ? input.thumbnailImageUrl : '',
     createdAt: now,
     updatedAt: now,
   };
 }
 
-function normalizeSurface(input: Record<string, unknown>, variantId: string, now: string, index: number): ProductSurface {
-  return {
-    id: typeof input.id === 'string' ? input.id : `import-s-${index}`,
-    variantId,
-    name: typeof input.name === 'string' ? input.name : `Surface ${index + 1}`,
-    code: typeof input.code === 'string' ? input.code : `surface-${index + 1}`,
-    width: numberOr(input.width, 1),
-    height: numberOr(input.height, 1),
-    unit: input.unit === 'mm' || input.unit === 'px' ? input.unit : 'in',
-    dpi: numberOr(input.dpi, 300),
-    bleed: normalizeBox(input.bleed),
-    safeArea: normalizeBox(input.safeArea),
-    backgroundColor: typeof input.backgroundColor === 'string' ? input.backgroundColor : '#ffffff',
-    allowTransparency: input.allowTransparency === true,
-    sortOrder: numberOr(input.sortOrder, index),
-    createdAt: now,
-    updatedAt: now,
-  };
-}
-
-function normalizeTemplate(input: Record<string, unknown>, productId: string, now: string, index: number): ProductTemplate {
+function normalizeTemplate(input: Record<string, unknown>, productId: string, surfaceId: string, now: string, index: number): ProductTemplate {
   return {
     id: typeof input.id === 'string' ? input.id : `import-tpl-${index}`,
     productId,
     name: typeof input.name === 'string' ? input.name : `Template ${index + 1}`,
     status: normalizeStatus(input.status),
     variantId: typeof input.variantId === 'string' ? input.variantId : '',
-    surfaceId: typeof input.surfaceId === 'string' ? input.surfaceId : '',
+    surfaceId: surfaceId || (typeof input.surfaceId === 'string' ? input.surfaceId : ''),
     thumbnailUrl: typeof input.thumbnailUrl === 'string' ? input.thumbnailUrl : '',
     elements: Array.isArray(input.elements) ? input.elements.filter(isRecord).map(normalizeElement) : [],
     createdAt: now,
@@ -273,14 +280,14 @@ function normalizeElement(input: Record<string, unknown>, index: number): Templa
   };
 }
 
-function normalizeBox(input: unknown): ProductSurface['bleed'] {
-  if (!isRecord(input)) return { top: 0, right: 0, bottom: 0, left: 0, unit: 'in' as const };
+function normalizeBox(input: unknown, fallback: number): ProductSurface['bleed'] {
+  if (!isRecord(input)) return { top: fallback, right: fallback, bottom: fallback, left: fallback, unit: 'inch' };
   return {
-    top: numberOr(input.top, 0),
-    right: numberOr(input.right, 0),
-    bottom: numberOr(input.bottom, 0),
-    left: numberOr(input.left, 0),
-    unit: input.unit === 'mm' || input.unit === 'px' ? input.unit : 'in',
+    top: numberOr(input.top, fallback),
+    right: numberOr(input.right, fallback),
+    bottom: numberOr(input.bottom, fallback),
+    left: numberOr(input.left, fallback),
+    unit: normalizeUnit(input.unit),
   };
 }
 
@@ -307,9 +314,3 @@ function createSlug(value: string) {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-
-
-
-
-
-

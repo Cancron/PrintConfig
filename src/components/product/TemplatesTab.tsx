@@ -4,7 +4,7 @@ import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
-import type { Product, ProductStatus, ProductSurface, ProductTemplate, TemplateElement, TemplateElementType } from '../../types';
+import type { Product, ProductStatus, ProductTemplate, ProductVariant, TemplateElement, TemplateElementType } from '../../types';
 
 interface Props {
   product: Product;
@@ -28,20 +28,19 @@ const yesNoOptions = [
 
 export function TemplatesTab({ product, onSave }: Props) {
   const firstVariant = product.variants[0];
-  const firstSurface = firstVariant?.surfaces[0];
+  const firstSurface = product.surface;
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ProductTemplate>(() => createTemplate(product.id, firstVariant?.id ?? '', firstSurface?.id ?? ''));
 
   const selectedVariant = product.variants.find((variant) => variant.id === form.variantId);
-  const availableSurfaces = selectedVariant?.surfaces ?? [];
-  const selectedSurface = availableSurfaces.find((surface) => surface.id === form.surfaceId);
+  const selectedSurface = product.surface?.id === form.surfaceId ? product.surface : product.surface;
   const errors = useMemo(() => validateTemplate(form), [form]);
   const isValid = Object.keys(errors).length === 0;
 
   function startCreate() {
     const variant = product.variants[0];
-    setForm(createTemplate(product.id, variant?.id ?? '', variant?.surfaces[0]?.id ?? ''));
+    setForm(createTemplate(product.id, variant?.id ?? '', product.surface?.id ?? ''));
     setEditingId(null);
     setIsFormOpen(true);
   }
@@ -62,11 +61,10 @@ export function TemplatesTab({ product, onSave }: Props) {
   }
 
   function updateVariant(variantId: string) {
-    const variant = product.variants.find((item) => item.id === variantId);
     setForm((prev) => ({
       ...prev,
       variantId,
-      surfaceId: variant?.surfaces[0]?.id ?? '',
+      surfaceId: product.surface?.id ?? '',
     }));
   }
 
@@ -175,7 +173,7 @@ export function TemplatesTab({ product, onSave }: Props) {
             <tbody className="divide-y divide-gray-200 bg-white">
               {product.templates.map((template) => {
                 const variant = product.variants.find((item) => item.id === template.variantId);
-                const surface = variant?.surfaces.find((item) => item.id === template.surfaceId);
+                const surface = product.surface?.id === template.surfaceId ? product.surface : product.surface;
                 return (
                   <tr key={template.id}>
                     <td className="px-4 py-3">
@@ -229,9 +227,9 @@ export function TemplatesTab({ product, onSave }: Props) {
                   label="Assigned Surface"
                   value={form.surfaceId}
                   onChange={(event) => update('surfaceId', event.target.value)}
-                  options={availableSurfaces.length > 0 ? availableSurfaces.map((surface) => ({ value: surface.id, label: `${surface.name} (${surface.code})` })) : [{ value: '', label: 'No surfaces available' }]}
+                  options={product.surface ? [{ value: product.surface.id, label: `${product.surface.name} (${product.surface.code})` }] : [{ value: '', label: 'No surface configured' }]}
                   error={errors.surfaceId}
-                  disabled={availableSurfaces.length === 0}
+                  disabled={!product.surface}
                 />
               </div>
 
@@ -298,9 +296,9 @@ export function TemplatesTab({ product, onSave }: Props) {
                 <p className="mt-1 text-sm text-gray-500">Placeholder boxes use normalized percentage coordinates.</p>
                 <div className="mt-4 flex justify-center overflow-auto">
                   {selectedSurface ? (
-                    <TemplatePreview surface={selectedSurface} elements={form.elements} />
+                    <TemplatePreview variant={selectedVariant} elements={form.elements} />
                   ) : (
-                    <div className="flex h-64 w-full items-center justify-center rounded-lg bg-gray-50 text-sm text-gray-500 ring-1 ring-gray-200">Select a surface to preview.</div>
+                    <div className="flex h-64 w-full items-center justify-center rounded-lg bg-gray-50 text-sm text-gray-500 ring-1 ring-gray-200">Select a variant to preview.</div>
                   )}
                 </div>
               </div>
@@ -312,9 +310,9 @@ export function TemplatesTab({ product, onSave }: Props) {
   );
 }
 
-function TemplatePreview({ surface, elements }: { surface: ProductSurface; elements: TemplateElement[] }) {
+function TemplatePreview({ variant, elements }: { variant?: ProductVariant; elements: TemplateElement[] }) {
   const maxSize = 320;
-  const ratio = surface.width > 0 && surface.height > 0 ? surface.width / surface.height : 1;
+  const ratio = variant && variant.width > 0 && variant.height > 0 ? variant.width / variant.height : 1;
   const width = ratio >= 1 ? maxSize : maxSize * ratio;
   const height = ratio >= 1 ? maxSize / ratio : maxSize;
 
@@ -396,3 +394,7 @@ function isPercent(value: number) {
 function clampPercent(value: number) {
   return Math.min(Math.max(value, 0), 100);
 }
+
+
+
+

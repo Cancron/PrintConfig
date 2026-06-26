@@ -11,6 +11,7 @@ export type ProductType =
 export type ProductStatus = 'Draft' | 'Active';
 export type MerchantStatus = 'Draft' | 'Active';
 export type ProductScope = 'shared' | 'merchant';
+export type ProductUnit = 'inch' | 'mm' | 'px';
 export type ProductOptionDisplayType = 'Dropdown' | 'Radio Buttons' | 'Color Swatches' | 'Image Swatches' | 'Text Buttons';
 export type PriceModifierType = 'none' | 'fixed' | 'percentage';
 
@@ -76,7 +77,7 @@ export interface BleedSettings {
   right: number;
   bottom: number;
   left: number;
-  unit: 'mm' | 'in' | 'px';
+  unit: ProductUnit;
 }
 
 export interface SafeAreaSettings {
@@ -84,23 +85,18 @@ export interface SafeAreaSettings {
   right: number;
   bottom: number;
   left: number;
-  unit: 'mm' | 'in' | 'px';
+  unit: ProductUnit;
 }
 
 export interface ProductSurface {
   id: string;
-  variantId: string;
+  productId: string;
   name: string;
   code: string;
-  width: number;
-  height: number;
-  unit: 'mm' | 'in' | 'px';
-  dpi: number;
-  bleed: BleedSettings;
-  safeArea: SafeAreaSettings;
   backgroundColor: string;
   allowTransparency: boolean;
-  sortOrder: number;
+  bleed: BleedSettings;
+  safeArea: SafeAreaSettings;
   createdAt: string;
   updatedAt: string;
 }
@@ -172,7 +168,12 @@ export interface ProductVariant {
   price: number;
   status: ProductStatus;
   options: Record<string, string>;
-  surfaces: ProductSurface[];
+  width: number;
+  height: number;
+  unit: ProductUnit;
+  dpi: number;
+  previewImageUrl: string;
+  thumbnailImageUrl: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -189,6 +190,7 @@ export interface Product {
   status: ProductStatus;
   basePrice: number;
   thumbnailUrl: string;
+  surface: ProductSurface | null;
   optionGroups: ProductOptionGroup[];
   editorRules: EditorRules;
   exportRules: ExportRules;
