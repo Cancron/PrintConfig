@@ -63,6 +63,7 @@ export function ThumbnailUpload({ value, onChange, productId }: Props) {
   async function handleRemove() {
     if (!value) return;
     onChange('');
+    // Best-effort delete from storage
     try {
       const url = new URL(value);
       const parts = url.pathname.split(`/object/public/${BUCKET}/`);
