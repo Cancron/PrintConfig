@@ -3,6 +3,7 @@ import { Save } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Textarea } from '../ui/Textarea';
+import { ThumbnailUpload } from './ThumbnailUpload';
 import { validateProductBasicInfo } from '../../lib/validation';
 import type { Product, ProductType, ProductStatus } from '../../types';
 
@@ -111,12 +112,10 @@ export function BasicInfoTab({ product, onSave }: Props) {
         placeholder="0.00"
       />
 
-      <Input
-        label="Thumbnail Image URL"
-        type="url"
+      <ThumbnailUpload
         value={thumbnailUrl}
-        onChange={(e) => setThumbnailUrl(e.target.value)}
-        placeholder="https://..."
+        onChange={setThumbnailUrl}
+        productId={product.id}
       />
 
       <div className="flex items-center gap-3 pt-2">
