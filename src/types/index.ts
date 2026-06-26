@@ -1,4 +1,10 @@
 export type ProductType =
+  | 'Canvas'
+  | 'Fine Art Paper'
+  | 'Matte Photo Paper'
+  | 'Acrylic Face Mount Prints'
+  | 'Poster Printing and Framing'
+  | 'Luster Photo Paper'
   | 'Canvas Print'
   | 'Metal Print'
   | 'Poster Print'
@@ -11,6 +17,7 @@ export type ProductType =
 export type ProductStatus = 'Draft' | 'Active';
 export type MerchantStatus = 'Draft' | 'Active';
 export type ProductScope = 'shared' | 'merchant';
+export type ProductCategoryStatus = 'active' | 'draft' | 'archived';
 export type ProductUnit = 'inch' | 'mm' | 'px';
 export type ProductOptionDisplayType = 'Dropdown' | 'Radio Buttons' | 'Color Swatches' | 'Image Swatches' | 'Text Buttons';
 export type PriceModifierType = 'none' | 'fixed' | 'percentage';
@@ -32,6 +39,21 @@ export interface Merchant {
   editorAccentColor: string;
   customCss: string;
   customJavascript: string;
+}
+
+export interface ProductCategory {
+  id: string;
+  accountId: string;
+  merchantId?: string | null;
+  scope: ProductScope;
+  name: string;
+  slug: string;
+  description: string;
+  status: ProductCategoryStatus;
+  thumbnailUrl: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ProductOptionValueMetadata {
@@ -190,6 +212,8 @@ export interface Product {
   status: ProductStatus;
   basePrice: number;
   thumbnailUrl: string;
+  categoryId: string;
+  categorySnapshot?: ProductCategory;
   surface: ProductSurface | null;
   optionGroups: ProductOptionGroup[];
   editorRules: EditorRules;
@@ -199,3 +223,4 @@ export interface Product {
   createdAt: string;
   updatedAt: string;
 }
+

@@ -5,6 +5,7 @@ import { Select } from '../ui/Select';
 import { Textarea } from '../ui/Textarea';
 import { ThumbnailUpload } from './ThumbnailUpload';
 import { useWorkspace } from '../../hooks/useWorkspace';
+import { useCategories } from '../../hooks/useCategories';
 import { validateProductBasicInfo } from '../../lib/validation';
 import type { Product, ProductScope, ProductType, ProductStatus } from '../../types';
 
@@ -14,6 +15,12 @@ interface Props {
 }
 
 const productTypeOptions: { value: ProductType; label: ProductType }[] = [
+  { value: 'Canvas', label: 'Canvas' },
+  { value: 'Fine Art Paper', label: 'Fine Art Paper' },
+  { value: 'Matte Photo Paper', label: 'Matte Photo Paper' },
+  { value: 'Acrylic Face Mount Prints', label: 'Acrylic Face Mount Prints' },
+  { value: 'Poster Printing and Framing', label: 'Poster Printing and Framing' },
+  { value: 'Luster Photo Paper', label: 'Luster Photo Paper' },
   { value: 'Canvas Print', label: 'Canvas Print' },
   { value: 'Poster Print', label: 'Poster Print' },
   { value: 'Framed Poster', label: 'Framed Poster' },
@@ -35,6 +42,7 @@ const scopeOptions = [
 
 export function BasicInfoTab({ product, onSave }: Props) {
   const { selectedMerchant } = useWorkspace();
+  const { categories } = useCategories();
   const [name, setName] = useState(product.name);
   const [slug, setSlug] = useState(product.slug);
   const [productType, setProductType] = useState<ProductType>(product.productType);
@@ -43,11 +51,12 @@ export function BasicInfoTab({ product, onSave }: Props) {
   const [scope, setScope] = useState<ProductScope>(product.scope);
   const [basePrice, setBasePrice] = useState(String(product.basePrice));
   const [thumbnailUrl, setThumbnailUrl] = useState(product.thumbnailUrl);
+  const [categoryId, setCategoryId] = useState(product.categoryId);
   const [saved, setSaved] = useState(false);
 
   const errors = useMemo(
-    () => validateProductBasicInfo({ name, slug, productType, basePrice }),
-    [basePrice, name, productType, slug]
+    () => validateProductBasicInfo({ name, slug, productType, basePrice, categoryId }),
+    [basePrice, categoryId, name, productType, slug]
   );
   const isValid = Object.keys(errors).length === 0;
 
@@ -65,6 +74,8 @@ export function BasicInfoTab({ product, onSave }: Props) {
       merchantId: scope === 'merchant' ? selectedMerchant?.id ?? product.merchantId ?? null : null,
       basePrice: Number(basePrice),
       thumbnailUrl: thumbnailUrl.trim(),
+      categoryId,
+      categorySnapshot: categories.find((category) => category.id === categoryId),
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -74,6 +85,7 @@ export function BasicInfoTab({ product, onSave }: Props) {
     <form onSubmit={handleSubmit} className="max-w-2xl space-y-6 pb-6">
       <Input label="Product Name" value={name} onChange={(e) => setName(e.target.value)} error={errors.name} placeholder="e.g. Canvas Print" />
       <Input label="Slug" value={slug} onChange={(e) => setSlug(e.target.value)} error={errors.slug} placeholder="e.g. canvas-print" />
+      <Select label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} options={categories.map((category) => ({ value: category.id, label: category.name }))} error={errors.categoryId} />
       <Select label="Product Type" value={productType} onChange={(e) => setProductType(e.target.value as ProductType)} options={productTypeOptions} error={errors.productType} />
       <Textarea label="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="Describe the product..." />
       <Select label="Product Scope" value={scope} onChange={(e) => setScope(e.target.value as ProductScope)} options={scopeOptions} />
@@ -91,4 +103,5 @@ export function BasicInfoTab({ product, onSave }: Props) {
     </form>
   );
 }
+
 

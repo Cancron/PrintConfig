@@ -1,10 +1,11 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Package, Settings, Menu, X, Store } from 'lucide-react';
+import { LayoutDashboard, Package, Settings, Menu, X, Store, FolderTree } from 'lucide-react';
 import { useState } from 'react';
 import { useWorkspace } from '../hooks/useWorkspace';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/categories', label: 'Categories', icon: FolderTree },
   { path: '/products', label: 'Products', icon: Package },
   { path: '/merchant-settings', label: 'Merchant Settings', icon: Store },
 ];
@@ -54,7 +55,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <nav className="px-4 py-4 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const active = location.pathname === item.path;
+            const active = item.path === '/' ? location.pathname === item.path : location.pathname.startsWith(item.path);
             return (
               <Link
                 key={item.path}
@@ -88,3 +89,4 @@ export function Layout({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+

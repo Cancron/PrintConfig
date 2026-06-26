@@ -1,17 +1,24 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { useProducts } from '../hooks/useProducts';
+import { useCategories } from '../hooks/useCategories';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { createDefaultEditorRules, createDefaultExportRules } from '../lib/storage';
 import { validateProductBasicInfo } from '../lib/validation';
 import type { Product, ProductScope, ProductType, ProductStatus } from '../types';
 
 const productTypeOptions: { value: ProductType; label: ProductType }[] = [
+  { value: 'Canvas', label: 'Canvas' },
+  { value: 'Fine Art Paper', label: 'Fine Art Paper' },
+  { value: 'Matte Photo Paper', label: 'Matte Photo Paper' },
+  { value: 'Acrylic Face Mount Prints', label: 'Acrylic Face Mount Prints' },
+  { value: 'Poster Printing and Framing', label: 'Poster Printing and Framing' },
+  { value: 'Luster Photo Paper', label: 'Luster Photo Paper' },
   { value: 'Canvas Print', label: 'Canvas Print' },
   { value: 'Poster Print', label: 'Poster Print' },
   { value: 'Framed Poster', label: 'Framed Poster' },
@@ -34,9 +41,12 @@ const scopeOptions = [
 
 export function CreateProduct() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { addProduct, account } = useProducts();
+  const { categories } = useCategories();
   const { selectedMerchant } = useWorkspace();
 
+  const initialCategoryId = searchParams.get('categoryId') ?? categories[0]?.id ?? '';
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [productType, setProductType] = useState<ProductType>('Canvas Print');
@@ -45,10 +55,11 @@ export function CreateProduct() {
   const [scope, setScope] = useState<ProductScope>('shared');
   const [basePrice, setBasePrice] = useState('');
   const [thumbnailUrl, setThumbnailUrl] = useState('');
+  const [categoryId, setCategoryId] = useState(initialCategoryId);
 
   const errors = useMemo(
-    () => validateProductBasicInfo({ name, slug, productType, basePrice }),
-    [basePrice, name, productType, slug]
+    () => validateProductBasicInfo({ name, slug, productType, basePrice, categoryId }),
+    [basePrice, categoryId, name, productType, slug]
   );
   const isValid = Object.keys(errors).length === 0;
 
@@ -74,6 +85,8 @@ export function CreateProduct() {
       status,
       basePrice: Number(basePrice),
       thumbnailUrl: thumbnailUrl.trim(),
+      categoryId,
+      categorySnapshot: categories.find((category) => category.id === categoryId),
       editorRules: createDefaultEditorRules(),
       exportRules: createDefaultExportRules(),
       surface: null,
@@ -99,6 +112,7 @@ export function CreateProduct() {
       <form onSubmit={handleSubmit} className="max-w-2xl bg-white rounded-lg shadow-sm ring-1 ring-gray-200 p-6 space-y-6">
         <Input label="Product Name" value={name} onChange={(e) => handleNameChange(e.target.value)} error={errors.name} placeholder="e.g. Canvas Print" />
         <Input label="Slug" value={slug} onChange={(e) => setSlug(e.target.value)} error={errors.slug} placeholder="e.g. canvas-print" />
+        <Select label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} options={categories.map((category) => ({ value: category.id, label: category.name }))} error={errors.categoryId} />
         <Select label="Product Type" value={productType} onChange={(e) => setProductType(e.target.value as ProductType)} options={productTypeOptions} error={errors.productType} />
         <Textarea label="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="Describe the product..." />
         <Select label="Product Scope" value={scope} onChange={(e) => setScope(e.target.value as ProductScope)} options={scopeOptions} />
@@ -115,6 +129,7 @@ export function CreateProduct() {
     </div>
   );
 }
+
 
 
 

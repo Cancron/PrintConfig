@@ -2,6 +2,7 @@ import { createDefaultEditorRules, createDefaultExportRules } from './storage';
 import { normalizeUnit } from './validation';
 import type {
   Product,
+  ProductCategory,
   ProductOptionDisplayType,
   ProductOptionGroup,
   ProductOptionValue,
@@ -15,6 +16,12 @@ import type {
 } from '../types';
 
 const PRODUCT_TYPES: ProductType[] = [
+  'Canvas',
+  'Fine Art Paper',
+  'Matte Photo Paper',
+  'Acrylic Face Mount Prints',
+  'Poster Printing and Framing',
+  'Luster Photo Paper',
   'Canvas Print',
   'Metal Print',
   'Poster Print',
@@ -146,6 +153,8 @@ function buildImportCandidate(input: Record<string, unknown>): Product {
     status: 'Draft',
     basePrice: typeof input.basePrice === 'number' ? input.basePrice : 0,
     thumbnailUrl: typeof input.thumbnailUrl === 'string' ? input.thumbnailUrl : '',
+    categoryId: typeof input.categoryId === 'string' ? input.categoryId : 'cat-canvas-print',
+    categorySnapshot: isRecord(input.categorySnapshot) ? normalizeCategorySnapshot(input.categorySnapshot) : undefined,
     surface,
     editorRules: isRecord(input.editorRules) ? { ...createDefaultEditorRules(), ...input.editorRules } : createDefaultEditorRules(),
     exportRules: isRecord(input.exportRules) ? { ...createDefaultExportRules(), ...input.exportRules } : createDefaultExportRules(),
@@ -165,6 +174,24 @@ function findLegacySurface(variants: Record<string, unknown>[]) {
     }
   }
   return null;
+}
+
+function normalizeCategorySnapshot(input: Record<string, unknown>): ProductCategory {
+  const now = new Date().toISOString();
+  return {
+    id: typeof input.id === 'string' ? input.id : 'cat-canvas-print',
+    accountId: typeof input.accountId === 'string' ? input.accountId : 'acct-1',
+    merchantId: typeof input.merchantId === 'string' ? input.merchantId : null,
+    scope: input.scope === 'merchant' ? 'merchant' : 'shared',
+    name: typeof input.name === 'string' ? input.name : 'Imported Category',
+    slug: typeof input.slug === 'string' ? input.slug : 'imported-category',
+    description: typeof input.description === 'string' ? input.description : '',
+    status: input.status === 'draft' || input.status === 'archived' ? input.status : 'active',
+    thumbnailUrl: typeof input.thumbnailUrl === 'string' ? input.thumbnailUrl : '',
+    sortOrder: numberOr(input.sortOrder, 0),
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 function normalizeSurface(input: Record<string, unknown>, productId: string, now: string, index: number): ProductSurface {
@@ -314,3 +341,6 @@ function createSlug(value: string) {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+
+
+

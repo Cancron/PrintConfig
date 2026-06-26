@@ -1,4 +1,4 @@
-import type { Product, ProductSurface, ProductType, ProductUnit, ProductVariant } from '../types';
+import type { Product, ProductCategory, ProductSurface, ProductType, ProductUnit, ProductVariant } from '../types';
 
 export type ValidationErrors = Record<string, string>;
 
@@ -21,6 +21,7 @@ export function validateProductBasicInfo(input: {
   slug: string;
   productType: string;
   basePrice: string | number;
+  categoryId?: string;
 }): ValidationErrors {
   const errors: ValidationErrors = {};
   const price = Number(input.basePrice);
@@ -37,6 +38,7 @@ export function validateProductBasicInfo(input: {
   if (input.basePrice === '' || Number.isNaN(price) || price < 0) {
     errors.basePrice = 'Base price must be zero or greater.';
   }
+  if (input.categoryId !== undefined && !input.categoryId) errors.categoryId = 'Category is required.';
 
   return errors;
 }
@@ -171,4 +173,34 @@ export function normalizeUnit(value: unknown): ProductUnit {
   if (value === 'in' || value === 'inch') return 'inch';
   if (value === 'mm' || value === 'px') return value;
   return 'inch';
+}
+
+export function validateCategory(input: {
+  id?: string | null;
+  name: string;
+  slug: string;
+  status: string;
+  scope: string;
+  merchantId?: string | null;
+  sortOrder: string | number;
+  existingCategories: ProductCategory[];
+}): ValidationErrors {
+  const errors: ValidationErrors = {};
+  const slug = input.slug.trim().toLowerCase();
+  const sortOrder = Number(input.sortOrder);
+
+  if (!input.name.trim()) errors.name = 'Category name is required.';
+  if (!slug) {
+    errors.slug = 'Slug is required.';
+  } else if (!URL_SAFE_SLUG.test(slug)) {
+    errors.slug = 'Use lowercase letters, numbers, and hyphens only.';
+  } else if (input.existingCategories.some((category) => category.id !== input.id && category.slug.toLowerCase() === slug && category.accountId === category.accountId && category.scope === input.scope && (category.scope === 'shared' || category.merchantId === input.merchantId))) {
+    errors.slug = 'Slug must be unique in this category scope.';
+  }
+  if (input.status !== 'active' && input.status !== 'draft' && input.status !== 'archived') errors.status = 'Status is required.';
+  if (input.scope !== 'shared' && input.scope !== 'merchant') errors.scope = 'Scope is required.';
+  if (input.scope === 'merchant' && !input.merchantId) errors.scope = 'Select a merchant for merchant custom categories.';
+  if (input.sortOrder === '' || Number.isNaN(sortOrder)) errors.sortOrder = 'Sort order must be numeric.';
+
+  return errors;
 }

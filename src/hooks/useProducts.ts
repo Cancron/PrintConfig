@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { Product, ProductScope } from '../types';
-import { loadProducts, saveProducts } from '../lib/storage';
+import { loadCategories, loadProducts, saveProducts } from '../lib/storage';
 import { cloneProductConfiguration } from '../lib/productConfig';
 import { useWorkspace } from './useWorkspace';
 
@@ -34,12 +34,14 @@ export function useProducts() {
       const source = allProducts.find((p) => p.id === id);
       if (!source) return null;
       const scope = targetScope ?? source.scope;
+      const categories = loadCategories();
       const copy = cloneProductConfiguration(source, {
         addCopySuffix: true,
         accountId: account.id,
         scope,
         merchantId: scope === 'merchant' ? selectedMerchantId : null,
       });
+      copy.categorySnapshot = categories.find((category) => category.id === copy.categoryId);
       setAllProducts((prev) => [...prev, copy]);
       return copy.id;
     },
@@ -48,3 +50,4 @@ export function useProducts() {
 
   return { products, allProducts, account, selectedMerchantId, addProduct, updateProduct, deleteProduct, duplicateProduct };
 }
+
