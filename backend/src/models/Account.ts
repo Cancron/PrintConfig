@@ -2,7 +2,6 @@ import { Schema, model } from 'mongoose';
 
 const accountSchema = new Schema(
   {
-    _id: { type: String },
     name: { type: String, required: true, trim: true },
     status: { type: String, enum: ['active', 'draft', 'archived'], default: 'active' },
   },
@@ -10,4 +9,5 @@ const accountSchema = new Schema(
 );
 
 export const AccountModel = model('Account', accountSchema);
+
 

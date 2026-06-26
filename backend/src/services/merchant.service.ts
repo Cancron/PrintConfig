@@ -1,39 +1,24 @@
-import { AccountModel } from '../models/Account.js';
 import { MerchantModel } from '../models/Merchant.js';
+import { resolveAccountId } from './account.service.js';
 
-export const DEMO_ACCOUNT_ID = 'acct-1';
-export const DEMO_ACCOUNT_NAME = 'Koda North Demo Account';
+export { resolveAccountId };
 
-export async function ensureDemoAccount() {
-  const existing = await AccountModel.findById(DEMO_ACCOUNT_ID);
-  if (existing) return existing;
-  return AccountModel.create({ _id: DEMO_ACCOUNT_ID, name: DEMO_ACCOUNT_NAME, status: 'active' });
-}
-
-export async function seedMerchants(accountId: string) {
-  const count = await MerchantModel.countDocuments({ accountId });
-  if (count > 0) return;
-  await MerchantModel.insertMany([
-    { accountId, name: 'Main Canvas Store', slug: 'main-canvas-store', status: 'active', editorPrimaryColor: '#111827', editorSecondaryColor: '#f3f4f6', editorAccentColor: '#2563eb' },
-    { accountId, name: 'Gift Shop Site', slug: 'gift-shop-site', status: 'active', editorPrimaryColor: '#14532d', editorSecondaryColor: '#ecfdf5', editorAccentColor: '#f59e0b' },
-    { accountId, name: 'Poster Brand Site', slug: 'poster-brand-site', status: 'draft', editorPrimaryColor: '#581c87', editorSecondaryColor: '#faf5ff', editorAccentColor: '#db2777' },
-  ]);
-}
-
-export async function listMerchants(accountId: string) {
-  return MerchantModel.find({ accountId }).sort({ name: 1 });
+export async function listMerchants(accountId?: string) {
+  return MerchantModel.find({ accountId: resolveAccountId(accountId) }).sort({ name: 1 });
 }
 
 export async function getMerchant(id: string) {
   return MerchantModel.findById(id);
 }
 
-export async function createMerchant(data: unknown) {
-  return MerchantModel.create(data);
+export async function createMerchant(data: Record<string, unknown>) {
+  return MerchantModel.create({ ...data, accountId: resolveAccountId(String(data.accountId ?? '')) });
 }
 
-export async function updateMerchant(id: string, data: unknown) {
-  return MerchantModel.findByIdAndUpdate(id, data, { new: true, runValidators: true });
+export async function updateMerchant(id: string, data: Record<string, unknown>) {
+  const payload = { ...data };
+  if (payload.accountId) payload.accountId = resolveAccountId(String(payload.accountId));
+  return MerchantModel.findByIdAndUpdate(id, payload, { new: true, runValidators: true });
 }
 
 export async function deleteMerchant(id: string) {

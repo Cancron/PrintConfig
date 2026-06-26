@@ -2,11 +2,11 @@ import { Schema, model } from 'mongoose';
 
 const merchantSchema = new Schema(
   {
-    accountId: { type: String, required: true, index: true },
+    accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true, trim: true },
     logoUrl: { type: String, default: '' },
-    status: { type: String, enum: ['active', 'draft', 'archived', 'Active', 'Draft'], default: 'active' },
+    status: { type: String, enum: ['active', 'draft', 'archived'], default: 'active' },
     editorPrimaryColor: { type: String, default: '#111827' },
     editorSecondaryColor: { type: String, default: '#f3f4f6' },
     editorAccentColor: { type: String, default: '#2563eb' },
@@ -18,4 +18,3 @@ const merchantSchema = new Schema(
 
 merchantSchema.index({ accountId: 1, slug: 1 }, { unique: true });
 export const MerchantModel = model('Merchant', merchantSchema);
-

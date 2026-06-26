@@ -52,6 +52,30 @@ function normalizeCategory(raw: any): ProductCategory {
   };
 }
 
+function normalizeSurface(raw: any) {
+  return raw ? { ...raw, id: idOf(raw), productId: String(raw.productId ?? '') } : null;
+}
+
+function normalizeOptionGroups(groups: any[] = []) {
+  return groups.map((group) => ({
+    ...group,
+    id: idOf(group),
+    productId: String(group.productId ?? ''),
+    values: (group.values ?? []).map((value: any) => ({ ...value, id: idOf(value), optionGroupId: String(value.optionGroupId ?? group._id ?? group.id ?? '') })),
+  }));
+}
+
+function normalizeTemplates(templates: any[] = []) {
+  return templates.map((template) => ({
+    ...template,
+    id: idOf(template),
+    productId: String(template.productId ?? ''),
+    variantId: String(template.variantId ?? ''),
+    surfaceId: String(template.surfaceId ?? ''),
+    elements: (template.elements ?? []).map((element: any) => ({ ...element, id: idOf(element) })),
+  }));
+}
+
 function normalizeProduct(raw: any): Product {
   return {
     ...raw,
@@ -61,12 +85,12 @@ function normalizeProduct(raw: any): Product {
     categoryId: String(raw.categoryId ?? ''),
     categorySnapshot: raw.categorySnapshot ? normalizeCategory(raw.categorySnapshot) : undefined,
     status: raw.status === 'active' || raw.status === 'Active' ? 'Active' : 'Draft',
-    surface: raw.surface ?? null,
-    optionGroups: raw.optionGroups ?? [],
-    variants: (raw.variants ?? []).map((variant: any) => ({ ...variant, status: variant.status === 'active' || variant.status === 'Active' ? 'Active' : 'Draft', options: variant.options ?? {} })),
+    surface: normalizeSurface(raw.surface),
+    optionGroups: normalizeOptionGroups(raw.optionGroups),
+    variants: (raw.variants ?? []).map((variant: any) => ({ ...variant, id: idOf(variant), productId: String(variant.productId ?? ''), status: variant.status === 'active' || variant.status === 'Active' ? 'Active' : 'Draft', options: variant.options ?? {} })),
     editorRules: raw.editorRules ?? {},
     exportRules: raw.exportRules ?? {},
-    templates: raw.templates ?? [],
+    templates: normalizeTemplates(raw.templates),
     createdAt: raw.createdAt ?? new Date().toISOString(),
     updatedAt: raw.updatedAt ?? new Date().toISOString(),
   };
@@ -93,4 +117,5 @@ export const api = {
   exportProduct: (id: string) => request<any>(`/products/${id}/export`).then(normalizeProduct),
   importProduct: (product: Product) => request<any>('/products/import', { method: 'POST', body: JSON.stringify(productPayload(product)) }).then(normalizeProduct),
 };
+
 

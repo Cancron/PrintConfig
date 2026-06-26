@@ -6,14 +6,21 @@ import { ApiError } from '../middleware/errorHandler.js';
 import { applyModifier } from '../utils/pricing.js';
 import { slugify } from '../utils/slug.js';
 import { visibleQuery } from './category.service.js';
+import { resolveAccountId } from './account.service.js';
 
 function normalizeScope(data: Record<string, unknown>) {
   if (data.scope === 'shared') data.merchantId = null;
   if (data.scope === 'merchant' && !data.merchantId) throw new ApiError(400, 'merchantId is required for merchant scoped products.');
 }
 
+async function normalizeRefs(data: Record<string, unknown>) {
+  data.accountId = resolveAccountId(String(data.accountId ?? ''));
+  if (data.scope === 'shared') data.merchantId = null;
+  if (data.merchantId && !Types.ObjectId.isValid(String(data.merchantId))) throw new ApiError(400, 'merchantId must be a valid MongoDB ObjectId.');
+  if (!data.categoryId || !Types.ObjectId.isValid(String(data.categoryId))) throw new ApiError(400, 'Product must have a valid categoryId.');
+}
+
 function validateProductShape(data: Record<string, any>) {
-  if (!data.categoryId) throw new ApiError(400, 'Product must have categoryId.');
   if (data.surface && !data.surface.code) throw new ApiError(400, 'Surface code is required.');
   const skus = new Set<string>();
   for (const variant of data.variants ?? []) {
@@ -46,7 +53,8 @@ async function assertUniqueSlug(data: Record<string, unknown>, id?: string) {
 }
 
 export async function listProducts(filters: Record<string, string | undefined>) {
-  const query: Record<string, unknown> = visibleQuery(String(filters.accountId), filters.merchantId);
+  const accountId = resolveAccountId(filters.accountId);
+  const query: Record<string, unknown> = visibleQuery(accountId, filters.merchantId);
   if (filters.categoryId) query.categoryId = filters.categoryId;
   if (filters.status) query.status = filters.status;
   if (filters.scope) query.scope = filters.scope;
@@ -60,6 +68,7 @@ export async function getProduct(id: string) {
 
 export async function createProduct(payload: Record<string, any>) {
   normalizeScope(payload);
+  await normalizeRefs(payload);
   payload.slug = payload.slug || slugify(String(payload.name ?? 'product'));
   validateProductShape(payload);
   await assertUniqueSlug(payload);
@@ -68,6 +77,7 @@ export async function createProduct(payload: Record<string, any>) {
 
 export async function updateProduct(id: string, payload: Record<string, any>) {
   normalizeScope(payload);
+  await normalizeRefs(payload);
   payload.slug = payload.slug || slugify(String(payload.name ?? 'product'));
   validateProductShape(payload);
   await assertUniqueSlug(payload, id);
@@ -82,7 +92,7 @@ export async function duplicateProduct(id: string, payload: { scope?: 'shared' |
   const product = await ProductModel.findById(id).lean();
   if (!product) throw new ApiError(404, 'Product not found.');
   const scope = payload.scope ?? product.scope;
-  const copy = await ProductModel.create({ ...product, _id: new Types.ObjectId(), name: `${product.name} Copy`, slug: `${product.slug}-copy-${Date.now()}`, status: 'draft', scope, merchantId: scope === 'shared' ? null : payload.merchantId ?? product.merchantId });
+  const copy = await ProductModel.create({ ...stripIds(product), name: `${product.name} Copy`, slug: `${product.slug}-copy-${Date.now()}`, status: 'draft', scope, merchantId: scope === 'shared' ? null : payload.merchantId ?? product.merchantId });
   return copy;
 }
 
@@ -95,16 +105,16 @@ export async function exportProduct(id: string) {
 
 export async function importProduct(payload: Record<string, any>) {
   if (!payload.categoryId && payload.categorySnapshot) {
-    const category = await ProductCategoryModel.create(payload.categorySnapshot);
+    const category = await ProductCategoryModel.create(stripIds(payload.categorySnapshot));
     payload.categoryId = category._id;
   }
-  return createProduct({ ...payload, status: 'draft', slug: `${payload.slug || slugify(payload.name)}-import-${Date.now()}` });
+  return createProduct({ ...stripIds(payload), status: 'draft', slug: `${payload.slug || slugify(payload.name)}-import-${Date.now()}` });
 }
 
 export async function calculatePrice(id: string, variantId: string, selectedOptions: Record<string, string>) {
   const product = await ProductModel.findById(id).lean();
   if (!product) throw new ApiError(404, 'Product not found.');
-  const variant = product.variants.find((item: any) => item.id === variantId);
+  const variant = product.variants.find((item: any) => String(item._id) === variantId);
   if (!variant) throw new ApiError(404, 'Variant not found.');
   const modifiers: Array<{ groupCode: string; value: string; amount: number }> = [];
   for (const group of product.optionGroups ?? []) {
@@ -119,41 +129,16 @@ export async function calculatePrice(id: string, variantId: string, selectedOpti
   return { basePrice: variant.price, modifiers, finalPrice: Math.round((variant.price + modifierTotal) * 100) / 100 };
 }
 
-const sizes = [['8x10', 8, 10], ['12x16', 12, 16], ['16x20', 16, 20], ['24x36', 24, 36]] as const;
-const productSeeds = [
-  ['Canvas', 'canvas'],
-  ['Fine Art Paper', 'fine-art-paper'],
-  ['Matte Photo Paper', 'matte-photo-paper'],
-  ['Acrylic Face Mount Prints', 'acrylic-face-mount-prints'],
-  ['Poster Printing and Framing', 'poster-printing-and-framing'],
-  ['Luster Photo Paper', 'luster-photo-paper'],
-] as const;
-
-export async function seedProducts(accountId: string, categoryId: string) {
-  const count = await ProductModel.countDocuments({ accountId, categoryId });
-  if (count > 0) return;
-  await ProductModel.insertMany(productSeeds.map(([name, slug]) => ({
-    accountId,
-    merchantId: null,
-    scope: 'shared',
-    categoryId,
-    name,
-    slug,
-    productType: name,
-    status: 'active',
-    basePrice: 29,
-    thumbnailUrl: '',
-    surface: { id: `s-${slug}-front`, productId: slug, name: 'Front Print Area', code: 'front', backgroundColor: '#ffffff', allowTransparency: false, bleed: { top: 0.125, right: 0.125, bottom: 0.125, left: 0.125 }, safeArea: { top: 0.25, right: 0.25, bottom: 0.25, left: 0.25 } },
-    variants: sizes.map(([label, width, height], index) => ({ id: `v-${slug}-${index}`, productId: slug, name: `${label} ${name}`, sku: `${slug.toUpperCase()}-${label}`, price: [29, 49, 69, 129][index], status: 'active', options: { size: label }, width, height, unit: 'inch', dpi: 300 })),
-    optionGroups: seedOptionGroups(slug),
-    editorRules: {},
-    exportRules: {},
-    templates: [],
-  })));
-}
-
-function seedOptionGroups(productId: string) {
-  const now = new Date();
-  return [{ id: `og-${productId}-finish`, productId, name: 'Finish', code: 'finish', displayType: 'Dropdown', required: true, sortOrder: 1, values: [{ id: `ov-${productId}-standard`, optionGroupId: `og-${productId}-finish`, label: 'Standard', value: 'standard', skuCode: 'STANDARD', priceModifierType: 'none', priceModifier: 0, isDefault: true, isActive: true, sortOrder: 1, previewImageUrl: '', thumbnailImageUrl: '', metadata: {}, createdAt: now, updatedAt: now }], createdAt: now, updatedAt: now }];
+function stripIds<T>(value: T): T {
+  if (Array.isArray(value)) return value.map(stripIds) as T;
+  if (value && typeof value === 'object') {
+    const output: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value)) {
+      if (key === '_id' || key === '__v') continue;
+      output[key] = stripIds(child);
+    }
+    return output as T;
+  }
+  return value;
 }
 

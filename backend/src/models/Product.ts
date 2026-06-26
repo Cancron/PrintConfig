@@ -7,28 +7,24 @@ const boxSchema = new Schema(
 
 const surfaceSchema = new Schema(
   {
-    id: { type: String, required: true },
-    productId: { type: String, required: true },
+    productId: { type: Schema.Types.ObjectId, ref: 'Product' },
     name: { type: String, required: true },
     code: { type: String, required: true },
     backgroundColor: { type: String, default: '#ffffff' },
     allowTransparency: { type: Boolean, default: false },
     bleed: { type: boxSchema, default: () => ({}) },
     safeArea: { type: boxSchema, default: () => ({}) },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
   },
-  { _id: false }
+  { timestamps: true }
 );
 
 const variantSchema = new Schema(
   {
-    id: { type: String, required: true },
-    productId: { type: String, required: true },
+    productId: { type: Schema.Types.ObjectId, ref: 'Product' },
     name: { type: String, required: true },
     sku: { type: String, required: true },
     price: { type: Number, required: true, min: 0 },
-    status: { type: String, enum: ['active', 'draft', 'archived', 'Active', 'Draft'], default: 'draft' },
+    status: { type: String, enum: ['active', 'draft', 'archived'], default: 'draft' },
     options: { type: Map, of: String, default: {} },
     width: { type: Number, required: true, min: 0.0001 },
     height: { type: Number, required: true, min: 0.0001 },
@@ -36,16 +32,13 @@ const variantSchema = new Schema(
     dpi: { type: Number, required: true, min: 0.0001 },
     previewImageUrl: { type: String, default: '' },
     thumbnailImageUrl: { type: String, default: '' },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
   },
-  { _id: false }
+  { timestamps: true }
 );
 
 const optionValueSchema = new Schema(
   {
-    id: { type: String, required: true },
-    optionGroupId: { type: String, required: true },
+    optionGroupId: { type: Schema.Types.ObjectId },
     label: { type: String, required: true },
     value: { type: String, required: true },
     skuCode: { type: String, default: '' },
@@ -62,26 +55,21 @@ const optionValueSchema = new Schema(
       productionCode: String,
       exportNotes: String,
     },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
   },
-  { _id: false }
+  { timestamps: true }
 );
 
 const optionGroupSchema = new Schema(
   {
-    id: { type: String, required: true },
-    productId: { type: String, required: true },
+    productId: { type: Schema.Types.ObjectId, ref: 'Product' },
     name: { type: String, required: true },
     code: { type: String, required: true },
     displayType: { type: String, enum: ['Dropdown', 'Radio Buttons', 'Color Swatches', 'Image Swatches', 'Text Buttons'], default: 'Dropdown' },
     required: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0 },
     values: { type: [optionValueSchema], default: [] },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
   },
-  { _id: false }
+  { timestamps: true }
 );
 
 const editorRulesSchema = new Schema(
@@ -118,34 +106,45 @@ const exportRulesSchema = new Schema(
   { _id: false }
 );
 
-const templateElementSchema = new Schema({}, { _id: false, strict: false });
+const templateElementSchema = new Schema(
+  {
+    name: String,
+    type: { type: String, enum: ['photo', 'text'] },
+    x: Number,
+    y: Number,
+    width: Number,
+    height: Number,
+    required: Boolean,
+    locked: Boolean,
+    editable: Boolean,
+  },
+  { timestamps: true }
+);
+
 const templateSchema = new Schema(
   {
-    id: String,
-    productId: String,
+    productId: { type: Schema.Types.ObjectId, ref: 'Product' },
     name: String,
     status: String,
-    variantId: String,
-    surfaceId: String,
+    variantId: { type: Schema.Types.ObjectId },
+    surfaceId: { type: Schema.Types.ObjectId },
     thumbnailUrl: String,
     elements: { type: [templateElementSchema], default: [] },
-    createdAt: Date,
-    updatedAt: Date,
   },
-  { _id: false }
+  { timestamps: true }
 );
 
 const productSchema = new Schema(
   {
-    accountId: { type: String, required: true, index: true },
-    merchantId: { type: String, default: null, index: true },
+    accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
+    merchantId: { type: Schema.Types.ObjectId, ref: 'Merchant', default: null, index: true },
     scope: { type: String, enum: ['shared', 'merchant'], required: true, index: true },
-    categoryId: { type: String, required: true, index: true },
+    categoryId: { type: Schema.Types.ObjectId, ref: 'ProductCategory', required: true, index: true },
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true, trim: true },
     description: { type: String, default: '' },
     productType: { type: String, required: true },
-    status: { type: String, enum: ['active', 'draft', 'archived', 'Active', 'Draft'], default: 'draft', index: true },
+    status: { type: String, enum: ['active', 'draft', 'archived'], default: 'draft', index: true },
     basePrice: { type: Number, default: 0, min: 0 },
     thumbnailUrl: { type: String, default: '' },
     surface: { type: surfaceSchema, default: null },
@@ -160,4 +159,3 @@ const productSchema = new Schema(
 
 productSchema.index({ accountId: 1, scope: 1, merchantId: 1, categoryId: 1, slug: 1 }, { unique: true });
 export const ProductModel = model('Product', productSchema);
-
