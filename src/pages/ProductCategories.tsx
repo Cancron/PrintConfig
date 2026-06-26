@@ -26,7 +26,7 @@ const scopeOptions = [
 
 export function ProductCategories() {
   const navigate = useNavigate();
-  const { categories, allCategories, account, selectedMerchantId, addCategory, updateCategory, deleteCategory, duplicateCategory } = useCategories();
+  const { categories, allCategories, account, selectedMerchantId, addCategory, updateCategory, deleteCategory, duplicateCategory, loading, error } = useCategories();
   const { products, addProduct } = useProducts();
   const { merchants, selectedMerchant } = useWorkspace();
   const [search, setSearch] = useState('');
@@ -64,6 +64,8 @@ export function ProductCategories() {
     <div>
       <PageHeader title="Product Categories" description="Shared categories plus custom categories for the selected merchant." action={<button onClick={openCreate} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"><Plus className="h-4 w-4" /> Create Category</button>} />
 
+      {loading && <div className="mb-4 rounded-md bg-blue-50 p-3 text-sm text-blue-700 ring-1 ring-inset ring-blue-200">Loading categories from API...</div>}
+      {error && <div className="mb-4 rounded-md bg-amber-50 p-3 text-sm text-amber-800 ring-1 ring-inset ring-amber-200">{error}</div>}
       <div className="rounded-lg bg-white shadow-sm ring-1 ring-gray-200">
         <div className="flex flex-col gap-3 border-b border-gray-200 p-4 lg:flex-row">
           <div className="relative max-w-md flex-1">
@@ -137,4 +139,5 @@ export function CategoryStatusBadge({ status }: { status: ProductCategoryStatus 
   const styles = status === 'active' ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20' : status === 'archived' ? 'bg-gray-50 text-gray-700 ring-gray-600/20' : 'bg-amber-50 text-amber-700 ring-amber-600/20';
   return <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium capitalize ring-1 ring-inset ${styles}`}>{status}</span>;
 }
+
 

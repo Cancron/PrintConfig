@@ -13,7 +13,7 @@ import type { ProductScope, ProductType } from '../types';
 const productTypes: ProductType[] = ['Canvas', 'Fine Art Paper', 'Matte Photo Paper', 'Acrylic Face Mount Prints', 'Poster Printing and Framing', 'Luster Photo Paper', 'Canvas Print', 'Metal Print', 'Poster Print', 'Framed Poster', 'T-Shirt', 'Mug', 'Business Card', 'Sticker'];
 
 export function Products() {
-  const { products, deleteProduct, duplicateProduct } = useProducts();
+  const { products, deleteProduct, duplicateProduct, loading, error } = useProducts();
   const { categories } = useCategories();
   const { merchants } = useWorkspace();
   const [search, setSearch] = useState('');
@@ -43,6 +43,8 @@ export function Products() {
   return (
     <div>
       <PageHeader title="Products" description="Shared products plus custom products for the selected merchant." action={<Link to="/products/new" className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"><Plus className="h-4 w-4" /> Create Product</Link>} />
+      {loading && <div className="mb-4 rounded-md bg-blue-50 p-3 text-sm text-blue-700 ring-1 ring-inset ring-blue-200">Loading products from API...</div>}
+      {error && <div className="mb-4 rounded-md bg-amber-50 p-3 text-sm text-amber-800 ring-1 ring-inset ring-amber-200">{error}</div>}
       <div className="rounded-lg bg-white shadow-sm ring-1 ring-gray-200">
         <div className="flex flex-col gap-3 border-b border-gray-200 p-4 lg:flex-row">
           <div className="relative max-w-md flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" /><input type="text" placeholder="Search products..." value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-md border-0 py-2 pl-9 pr-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm" /></div>
@@ -62,3 +64,4 @@ export function Products() {
 function ScopeBadge({ scope }: { scope: ProductScope }) {
   return <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 ring-inset ${scope === 'shared' ? 'bg-blue-50 text-blue-700 ring-blue-600/20' : 'bg-purple-50 text-purple-700 ring-purple-600/20'}`}>{scope === 'shared' ? 'Shared' : 'Merchant Custom'}</span>;
 }
+
