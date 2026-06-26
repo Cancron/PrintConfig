@@ -1,5 +1,6 @@
 export type ProductType =
   | 'Canvas Print'
+  | 'Metal Print'
   | 'Poster Print'
   | 'Framed Poster'
   | 'T-Shirt'
@@ -10,6 +11,8 @@ export type ProductType =
 export type ProductStatus = 'Draft' | 'Active';
 export type MerchantStatus = 'Draft' | 'Active';
 export type ProductScope = 'shared' | 'merchant';
+export type ProductOptionDisplayType = 'Dropdown' | 'Radio Buttons' | 'Color Swatches' | 'Image Swatches' | 'Text Buttons';
+export type PriceModifierType = 'none' | 'fixed' | 'percentage';
 
 export interface Account {
   id: string;
@@ -28,6 +31,44 @@ export interface Merchant {
   editorAccentColor: string;
   customCss: string;
   customJavascript: string;
+}
+
+export interface ProductOptionValueMetadata {
+  colorHex?: string;
+  description?: string;
+  productionCode?: string;
+  exportNotes?: string;
+}
+
+export interface ProductOptionValue {
+  id: string;
+  optionGroupId: string;
+  label: string;
+  value: string;
+  skuCode: string;
+  priceModifierType: PriceModifierType;
+  priceModifier: number;
+  isDefault: boolean;
+  isActive: boolean;
+  sortOrder: number;
+  previewImageUrl: string;
+  thumbnailImageUrl: string;
+  metadata: ProductOptionValueMetadata;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductOptionGroup {
+  id: string;
+  productId: string;
+  name: string;
+  code: string;
+  displayType: ProductOptionDisplayType;
+  required: boolean;
+  sortOrder: number;
+  values: ProductOptionValue[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface BleedSettings {
@@ -148,6 +189,7 @@ export interface Product {
   status: ProductStatus;
   basePrice: number;
   thumbnailUrl: string;
+  optionGroups: ProductOptionGroup[];
   editorRules: EditorRules;
   exportRules: ExportRules;
   templates: ProductTemplate[];

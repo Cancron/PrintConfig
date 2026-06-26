@@ -1,4 +1,14 @@
-import type { Account, EditorRules, ExportRules, Merchant, Product, ProductScope } from '../types';
+import type {
+  Account,
+  EditorRules,
+  ExportRules,
+  Merchant,
+  PriceModifierType,
+  Product,
+  ProductOptionDisplayType,
+  ProductOptionGroup,
+  ProductScope,
+} from '../types';
 
 const PRODUCTS_KEY = 'print-config-products';
 const MERCHANTS_KEY = 'print-config-merchants';
@@ -7,51 +17,12 @@ const SELECTED_MERCHANT_KEY = 'print-config-selected-merchant';
 
 export const CURRENT_ACCOUNT_ID = 'acct-1';
 
-export const defaultAccount: Account = {
-  id: CURRENT_ACCOUNT_ID,
-  name: 'Koda North Account',
-};
+export const defaultAccount: Account = { id: CURRENT_ACCOUNT_ID, name: 'Koda North Account' };
 
 export const defaultMerchants: Merchant[] = [
-  {
-    id: 'm-main-canvas',
-    accountId: CURRENT_ACCOUNT_ID,
-    name: 'Main Canvas Store',
-    slug: 'main-canvas-store',
-    logoUrl: '',
-    status: 'Active',
-    editorPrimaryColor: '#111827',
-    editorSecondaryColor: '#f3f4f6',
-    editorAccentColor: '#2563eb',
-    customCss: '',
-    customJavascript: '',
-  },
-  {
-    id: 'm-gift-shop',
-    accountId: CURRENT_ACCOUNT_ID,
-    name: 'Gift Shop Site',
-    slug: 'gift-shop-site',
-    logoUrl: '',
-    status: 'Active',
-    editorPrimaryColor: '#14532d',
-    editorSecondaryColor: '#ecfdf5',
-    editorAccentColor: '#f59e0b',
-    customCss: '',
-    customJavascript: '',
-  },
-  {
-    id: 'm-poster-brand',
-    accountId: CURRENT_ACCOUNT_ID,
-    name: 'Poster Brand Site',
-    slug: 'poster-brand-site',
-    logoUrl: '',
-    status: 'Draft',
-    editorPrimaryColor: '#581c87',
-    editorSecondaryColor: '#faf5ff',
-    editorAccentColor: '#db2777',
-    customCss: '',
-    customJavascript: '',
-  },
+  { id: 'm-main-canvas', accountId: CURRENT_ACCOUNT_ID, name: 'Main Canvas Store', slug: 'main-canvas-store', logoUrl: '', status: 'Active', editorPrimaryColor: '#111827', editorSecondaryColor: '#f3f4f6', editorAccentColor: '#2563eb', customCss: '', customJavascript: '' },
+  { id: 'm-gift-shop', accountId: CURRENT_ACCOUNT_ID, name: 'Gift Shop Site', slug: 'gift-shop-site', logoUrl: '', status: 'Active', editorPrimaryColor: '#14532d', editorSecondaryColor: '#ecfdf5', editorAccentColor: '#f59e0b', customCss: '', customJavascript: '' },
+  { id: 'm-poster-brand', accountId: CURRENT_ACCOUNT_ID, name: 'Poster Brand Site', slug: 'poster-brand-site', logoUrl: '', status: 'Draft', editorPrimaryColor: '#581c87', editorSecondaryColor: '#faf5ff', editorAccentColor: '#db2777', customCss: '', customJavascript: '' },
 ];
 
 export const defaultEditorRules: EditorRules = {
@@ -135,11 +106,7 @@ export function saveSelectedMerchantId(merchantId: string) {
 }
 
 export function getProducts(accountId: string, selectedMerchantId: string) {
-  return loadProducts().filter(
-    (product) =>
-      product.accountId === accountId &&
-      (product.scope === 'shared' || product.merchantId === selectedMerchantId)
-  );
+  return loadProducts().filter((product) => product.accountId === accountId && (product.scope === 'shared' || product.merchantId === selectedMerchantId));
 }
 
 export function normalizeProduct(product: Product): Product {
@@ -150,14 +117,9 @@ export function normalizeProduct(product: Product): Product {
     accountId: product.accountId ?? CURRENT_ACCOUNT_ID,
     scope,
     merchantId: scope === 'shared' ? null : legacyMerchantId,
-    editorRules: {
-      ...defaultEditorRules,
-      ...(product.editorRules ?? {}),
-    },
-    exportRules: {
-      ...defaultExportRules,
-      ...(product.exportRules ?? {}),
-    },
+    optionGroups: product.optionGroups ?? [],
+    editorRules: { ...defaultEditorRules, ...(product.editorRules ?? {}) },
+    exportRules: { ...defaultExportRules, ...(product.exportRules ?? {}) },
     templates: product.templates ?? [],
   };
 }
@@ -165,10 +127,7 @@ export function normalizeProduct(product: Product): Product {
 export function loadProducts(): Product[] {
   try {
     const raw = localStorage.getItem(PRODUCTS_KEY);
-    if (raw) {
-      const products = JSON.parse(raw) as Product[];
-      return products.map(normalizeProduct);
-    }
+    if (raw) return (JSON.parse(raw) as Product[]).map(normalizeProduct);
   } catch {
     // ignore
   }
@@ -197,73 +156,27 @@ function seedProducts(): Product[] {
   const now = new Date().toISOString();
   const products: Product[] = [
     createSeedProduct({
-      id: 'p1',
-      name: 'Canvas Print',
-      slug: 'canvas-print',
-      description: 'Premium gallery-wrapped canvas prints with vibrant colors and archival-quality inks.',
-      productType: 'Canvas Print',
-      status: 'Active',
-      basePrice: 49.99,
-      thumbnailUrl: 'https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg?auto=compress&cs=tinysrgb&w=400',
-      scope: 'shared',
-      merchantId: null,
-      variants: [
-        ['v1', 'Small Portrait', 'CP-S-P', 49.99, 'Active'],
-        ['v2', 'Medium Landscape', 'CP-M-L', 79.99, 'Active'],
-        ['v3', 'Large Square', 'CP-L-SQ', 129.99, 'Draft'],
-      ],
-      now,
+      id: 'p1', name: 'Canvas Print', slug: 'canvas-print', description: 'Premium gallery-wrapped canvas prints with vibrant colors and archival-quality inks.', productType: 'Canvas Print', status: 'Active', basePrice: 49.99, thumbnailUrl: 'https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg?auto=compress&cs=tinysrgb&w=400', scope: 'shared', merchantId: null,
+      optionGroups: createCanvasOptionGroups('p1', now),
+      variants: [['v1', 'Small Portrait', 'CP-S-P', 49.99, 'Active'], ['v2', 'Medium Landscape', 'CP-M-L', 79.99, 'Active'], ['v3', 'Large Square', 'CP-L-SQ', 129.99, 'Draft']], now,
     }),
     createSeedProduct({
-      id: 'p2',
-      name: 'Poster Print',
-      slug: 'poster-print',
-      description: 'High-quality poster prints on premium photo paper with a satin finish.',
-      productType: 'Poster Print',
-      status: 'Active',
-      basePrice: 19.99,
-      thumbnailUrl: 'https://images.pexels.com/photos/1287145/pexels-photo-1287145.jpeg?auto=compress&cs=tinysrgb&w=400',
-      scope: 'shared',
-      merchantId: null,
-      variants: [
-        ['v4', 'Standard', 'PP-STD', 19.99, 'Active'],
-        ['v5', 'Large Glossy', 'PP-LG-GL', 34.99, 'Active'],
-      ],
-      now,
+      id: 'p2', name: 'Poster Print', slug: 'poster-print', description: 'High-quality poster prints on premium photo paper with a satin finish.', productType: 'Poster Print', status: 'Active', basePrice: 19.99, thumbnailUrl: 'https://images.pexels.com/photos/1287145/pexels-photo-1287145.jpeg?auto=compress&cs=tinysrgb&w=400', scope: 'shared', merchantId: null,
+      optionGroups: [], variants: [['v4', 'Standard', 'PP-STD', 19.99, 'Active'], ['v5', 'Large Glossy', 'PP-LG-GL', 34.99, 'Active']], now,
     }),
     createSeedProduct({
-      id: 'p3',
-      name: 'T-Shirt',
-      slug: 't-shirt',
-      description: 'Soft, durable cotton t-shirts perfect for custom designs and prints.',
-      productType: 'T-Shirt',
-      status: 'Draft',
-      basePrice: 24.99,
-      thumbnailUrl: 'https://images.pexels.com/photos/991509/pexels-photo-991509.jpeg?auto=compress&cs=tinysrgb&w=400',
-      scope: 'merchant',
-      merchantId: 'm-main-canvas',
-      variants: [
-        ['v6', 'Small Black', 'TS-S-BLK', 24.99, 'Draft'],
-        ['v7', 'Medium White', 'TS-M-WHT', 24.99, 'Draft'],
-      ],
-      now,
+      id: 'p-metal', name: 'Metal Print', slug: 'metal-print', description: 'Sleek metal prints with rich color and modern mounting choices.', productType: 'Metal Print', status: 'Active', basePrice: 59.99, thumbnailUrl: 'https://images.pexels.com/photos/102127/pexels-photo-102127.jpeg?auto=compress&cs=tinysrgb&w=400', scope: 'shared', merchantId: null,
+      optionGroups: createMetalOptionGroups('p-metal', now), variants: [['v-metal-1', 'Standard Metal', 'MP-STD', 59.99, 'Active']], now,
     }),
     createSeedProduct({
-      id: 'p4',
-      name: 'Mug',
-      slug: 'mug',
-      description: 'Custom ceramic mugs for personalized gifts and branded merchandise.',
-      productType: 'Mug',
-      status: 'Active',
-      basePrice: 14.99,
-      thumbnailUrl: 'https://images.pexels.com/photos/1793035/pexels-photo-1793035.jpeg?auto=compress&cs=tinysrgb&w=400',
-      scope: 'merchant',
-      merchantId: 'm-gift-shop',
-      variants: [['v8', 'Standard White', 'MG-STD-WHT', 14.99, 'Active']],
-      now,
+      id: 'p3', name: 'T-Shirt', slug: 't-shirt', description: 'Soft, durable cotton t-shirts perfect for custom designs and prints.', productType: 'T-Shirt', status: 'Draft', basePrice: 24.99, thumbnailUrl: 'https://images.pexels.com/photos/991509/pexels-photo-991509.jpeg?auto=compress&cs=tinysrgb&w=400', scope: 'merchant', merchantId: 'm-main-canvas',
+      optionGroups: [], variants: [['v6', 'Small Black', 'TS-S-BLK', 24.99, 'Draft'], ['v7', 'Medium White', 'TS-M-WHT', 24.99, 'Draft']], now,
+    }),
+    createSeedProduct({
+      id: 'p4', name: 'Mug', slug: 'mug', description: 'Custom ceramic mugs for personalized gifts and branded merchandise.', productType: 'Mug', status: 'Active', basePrice: 14.99, thumbnailUrl: 'https://images.pexels.com/photos/1793035/pexels-photo-1793035.jpeg?auto=compress&cs=tinysrgb&w=400', scope: 'merchant', merchantId: 'm-gift-shop',
+      optionGroups: [], variants: [['v8', 'Standard White', 'MG-STD-WHT', 14.99, 'Active']], now,
     }),
   ];
-
   saveProducts(products);
   return products;
 }
@@ -282,17 +195,58 @@ function createSeedProduct(input: SeedProductInput): Product {
     templates: [],
     createdAt: input.now,
     updatedAt: input.now,
-    variants: input.variants.map(([id, name, sku, price, status]) => ({
-      id,
-      productId: input.id,
-      name,
-      sku,
-      price,
-      status,
-      options: {},
-      surfaces: [],
-      createdAt: input.now,
-      updatedAt: input.now,
-    })),
+    variants: input.variants.map(([id, name, sku, price, status]) => ({ id, productId: input.id, name, sku, price, status, options: {}, surfaces: [], createdAt: input.now, updatedAt: input.now })),
   };
 }
+
+type OptionSeed = [string, string, PriceModifierType, number, Partial<ProductOptionGroup['values'][number]['metadata']>?, string?];
+
+function createOptionGroup(productId: string, now: string, sortOrder: number, name: string, code: string, displayType: ProductOptionDisplayType, values: OptionSeed[]): ProductOptionGroup {
+  const groupId = `og-${productId}-${code}`;
+  return {
+    id: groupId,
+    productId,
+    name,
+    code,
+    displayType,
+    required: true,
+    sortOrder,
+    values: values.map(([label, value, priceModifierType, priceModifier, metadata = {}, previewImageUrl = ''], index) => ({
+      id: `ov-${productId}-${code}-${value}`,
+      optionGroupId: groupId,
+      label,
+      value,
+      skuCode: value.toUpperCase().replace(/-/g, '_'),
+      priceModifierType,
+      priceModifier,
+      isDefault: index === 0,
+      isActive: true,
+      sortOrder: index + 1,
+      previewImageUrl,
+      thumbnailImageUrl: previewImageUrl,
+      metadata,
+      createdAt: now,
+      updatedAt: now,
+    })),
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function createCanvasOptionGroups(productId: string, now: string): ProductOptionGroup[] {
+  return [
+    createOptionGroup(productId, now, 1, 'Size', 'size', 'Dropdown', [['8x10', '8x10', 'none', 0], ['12x16', '12x16', 'fixed', 10], ['16x20', '16x20', 'fixed', 20], ['24x36', '24x36', 'fixed', 50]]),
+    createOptionGroup(productId, now, 2, 'Thickness', 'thickness', 'Text Buttons', [['0.75 inch', '075-inch', 'none', 0], ['1.5 inch', '15-inch', 'fixed', 15]]),
+    createOptionGroup(productId, now, 3, 'Frame Type', 'frame-type', 'Image Swatches', [['No Frame', 'no-frame', 'none', 0], ['Black Floating Frame', 'black-floating-frame', 'fixed', 20, { colorHex: '#111111', description: 'Black floating frame' }, 'https://placehold.co/160x120/111111/ffffff?text=Black+Frame'], ['White Floating Frame', 'white-floating-frame', 'fixed', 20, { colorHex: '#ffffff', description: 'White floating frame' }, 'https://placehold.co/160x120/ffffff/111111?text=White+Frame'], ['Walnut Floating Frame', 'walnut-floating-frame', 'fixed', 35, { colorHex: '#8b5a2b', description: 'Walnut floating frame' }, 'https://placehold.co/160x120/8b5a2b/ffffff?text=Walnut+Frame']]),
+    createOptionGroup(productId, now, 4, 'Hanger Type', 'hanger-type', 'Radio Buttons', [['Sawtooth Hanger', 'sawtooth-hanger', 'none', 0], ['Wire Hanger', 'wire-hanger', 'fixed', 5], ['No Hanger', 'no-hanger', 'none', 0]]),
+  ];
+}
+
+function createMetalOptionGroups(productId: string, now: string): ProductOptionGroup[] {
+  return [
+    createOptionGroup(productId, now, 1, 'Size', 'size', 'Dropdown', [['8x10', '8x10', 'none', 0], ['12x16', '12x16', 'fixed', 15], ['16x20', '16x20', 'fixed', 30], ['24x36', '24x36', 'fixed', 70]]),
+    createOptionGroup(productId, now, 2, 'Metal Type', 'metal-type', 'Text Buttons', [['High Gloss', 'high-gloss', 'fixed', 10], ['Semi Gloss', 'semi-gloss', 'none', 0]]),
+    createOptionGroup(productId, now, 3, 'Hanger Type', 'hanger-type', 'Radio Buttons', [['Float Mount', 'float-mount', 'fixed', 20], ['Inset Frame', 'inset-frame', 'fixed', 35], ['Metal Easel', 'metal-easel', 'fixed', 10], ['No Hanger', 'no-hanger', 'none', 0]]),
+  ];
+}
+

@@ -15,6 +15,7 @@ const productTypeOptions: { value: ProductType; label: ProductType }[] = [
   { value: 'Canvas Print', label: 'Canvas Print' },
   { value: 'Poster Print', label: 'Poster Print' },
   { value: 'Framed Poster', label: 'Framed Poster' },
+  { value: 'Metal Print', label: 'Metal Print' },
   { value: 'T-Shirt', label: 'T-Shirt' },
   { value: 'Mug', label: 'Mug' },
   { value: 'Business Card', label: 'Business Card' },
@@ -75,6 +76,7 @@ export function CreateProduct() {
       thumbnailUrl: thumbnailUrl.trim(),
       editorRules: createDefaultEditorRules(),
       exportRules: createDefaultExportRules(),
+      optionGroups: [],
       templates: [],
       variants: [],
       createdAt: now,
@@ -112,3 +114,5 @@ export function CreateProduct() {
     </div>
   );
 }
+
+

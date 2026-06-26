@@ -1,6 +1,8 @@
 import { createDefaultEditorRules, createDefaultExportRules } from './storage';
 import type {
   Product,
+  ProductOptionGroup,
+  ProductOptionValue,
   ProductScope,
   ProductStatus,
   ProductSurface,
@@ -12,6 +14,7 @@ import type {
 
 const PRODUCT_TYPES: ProductType[] = [
   'Canvas Print',
+  'Metal Print',
   'Poster Print',
   'Framed Poster',
   'T-Shirt',
@@ -26,6 +29,7 @@ export function cloneProductConfiguration(source: Product, options: { addCopySuf
   const variantMap = new Map<string, string>();
   const surfaceMap = new Map<string, string>();
 
+  const optionGroups = (source.optionGroups ?? []).map((group) => cloneOptionGroup(group, productId, now));
   const variants = source.variants.map((variant) => cloneVariant(variant, productId, now, variantMap, surfaceMap));
   const templates = (source.templates ?? []).map((template) => cloneTemplate(template, productId, now, variantMap, surfaceMap));
   const name = options.addCopySuffix ? `${source.name} Copy` : source.name;
@@ -42,6 +46,7 @@ export function cloneProductConfiguration(source: Product, options: { addCopySuf
     status: 'Draft',
     editorRules: { ...createDefaultEditorRules(), ...(source.editorRules ?? {}) },
     exportRules: { ...createDefaultExportRules(), ...(source.exportRules ?? {}) },
+    optionGroups,
     templates,
     variants,
     createdAt: now,
@@ -65,6 +70,24 @@ export function parseImportedProduct(json: string, options: { accountId: string;
   if (!Array.isArray(parsed.variants)) return { error: 'Variants are required.' };
 
   return { product: cloneProductConfiguration(buildImportCandidate(parsed), options) };
+}
+
+function cloneOptionGroup(group: ProductOptionGroup, productId: string, now: string): ProductOptionGroup {
+  const groupId = createId('og');
+  return {
+    ...group,
+    id: groupId,
+    productId,
+    values: group.values.map((value) => ({
+      ...value,
+      id: createId('ov'),
+      optionGroupId: groupId,
+      createdAt: now,
+      updatedAt: now,
+    })),
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 function cloneVariant(
@@ -130,11 +153,58 @@ function buildImportCandidate(input: Record<string, unknown>): Product {
     thumbnailUrl: typeof input.thumbnailUrl === 'string' ? input.thumbnailUrl : '',
     editorRules: isRecord(input.editorRules) ? { ...createDefaultEditorRules(), ...input.editorRules } : createDefaultEditorRules(),
     exportRules: isRecord(input.exportRules) ? { ...createDefaultExportRules(), ...input.exportRules } : createDefaultExportRules(),
+    optionGroups: Array.isArray(input.optionGroups) ? input.optionGroups.filter(isRecord).map((group, index) => normalizeOptionGroup(group, id, now, index)) : [],
     templates: Array.isArray(input.templates) ? input.templates.filter(isRecord).map((template, index) => normalizeTemplate(template, id, now, index)) : [],
     variants: (input.variants as unknown[]).filter(isRecord).map((variant, index) => normalizeVariant(variant, id, now, index)),
     createdAt: now,
     updatedAt: now,
   };
+}
+
+function normalizeOptionGroup(input: Record<string, unknown>, productId: string, now: string, index: number): ProductOptionGroup {
+  const id = typeof input.id === 'string' ? input.id : `import-og-${index}`;
+  return {
+    id,
+    productId,
+    name: typeof input.name === 'string' ? input.name : `Option Group ${index + 1}`,
+    code: typeof input.code === 'string' ? input.code : `option-group-${index + 1}`,
+    displayType: normalizeDisplayType(input.displayType),
+    required: input.required !== false,
+    sortOrder: numberOr(input.sortOrder, index + 1),
+    values: Array.isArray(input.values) ? input.values.filter(isRecord).map((value, valueIndex) => normalizeOptionValue(value, id, now, valueIndex)) : [],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function normalizeOptionValue(input: Record<string, unknown>, optionGroupId: string, now: string, index: number): ProductOptionValue {
+  const priceModifierType = input.priceModifierType === 'fixed' || input.priceModifierType === 'percentage' ? input.priceModifierType : 'none';
+  return {
+    id: typeof input.id === 'string' ? input.id : `import-ov-${index}`,
+    optionGroupId,
+    label: typeof input.label === 'string' ? input.label : `Option ${index + 1}`,
+    value: typeof input.value === 'string' ? input.value : `option-${index + 1}`,
+    skuCode: typeof input.skuCode === 'string' ? input.skuCode : '',
+    priceModifierType,
+    priceModifier: priceModifierType === 'none' ? 0 : numberOr(input.priceModifier, 0),
+    isDefault: input.isDefault === true,
+    isActive: input.isActive !== false,
+    sortOrder: numberOr(input.sortOrder, index + 1),
+    previewImageUrl: typeof input.previewImageUrl === 'string' ? input.previewImageUrl : '',
+    thumbnailImageUrl: typeof input.thumbnailImageUrl === 'string' ? input.thumbnailImageUrl : '',
+    metadata: isRecord(input.metadata) ? {
+      colorHex: typeof input.metadata.colorHex === 'string' ? input.metadata.colorHex : undefined,
+      description: typeof input.metadata.description === 'string' ? input.metadata.description : undefined,
+      productionCode: typeof input.metadata.productionCode === 'string' ? input.metadata.productionCode : undefined,
+      exportNotes: typeof input.metadata.exportNotes === 'string' ? input.metadata.exportNotes : undefined,
+    } : {},
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function normalizeDisplayType(value: unknown) {
+  return value === 'Radio Buttons' || value === 'Color Swatches' || value === 'Image Swatches' || value === 'Text Buttons' ? value : 'Dropdown';
 }
 
 function normalizeVariant(input: Record<string, unknown>, productId: string, now: string, index: number): ProductVariant {
@@ -237,6 +307,8 @@ function createSlug(value: string) {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+
+
 
 
 

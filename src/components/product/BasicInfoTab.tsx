@@ -91,3 +91,4 @@ export function BasicInfoTab({ product, onSave }: Props) {
     </form>
   );
 }
+

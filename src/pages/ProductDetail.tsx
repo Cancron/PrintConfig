@@ -10,6 +10,7 @@ import { useWorkspace } from '../hooks/useWorkspace';
 import { parseImportedProduct } from '../lib/productConfig';
 import { getProductReadiness } from '../lib/validation';
 import { BasicInfoTab } from '../components/product/BasicInfoTab';
+import { OptionsTab } from '../components/product/OptionsTab';
 import { VariantsTab } from '../components/product/VariantsTab';
 import { SurfacesTab } from '../components/product/SurfacesTab';
 import { EditorRulesTab } from '../components/product/EditorRulesTab';
@@ -93,6 +94,7 @@ export function ProductDetail() {
 
   const tabs = [
     { id: 'basic', label: 'Basic Info', content: <BasicInfoTab product={product} onSave={updateProduct} /> },
+    { id: 'options', label: 'Options', content: <OptionsTab product={product} onSave={updateProduct} /> },
     { id: 'variants', label: 'Variants', content: <VariantsTab product={product} onSave={updateProduct} /> },
     { id: 'surfaces', label: 'Surfaces', content: <SurfacesTab product={product} onSave={updateProduct} /> },
     { id: 'editor-rules', label: 'Editor Rules', content: <EditorRulesTab product={product} onSave={updateProduct} /> },
@@ -195,5 +197,6 @@ function JsonPreviewTab({ product }: { product: Product }) {
   const json = JSON.stringify(product, null, 2);
   return <div className="relative"><pre className="bg-slate-900 text-slate-50 rounded-lg p-4 overflow-x-auto text-sm font-mono leading-relaxed"><code>{json}</code></pre></div>;
 }
+
 
 

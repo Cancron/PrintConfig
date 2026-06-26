@@ -9,7 +9,7 @@ import { useProducts } from '../hooks/useProducts';
 import { useWorkspace } from '../hooks/useWorkspace';
 import type { ProductScope, ProductType } from '../types';
 
-const productTypes: ProductType[] = ['Canvas Print', 'Poster Print', 'Framed Poster', 'T-Shirt', 'Mug', 'Business Card', 'Sticker'];
+const productTypes: ProductType[] = ['Canvas Print', 'Metal Print', 'Poster Print', 'Framed Poster', 'T-Shirt', 'Mug', 'Business Card', 'Sticker'];
 
 export function Products() {
   const { products, deleteProduct, duplicateProduct } = useProducts();
@@ -77,6 +77,7 @@ export function Products() {
               <TableHeader>Type</TableHeader>
               <TableHeader>Status</TableHeader>
               <TableHeader>Scope</TableHeader>
+              <TableHeader>Options</TableHeader>
               <TableHeader>Variants</TableHeader>
               <TableHeader>Updated</TableHeader>
               <TableHeader className="text-right">Actions</TableHeader>
@@ -96,6 +97,7 @@ export function Products() {
                     <ScopeBadge scope={product.scope} />
                     {product.scope === 'merchant' && <p className="mt-1 text-xs text-gray-500">{merchants.find((m) => m.id === product.merchantId)?.name}</p>}
                   </TableCell>
+                  <TableCell>{product.optionGroups.length}</TableCell>
                   <TableCell>{product.variants.length}</TableCell>
                   <TableCell>{new Date(product.updatedAt).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right">
@@ -123,4 +125,5 @@ function ScopeBadge({ scope }: { scope: ProductScope }) {
     </span>
   );
 }
+
 
