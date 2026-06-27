@@ -25,14 +25,19 @@ export function calculateRoomPreviewSize(variant: Pick<ProductVariant, 'width' |
   };
 }
 
-export function getOverlayStyle(variant: Pick<ProductVariant, 'width' | 'height' | 'unit'>, roomPreview: VariantRoomPreview) {
+export function getOverlayStyle(variant: Pick<ProductVariant, 'width' | 'height' | 'unit'>, roomPreview: VariantRoomPreview, displayedImageWidth?: number, displayedImageHeight?: number) {
   const size = calculateRoomPreviewSize(variant, roomPreview);
   if (!size) return null;
+  // CSS height percentages resolve against image height. Convert the width-based
+  // physical percentage so the rendered border keeps the variant's true ratio.
+  const renderedHeightPercent = displayedImageWidth && displayedImageHeight
+    ? size.heightPercent * (displayedImageWidth / displayedImageHeight)
+    : size.heightPercent;
   return {
     left: `${roomPreview.centerLeftPercent - size.widthPercent / 2}%`,
-    top: `${roomPreview.centerTopPercent - size.heightPercent / 2}%`,
+    top: `${roomPreview.centerTopPercent - renderedHeightPercent / 2}%`,
     width: `${size.widthPercent}%`,
-    height: `${size.heightPercent}%`,
+    height: `${renderedHeightPercent}%`,
   };
 }
 

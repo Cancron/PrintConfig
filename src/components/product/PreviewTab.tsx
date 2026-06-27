@@ -65,6 +65,7 @@ export function PreviewTab({ product, onSave }: Props) {
         </div>
       )}
 
+      <RoomPreviewsPanel product={product} variant={selectedVariant} onSave={onSave} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200 xl:col-span-2">
           <h3 className="text-sm font-semibold text-gray-900">Surface Preview</h3>
@@ -95,8 +96,6 @@ export function PreviewTab({ product, onSave }: Props) {
           </SummaryPanel>
         </div>
       </div>
-
-      <RoomPreviewsPanel product={product} variant={selectedVariant} onSave={onSave} />
 
       <div className="rounded-lg bg-slate-50 p-4 ring-1 ring-slate-200">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Copy, Image, Pencil, Plus, Star, Trash2, X } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
@@ -111,32 +111,129 @@ function RoomPreviewForm({ form, errors, onChange, onSave, onClose }: { form: Va
 }
 
 function RoomPreviewEditor({ product, variant, room, onChange, onSave, onClose }: { product: Product; variant: ProductVariant; room: VariantRoomPreview; onChange: (room: VariantRoomPreview) => void; onSave: (room: VariantRoomPreview) => void; onClose: () => void }) {
-  const stageRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [imageMetrics, setImageMetrics] = useState({ displayedWidth: 0, displayedHeight: 0, naturalWidth: 0, naturalHeight: 0 });
   const size = calculateRoomPreviewSize(variant, room);
-  const style = getOverlayStyle(variant, room);
+  const style = getOverlayStyle(variant, room, imageMetrics.displayedWidth, imageMetrics.displayedHeight);
   const imageUrl = variant.previewImageUrl || product.thumbnailUrl;
 
+  useEffect(() => {
+    setImageLoaded(false);
+    setImageError(false);
+    setImageMetrics({ displayedWidth: 0, displayedHeight: 0, naturalWidth: 0, naturalHeight: 0 });
+  }, [room.roomImageUrl]);
+
+  useEffect(() => {
+    const image = imageRef.current;
+    if (!image || !imageLoaded) return;
+    const measure = () => {
+      const rect = image.getBoundingClientRect();
+      setImageMetrics({ displayedWidth: rect.width, displayedHeight: rect.height, naturalWidth: image.naturalWidth, naturalHeight: image.naturalHeight });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(image);
+    window.addEventListener('resize', measure);
+    return () => { observer.disconnect(); window.removeEventListener('resize', measure); };
+  }, [imageLoaded]);
+
+  function handleImageLoad() {
+    setImageLoaded(true);
+    setImageError(false);
+    window.requestAnimationFrame(() => {
+      const image = imageRef.current;
+      if (!image) return;
+      const rect = image.getBoundingClientRect();
+      setImageMetrics({ displayedWidth: rect.width, displayedHeight: rect.height, naturalWidth: image.naturalWidth, naturalHeight: image.naturalHeight });
+    });
+  }
+
   function pointerPercent(event: React.PointerEvent) {
-    const rect = stageRef.current?.getBoundingClientRect();
-    if (!rect) return null;
+    const rect = wrapperRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return null;
     return { x: ((event.clientX - rect.left) / rect.width) * 100, y: ((event.clientY - rect.top) / rect.height) * 100 };
   }
+
   function startDrag(event: React.PointerEvent<HTMLDivElement>) {
-    const point = pointerPercent(event); if (!point) return;
+    const point = pointerPercent(event);
+    if (!point) return;
     dragOffset.current = { x: point.x - room.centerLeftPercent, y: point.y - room.centerTopPercent };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
+
   function drag(event: React.PointerEvent<HTMLDivElement>) {
     if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    const point = pointerPercent(event); if (!point) return;
-    const halfW = Math.min((size?.widthPercent ?? 0) / 2, 50); const halfH = Math.min((size?.heightPercent ?? 0) / 2, 50);
-    onChange({ ...room, centerLeftPercent: clamp(point.x - dragOffset.current.x, halfW, 100 - halfW), centerTopPercent: clamp(point.y - dragOffset.current.y, halfH, 100 - halfH) });
+    const point = pointerPercent(event);
+    if (!point) return;
+    onChange({ ...room, centerLeftPercent: clamp(point.x - dragOffset.current.x, 0, 100), centerTopPercent: clamp(point.y - dragOffset.current.y, 0, 100) });
   }
 
-  return <div className="fixed inset-0 z-50 overflow-auto bg-black/60 p-4"><div className="mx-auto w-full max-w-6xl rounded-lg bg-white shadow-xl"><div className="flex items-center justify-between border-b border-gray-200 px-5 py-4"><div><h3 className="text-lg font-semibold text-gray-900">{room.name}</h3><p className="text-sm text-gray-500">Drag the product to position it in the room.</p></div><IconButton title="Close" onClick={onClose}><X className="h-5 w-5" /></IconButton></div><div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_280px]"><div ref={stageRef} className="relative aspect-video overflow-hidden rounded-md bg-gray-100 ring-1 ring-gray-300" style={{ backgroundImage: room.roomImageUrl ? `url(${room.roomImageUrl})` : undefined, backgroundSize: '100% 100%', backgroundPosition: 'center' }}>{style && <div onPointerDown={startDrag} onPointerMove={drag} style={style} className="absolute flex touch-none cursor-grab select-none items-center justify-center overflow-hidden border-2 border-white bg-slate-900/90 text-center text-white shadow-xl active:cursor-grabbing">{imageUrl ? <img src={imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}<div className="relative bg-black/55 p-2 text-xs"><strong className="block">{product.name}</strong><span>{variant.name}</span><span className="block">{variant.width} x {variant.height} {variant.unit}</span><span className="block">{variant.dpi} DPI</span></div></div>}</div><aside className="space-y-4"><div><label className="block text-sm font-medium text-gray-700">Zoom: {room.zoom.toFixed(2)}x</label><input type="range" min="0.25" max="3" step="0.05" value={room.zoom} onChange={(e) => onChange({ ...room, zoom: Number(e.target.value) })} className="mt-2 w-full accent-slate-900" /></div>{variant.unit === 'px' && <Warning>This variant uses px unit, so real-world scaling cannot be calculated. Please use inch or mm for real-world preview.</Warning>}{!room.roomImageUrl && <Warning>Room image URL is missing.</Warning>}{!room.roomWidthMeters && <Warning>Room width is missing.</Warning>}{(!variant.width || !variant.height) && <Warning>Variant width or height is missing.</Warning>}{!variant.unit && <Warning>Variant unit is missing.</Warning>}{!variant.dpi && <Warning>Variant DPI is missing.</Warning>}<dl className="space-y-2 text-sm"><Row label="Room width" value={`${room.roomWidthMeters}m`} /><Row label="Variant physical size" value={size ? `${size.widthMeters.toFixed(3)}m x ${size.heightMeters.toFixed(3)}m` : 'Unavailable'} /><Row label="Preview size in image" value={size ? `${size.widthPercent.toFixed(2)}% x ${size.heightPercent.toFixed(2)}%` : 'Unavailable'} /><Row label="Center position" value={`${room.centerLeftPercent.toFixed(1)}%, ${room.centerTopPercent.toFixed(1)}%`} /><Row label="Zoom" value={`${room.zoom.toFixed(2)}x`} /></dl><button type="button" onClick={() => onSave(room)} className="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">Save Preview Settings</button></aside></div></div></div>;
-}
+  const orientation = imageMetrics.naturalWidth === imageMetrics.naturalHeight ? 'Square' : imageMetrics.naturalWidth > imageMetrics.naturalHeight ? 'Landscape' : 'Portrait';
+  const variantAspectRatio = variant.height > 0 ? variant.width / variant.height : 0;
+  const overlayShape = variant.width === variant.height ? 'Square' : variant.width > variant.height ? 'Landscape' : 'Portrait';
+  const canRenderOverlay = imageLoaded && !imageError && imageMetrics.displayedWidth > 0 && imageMetrics.displayedHeight > 0 && !!style;
 
+  return (
+    <div className="fixed inset-0 z-50 overflow-auto bg-black/60 p-4">
+      <div className="mx-auto w-full max-w-6xl rounded-lg bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+          <div><h3 className="text-lg font-semibold text-gray-900">{room.name}</h3><p className="text-sm text-gray-500">Drag the product to position it in the room.</p></div>
+          <IconButton title="Close" onClick={onClose}><X className="h-5 w-5" /></IconButton>
+        </div>
+        <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="relative flex h-auto min-h-64 max-h-[70vh] w-full items-center justify-center overflow-hidden rounded-md bg-slate-50 p-2 ring-1 ring-gray-300">
+            {!room.roomImageUrl && <p className="py-24 text-sm text-gray-500">Room image URL is missing.</p>}
+            {room.roomImageUrl && !imageLoaded && !imageError && <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-50 text-sm text-gray-500">Loading room image...</div>}
+            {imageError && <p className="py-24 text-sm text-red-600">The room image could not be loaded.</p>}
+            {room.roomImageUrl && !imageError && (
+              <div ref={wrapperRef} className="relative inline-block max-h-[70vh] max-w-full overflow-hidden leading-none">
+                <img ref={imageRef} src={room.roomImageUrl} alt={room.name} onLoad={handleImageLoad} onError={() => { setImageError(true); setImageLoaded(false); }} className="block h-auto max-h-[70vh] w-auto max-w-full object-contain" />
+                {canRenderOverlay && (
+                  <div onPointerDown={startDrag} onPointerMove={drag} style={style ?? undefined} className="absolute box-border flex min-h-0 min-w-0 touch-none cursor-grab select-none items-center justify-center overflow-hidden border-2 border-slate-900/90 bg-white text-center text-slate-900/90 shadow-xl active:cursor-grabbing">
+                    {imageUrl && <img src={imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+                    <div className="relative p-2 text-xs">
+                      <strong className="block">{product.name}</strong>
+                      <span>{variant.name}</span>
+                      {/* <span className="block">{variant.width} x {variant.height} {variant.unit}</span>
+                      <span className="block">{variant.dpi} DPI</span> */}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <aside className="space-y-4">
+            <div><label className="block text-sm font-medium text-gray-700">Zoom: {room.zoom.toFixed(2)}x</label><input type="range" min="0.25" max="3" step="0.05" value={room.zoom} onChange={(e) => onChange({ ...room, zoom: Number(e.target.value) })} className="mt-2 w-full accent-slate-900" /></div>
+            {variant.unit === 'px' && <Warning>This variant uses px unit, so real-world scaling cannot be calculated. Please use inch or mm for real-world preview.</Warning>}
+            {!room.roomImageUrl && <Warning>Room image URL is missing.</Warning>}
+            {!room.roomWidthMeters && <Warning>Room width is missing.</Warning>}
+            {(!variant.width || !variant.height) && <Warning>Variant width or height is missing.</Warning>}
+            {!variant.unit && <Warning>Variant unit is missing.</Warning>}
+            {!variant.dpi && <Warning>Variant DPI is missing.</Warning>}
+            <dl className="space-y-2 text-sm">
+              <Row label="Image orientation" value={imageLoaded ? orientation : 'Loading'} />
+              <Row label="Natural image size" value={imageLoaded ? `${imageMetrics.naturalWidth} x ${imageMetrics.naturalHeight}px` : 'Unavailable'} />
+              <Row label="Displayed image size" value={imageLoaded ? `${Math.round(imageMetrics.displayedWidth)} x ${Math.round(imageMetrics.displayedHeight)}px` : 'Unavailable'} />
+              <Row label="Variant aspect ratio" value={variantAspectRatio > 0 ? variantAspectRatio.toFixed(2) : 'Unavailable'} />
+              <Row label="Overlay calculated size" value={size ? `${size.widthPercent.toFixed(2)}% x ${size.heightPercent.toFixed(2)}%` : 'Unavailable'} />
+              <Row label="Overlay expected shape" value={overlayShape} />
+              <Row label="Room width" value={`${room.roomWidthMeters}m`} />
+              <Row label="Variant physical size" value={size ? `${size.widthMeters.toFixed(3)}m x ${size.heightMeters.toFixed(3)}m` : 'Unavailable'} />
+              <Row label="Preview size in image" value={size ? `${size.widthPercent.toFixed(2)}% x ${size.heightPercent.toFixed(2)}%` : 'Unavailable'} />
+              <Row label="Center position" value={`${room.centerLeftPercent.toFixed(1)}%, ${room.centerTopPercent.toFixed(1)}%`} />
+              <Row label="Zoom" value={`${room.zoom.toFixed(2)}x`} />
+            </dl>
+            <button type="button" onClick={() => onSave(room)} className="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">Save Preview Settings</button>
+          </aside>
+        </div>
+      </div>
+    </div>
+  );
+}
 function Header({ children }: { children: React.ReactNode }) { return <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">{children}</th>; }
 function IconButton({ title, onClick, danger, children }: { title: string; onClick: () => void; danger?: boolean; children: React.ReactNode }) { return <button type="button" title={title} onClick={onClick} className={`rounded-md p-2 ${danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}>{children}</button>; }
 function Warning({ children }: { children: React.ReactNode }) { return <div className="mt-4 rounded-md bg-amber-50 p-3 text-sm text-amber-800 ring-1 ring-amber-200">{children}</div>; }
