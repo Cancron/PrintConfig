@@ -3,6 +3,8 @@ import express from 'express';
 import { categoryRoutes } from './routes/category.routes.js';
 import { merchantRoutes } from './routes/merchant.routes.js';
 import { productRoutes } from './routes/product.routes.js';
+import { imageFolderRoutes } from './routes/image-folder.routes.js';
+import { imageAssetRoutes } from './routes/image-asset.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const configuredOrigins = (process.env.FRONTEND_URL ?? 'http://localhost:5173,http://127.0.0.1:5173')
@@ -29,4 +31,6 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'product-con
 app.use('/api/merchants', merchantRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/image-folders', imageFolderRoutes);
+app.use('/api/image-assets', imageAssetRoutes);
 app.use(errorHandler);

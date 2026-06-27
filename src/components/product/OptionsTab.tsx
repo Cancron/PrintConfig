@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Check, Copy, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
+import { ImageField } from '../gallery/ImageField';
 import type { PriceModifierType, Product, ProductOptionDisplayType, ProductOptionGroup, ProductOptionValue } from '../../types';
 
 interface Props {
@@ -168,8 +169,8 @@ export function OptionsTab({ product, onSave }: Props) {
                   <Select label="Price Modifier Type" value={value.priceModifierType} onChange={(e) => updateValue(entityKey(value), 'priceModifierType', e.target.value as PriceModifierType)} options={modifierOptions} />
                   <Input label="Price Modifier" type="number" step="0.01" value={value.priceModifier} onChange={(e) => updateValue(entityKey(value), 'priceModifier', Number(e.target.value))} error={errors[`value.${entityKey(value)}.priceModifier`]} />
                   <Input label="Sort Order" type="number" value={value.sortOrder} onChange={(e) => updateValue(entityKey(value), 'sortOrder', Number(e.target.value))} />
-                  {/* <Input label="Preview Image URL" value={value.previewImageUrl} onChange={(e) => updateValue(entityKey(value), 'previewImageUrl', e.target.value)} /> */}
-                  <Input label="Thumbnail Image URL" value={value.thumbnailImageUrl} onChange={(e) => updateValue(entityKey(value), 'thumbnailImageUrl', e.target.value)} />
+                  <ImageField label="Preview Image URL" url={value.previewImageUrl} assetId={value.previewImageAssetId} onChange={(url, assetId) => { updateValue(entityKey(value), 'previewImageUrl', url); updateValue(entityKey(value), 'previewImageAssetId', assetId); }} />
+                  <ImageField label="Thumbnail Image URL" url={value.thumbnailImageUrl} assetId={value.thumbnailImageAssetId} onChange={(url, assetId) => { updateValue(entityKey(value), 'thumbnailImageUrl', url); updateValue(entityKey(value), 'thumbnailImageAssetId', assetId); }} />
                   <Input label="Color Hex" value={value.metadata.colorHex ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'colorHex', e.target.value)} error={errors[`value.${entityKey(value)}.colorHex`]} />
                   {/* <Input label="Production Code" value={value.metadata.productionCode ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'productionCode', e.target.value)} /> */}
                 </div>

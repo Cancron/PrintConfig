@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Merchant, Product, ProductCategory } from '../types';
+import type { ImageAsset, ImageFolder, Merchant, Product, ProductCategory } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api';
 
@@ -26,6 +26,7 @@ function normalizeMerchant(raw: any): Merchant {
     name: raw.name ?? '',
     slug: raw.slug ?? '',
     logoUrl: raw.logoUrl ?? '',
+    logoAssetId: raw.logoAssetId ? String(raw.logoAssetId) : undefined,
     status: raw.status === 'draft' || raw.status === 'Draft' ? 'Draft' : 'Active',
     editorPrimaryColor: raw.editorPrimaryColor ?? '#111827',
     editorSecondaryColor: raw.editorSecondaryColor ?? '#f3f4f6',
@@ -46,6 +47,7 @@ function normalizeCategory(raw: any): ProductCategory {
     description: raw.description ?? '',
     status: raw.status === 'archived' ? 'archived' : raw.status === 'active' ? 'active' : 'draft',
     thumbnailUrl: raw.thumbnailUrl ?? '',
+    thumbnailAssetId: raw.thumbnailAssetId ? String(raw.thumbnailAssetId) : undefined,
     sortOrder: Number(raw.sortOrder ?? 0),
     createdAt: raw.createdAt ?? new Date().toISOString(),
     updatedAt: raw.updatedAt ?? new Date().toISOString(),
@@ -76,6 +78,22 @@ function normalizeTemplates(templates: any[] = []) {
   }));
 }
 
+function normalizeFolder(raw: any): ImageFolder {
+  return { ...raw, _id: idOf(raw), accountId: String(raw.accountId ?? ''), merchantId: raw.merchantId ? String(raw.merchantId) : null, parentFolderId: raw.parentFolderId ? String(raw.parentFolderId) : null };
+}
+
+function normalizeAsset(raw: any): ImageAsset {
+  return { ...raw, _id: idOf(raw), accountId: String(raw.accountId ?? ''), merchantId: raw.merchantId ? String(raw.merchantId) : null, folderId: raw.folderId ? String(raw.folderId) : null, tags: raw.tags ?? [] };
+}
+
+function galleryQuery(input: { accountId: string; merchantId?: string; folderId?: string | null; scope?: string; search?: string }) {
+  const params = new URLSearchParams({ accountId: input.accountId });
+  if (input.merchantId) params.set('merchantId', input.merchantId);
+  if (input.folderId) params.set('folderId', input.folderId);
+  if (input.scope) params.set('scope', input.scope);
+  if (input.search) params.set('search', input.search);
+  return params.toString();
+}
 function normalizeProduct(raw: any): Product {
   return {
     ...raw,
@@ -121,6 +139,18 @@ function productPayload(product: Product) {
 }
 export const api = {
   health: () => request<{ ok: boolean }>('/health'),
+  listImageFolders: (filters: { accountId: string; merchantId?: string; folderId?: string | null; scope?: string; search?: string }) => request<any[]>(`/image-folders?${galleryQuery(filters)}`).then((items) => items.map(normalizeFolder)),
+  listAllImageFolders: (accountId: string, merchantId?: string) => request<any[]>(`/image-folders/all?${galleryQuery({ accountId, merchantId })}`).then((items) => items.map(normalizeFolder)),
+  getImageFolder: (id: string) => request<any>(`/image-folders/${id}`).then(normalizeFolder),
+  createImageFolder: (folder: ImageFolder) => request<any>('/image-folders', { method: 'POST', body: JSON.stringify(apiPayload(withoutRootId(folder))) }).then(normalizeFolder),
+  updateImageFolder: (folder: ImageFolder) => request<any>(`/image-folders/${folder._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(folder))) }).then(normalizeFolder),
+  deleteImageFolder: (id: string) => request(`/image-folders/${id}`, { method: 'DELETE' }),
+  listImageAssets: (filters: { accountId: string; merchantId?: string; folderId?: string | null; scope?: string; search?: string }) => request<any[]>(`/image-assets?${galleryQuery(filters)}`).then((items) => items.map(normalizeAsset)),
+  getImageAsset: (id: string) => request<any>(`/image-assets/${id}`).then(normalizeAsset),
+  createImageAsset: (asset: ImageAsset) => request<any>('/image-assets', { method: 'POST', body: JSON.stringify(apiPayload(withoutRootId(asset))) }).then(normalizeAsset),
+  updateImageAsset: (asset: ImageAsset) => request<any>(`/image-assets/${asset._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(asset))) }).then(normalizeAsset),
+  deleteImageAsset: (id: string) => request(`/image-assets/${id}`, { method: 'DELETE' }),
+  moveImageAsset: (id: string, folderId?: string | null) => request<any>(`/image-assets/${id}/move`, { method: 'POST', body: JSON.stringify({ folderId: folderId || null }) }).then(normalizeAsset),
   listMerchants: (accountId: string) => request<any[]>(`/merchants?accountId=${encodeURIComponent(accountId)}`).then((items) => items.map(normalizeMerchant)),
   updateMerchant: (merchant: Merchant) => request<any>(`/merchants/${merchant._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(merchant))) }).then(normalizeMerchant),
   listCategories: (accountId: string, merchantId: string) => request<any[]>(`/categories?accountId=${encodeURIComponent(accountId)}&merchantId=${encodeURIComponent(merchantId)}`).then((items) => items.map(normalizeCategory)),

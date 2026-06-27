@@ -4,6 +4,7 @@ import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Textarea } from '../ui/Textarea';
 import { ThumbnailUpload } from './ThumbnailUpload';
+import { ImageField } from '../gallery/ImageField';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { useCategories } from '../../hooks/useCategories';
 import { validateProductBasicInfo } from '../../lib/validation';
@@ -51,6 +52,7 @@ export function BasicInfoTab({ product, onSave }: Props) {
   const [scope, setScope] = useState<ProductScope>(product.scope);
   const [basePrice, setBasePrice] = useState(String(product.basePrice));
   const [thumbnailUrl, setThumbnailUrl] = useState(product.thumbnailUrl);
+  const [thumbnailAssetId, setThumbnailAssetId] = useState(product.thumbnailAssetId);
   const [categoryId, setCategoryId] = useState(product.categoryId);
   const [saved, setSaved] = useState(false);
 
@@ -74,6 +76,7 @@ export function BasicInfoTab({ product, onSave }: Props) {
       merchantId: scope === 'merchant' ? selectedMerchant?._id ?? product.merchantId ?? null : null,
       basePrice: Number(basePrice),
       thumbnailUrl: thumbnailUrl.trim(),
+      thumbnailAssetId,
       categoryId,
       categorySnapshot: categories.find((category) => category._id === categoryId),
     });
@@ -92,7 +95,8 @@ export function BasicInfoTab({ product, onSave }: Props) {
       {scope === 'merchant' && selectedMerchant && <p className="rounded-md bg-purple-50 p-3 text-sm text-purple-700 ring-1 ring-inset ring-purple-200">This product will belong to {selectedMerchant.name}.</p>}
       <Select label="Status" value={status} onChange={(e) => setStatus(e.target.value as ProductStatus)} options={statusOptions} />
       <Input label="Base Price" type="number" step="0.01" min="0" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} error={errors.basePrice} placeholder="0.00" />
-      <ThumbnailUpload value={thumbnailUrl} onChange={setThumbnailUrl} productId={product._id} />
+      <ThumbnailUpload value={thumbnailUrl} onChange={(url) => { setThumbnailUrl(url); setThumbnailAssetId(undefined); }} productId={product._id} />
+      <ImageField label="Thumbnail Image URL" url={thumbnailUrl} assetId={thumbnailAssetId} onChange={(url, assetId) => { setThumbnailUrl(url); setThumbnailAssetId(assetId); }} />
 
       <div className="flex items-center gap-3 pt-2">
         <button type="submit" disabled={!isValid} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors disabled:cursor-not-allowed disabled:bg-slate-300">

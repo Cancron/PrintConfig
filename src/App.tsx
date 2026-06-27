@@ -7,6 +7,7 @@ import { Products } from './pages/Products';
 import { CreateProduct } from './pages/CreateProduct';
 import { ProductDetail } from './pages/ProductDetail';
 import { MerchantSettings } from './pages/MerchantSettings';
+import { ImageLibrary } from './pages/ImageLibrary';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           <Route path="/products/new" element={<CreateProduct />} />
           <Route path="/products/:id" element={<ProductDetail />} />
           <Route path="/merchant-settings" element={<MerchantSettings />} />
+          <Route path="/image-library" element={<ImageLibrary />} />
         </Routes>
       </Layout>
     </BrowserRouter>

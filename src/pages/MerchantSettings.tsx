@@ -4,6 +4,7 @@ import { PageHeader } from '../components/PageHeader';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
+import { ImageField } from '../components/gallery/ImageField';
 import { useWorkspace } from '../hooks/useWorkspace';
 import type { Merchant, MerchantStatus } from '../types';
 
@@ -42,7 +43,7 @@ export function MerchantSettings() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input label="Merchant Name" value={form.name} onChange={(e) => update('name', e.target.value)} error={errors.name} />
             <Input label="Slug" value={form.slug} onChange={(e) => update('slug', e.target.value)} error={errors.slug} />
-            <Input label="Logo URL" value={form.logoUrl} onChange={(e) => update('logoUrl', e.target.value)} placeholder="https://..." />
+            <ImageField label="Logo URL" url={form.logoUrl} assetId={form.logoAssetId} onChange={(url, assetId) => setForm((prev) => ({ ...prev, logoUrl: url, logoAssetId: assetId }))} />
             <Select label="Status" value={form.status} onChange={(e) => update('status', e.target.value as MerchantStatus)} options={statusOptions} />
             <ColorField label="Editor Primary Color" value={form.editorPrimaryColor} error={errors.editorPrimaryColor} onChange={(value) => update('editorPrimaryColor', value)} />
             <ColorField label="Editor Secondary Color" value={form.editorSecondaryColor} error={errors.editorSecondaryColor} onChange={(value) => update('editorSecondaryColor', value)} />

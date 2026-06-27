@@ -6,6 +6,7 @@ const merchantSchema = new Schema(
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true, trim: true },
     logoUrl: { type: String, default: '' },
+    logoAssetId: { type: Schema.Types.ObjectId, ref: 'ImageAsset' },
     status: { type: String, enum: ['active', 'draft', 'archived'], default: 'active' },
     editorPrimaryColor: { type: String, default: '#111827' },
     editorSecondaryColor: { type: String, default: '#f3f4f6' },

@@ -6,6 +6,7 @@ import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
+import { ImageField } from '../gallery/ImageField';
 import { toPixels, validateVariant } from '../../lib/validation';
 import type { Product, ProductStatus, ProductUnit, ProductVariant } from '../../types';
 
@@ -39,7 +40,9 @@ export function VariantsTab({ product, onSave }: Props) {
     unit: 'inch' as ProductUnit,
     dpi: '300',
     previewImageUrl: '',
+    previewImageAssetId: undefined as string | undefined,
     thumbnailImageUrl: '',
+    thumbnailImageAssetId: undefined as string | undefined,
     options: [{ key: '', value: '' }],
   });
 
@@ -70,7 +73,9 @@ export function VariantsTab({ product, onSave }: Props) {
       unit: 'inch',
       dpi: '300',
       previewImageUrl: '',
+      previewImageAssetId: undefined,
       thumbnailImageUrl: '',
+      thumbnailImageAssetId: undefined,
       options: [{ key: '', value: '' }],
     });
   }
@@ -92,7 +97,9 @@ export function VariantsTab({ product, onSave }: Props) {
       unit: variant.unit,
       dpi: String(variant.dpi),
       previewImageUrl: variant.previewImageUrl,
+      previewImageAssetId: variant.previewImageAssetId,
       thumbnailImageUrl: variant.thumbnailImageUrl,
+      thumbnailImageAssetId: variant.thumbnailImageAssetId,
       options: Object.entries(variant.options).length > 0 ? Object.entries(variant.options).map(([key, value]) => ({ key, value })) : [{ key: '', value: '' }],
     });
     setEditingId(variant._id);
@@ -140,7 +147,9 @@ export function VariantsTab({ product, onSave }: Props) {
       unit: form.unit,
       dpi: Number(form.dpi),
       previewImageUrl: form.previewImageUrl.trim(),
+      previewImageAssetId: form.previewImageAssetId,
       thumbnailImageUrl: form.thumbnailImageUrl.trim(),
+      thumbnailImageAssetId: form.thumbnailImageAssetId,
       roomPreviews: existing?.roomPreviews ?? [],
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
@@ -182,8 +191,8 @@ export function VariantsTab({ product, onSave }: Props) {
             <Input label="Height" type="number" step="0.01" min="0" value={form.height} onChange={(event) => setForm((prev) => ({ ...prev, height: event.target.value }))} error={errors.height} />
             <Select label="Unit" value={form.unit} onChange={(event) => setForm((prev) => ({ ...prev, unit: event.target.value as ProductUnit }))} options={unitOptions} error={errors.unit} />
             <Input label="DPI" type="number" min="1" value={form.dpi} onChange={(event) => setForm((prev) => ({ ...prev, dpi: event.target.value }))} error={errors.dpi} />
-            <Input label="Preview Image URL" type="url" value={form.previewImageUrl} onChange={(event) => setForm((prev) => ({ ...prev, previewImageUrl: event.target.value }))} placeholder="https://..." />
-            <Input label="Thumbnail Image URL" type="url" value={form.thumbnailImageUrl} onChange={(event) => setForm((prev) => ({ ...prev, thumbnailImageUrl: event.target.value }))} placeholder="https://..." />
+            <ImageField label="Preview Image URL" url={form.previewImageUrl} assetId={form.previewImageAssetId} onChange={(url, assetId) => setForm((prev) => ({ ...prev, previewImageUrl: url, previewImageAssetId: assetId }))} />
+            <ImageField label="Thumbnail Image URL" url={form.thumbnailImageUrl} assetId={form.thumbnailImageAssetId} onChange={(url, assetId) => setForm((prev) => ({ ...prev, thumbnailImageUrl: url, thumbnailImageAssetId: assetId }))} />
           </div>
 
           <div className="mt-5">

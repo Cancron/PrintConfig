@@ -10,6 +10,7 @@ const productCategorySchema = new Schema(
     description: { type: String, default: '' },
     status: { type: String, enum: ['active', 'draft', 'archived'], default: 'draft', index: true },
     thumbnailUrl: { type: String, default: '' },
+    thumbnailAssetId: { type: Schema.Types.ObjectId, ref: 'ImageAsset' },
     sortOrder: { type: Number, default: 0 },
   },
   { timestamps: true }

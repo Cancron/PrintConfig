@@ -5,6 +5,7 @@ import { PageHeader } from '../components/PageHeader';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
+import { ImageField } from '../components/gallery/ImageField';
 import { useProducts } from '../hooks/useProducts';
 import { useCategories } from '../hooks/useCategories';
 import { useWorkspace } from '../hooks/useWorkspace';
@@ -55,6 +56,7 @@ export function CreateProduct() {
   const [scope, setScope] = useState<ProductScope>('shared');
   const [basePrice, setBasePrice] = useState('');
   const [thumbnailUrl, setThumbnailUrl] = useState('');
+  const [thumbnailAssetId, setThumbnailAssetId] = useState<string>();
   const [categoryId, setCategoryId] = useState(initialCategoryId);
 
   const errors = useMemo(
@@ -85,6 +87,7 @@ export function CreateProduct() {
       status,
       basePrice: Number(basePrice),
       thumbnailUrl: thumbnailUrl.trim(),
+      thumbnailAssetId,
       categoryId,
       categorySnapshot: categories.find((category) => category._id === categoryId),
       editorRules: createDefaultEditorRules(),
@@ -119,7 +122,7 @@ export function CreateProduct() {
         {scope === 'merchant' && selectedMerchant && <p className="rounded-md bg-purple-50 p-3 text-sm text-purple-700 ring-1 ring-inset ring-purple-200">This product will belong only to {selectedMerchant.name}.</p>}
         <Select label="Status" value={status} onChange={(e) => setStatus(e.target.value as ProductStatus)} options={statusOptions} />
         <Input label="Base Price" type="number" step="0.01" min="0" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} error={errors.basePrice} placeholder="0.00" />
-        <Input label="Thumbnail Image URL" type="url" value={thumbnailUrl} onChange={(e) => setThumbnailUrl(e.target.value)} placeholder="https://..." />
+        <ImageField label="Thumbnail Image URL" url={thumbnailUrl} assetId={thumbnailAssetId} onChange={(url, assetId) => { setThumbnailUrl(url); setThumbnailAssetId(assetId); }} />
 
         <div className="flex items-center gap-3 pt-2">
           <button type="submit" disabled={!isValid} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors disabled:cursor-not-allowed disabled:bg-slate-300">Create Product</button>

@@ -22,6 +22,52 @@ export type ProductUnit = 'inch' | 'mm' | 'px';
 export type ProductOptionDisplayType = 'Dropdown' | 'Radio Buttons' | 'Color Swatches' | 'Image Swatches' | 'Text Buttons';
 export type PriceModifierType = 'none' | 'fixed' | 'percentage';
 
+export interface ImageFolder {
+  _id: string;
+  accountId: string;
+  merchantId?: string | null;
+  scope: ProductScope;
+  parentFolderId?: string | null;
+  name: string;
+  slug: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ImageAsset {
+  _id: string;
+  accountId: string;
+  merchantId?: string | null;
+  scope: ProductScope;
+  folderId?: string | null;
+  name: string;
+  filename: string;
+  originalFilename: string;
+  url: string;
+  publicUrl: string;
+  thumbnailUrl?: string;
+  storageProvider: 'supabase';
+  bucket: string;
+  storagePath: string;
+  mimeType: string;
+  sizeBytes?: number;
+  width?: number;
+  height?: number;
+  altText?: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ImagePickerValue {
+  assetId: string;
+  url: string;
+  thumbnailUrl?: string;
+  name: string;
+  altText?: string;
+  storagePath: string;
+}
 export interface Account {
   _id: string;
   name: string;
@@ -33,6 +79,7 @@ export interface Merchant {
   name: string;
   slug: string;
   logoUrl: string;
+  logoAssetId?: string;
   status: MerchantStatus;
   editorPrimaryColor: string;
   editorSecondaryColor: string;
@@ -51,6 +98,7 @@ export interface ProductCategory {
   description: string;
   status: ProductCategoryStatus;
   thumbnailUrl: string;
+  thumbnailAssetId?: string;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -76,7 +124,9 @@ export interface ProductOptionValue {
   isActive: boolean;
   sortOrder: number;
   previewImageUrl: string;
+  previewImageAssetId?: string;
   thumbnailImageUrl: string;
+  thumbnailImageAssetId?: string;
   metadata: ProductOptionValueMetadata;
   createdAt: string;
   updatedAt: string;
@@ -193,6 +243,7 @@ export interface VariantRoomPreview {
   variantId: string;
   name: string;
   roomImageUrl: string;
+  roomImageAssetId?: string;
   roomWidthMeters: number;
   roomHeightMeters?: number;
   centerLeftPercent: number;
@@ -217,7 +268,9 @@ export interface ProductVariant {
   unit: ProductUnit;
   dpi: number;
   previewImageUrl: string;
+  previewImageAssetId?: string;
   thumbnailImageUrl: string;
+  thumbnailImageAssetId?: string;
   roomPreviews: VariantRoomPreview[];
   createdAt: string;
   updatedAt: string;
@@ -235,6 +288,7 @@ export interface Product {
   status: ProductStatus;
   basePrice: number;
   thumbnailUrl: string;
+  thumbnailAssetId?: string;
   categoryId: string;
   categorySnapshot?: ProductCategory;
   surface: ProductSurface | null;
