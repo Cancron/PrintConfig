@@ -71,11 +71,11 @@ export function BasicInfoTab({ product, onSave }: Props) {
       description: description.trim(),
       status,
       scope,
-      merchantId: scope === 'merchant' ? selectedMerchant?.id ?? product.merchantId ?? null : null,
+      merchantId: scope === 'merchant' ? selectedMerchant?._id ?? product.merchantId ?? null : null,
       basePrice: Number(basePrice),
       thumbnailUrl: thumbnailUrl.trim(),
       categoryId,
-      categorySnapshot: categories.find((category) => category.id === categoryId),
+      categorySnapshot: categories.find((category) => category._id === categoryId),
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -85,14 +85,14 @@ export function BasicInfoTab({ product, onSave }: Props) {
     <form onSubmit={handleSubmit} className="max-w-2xl space-y-6 pb-6">
       <Input label="Product Name" value={name} onChange={(e) => setName(e.target.value)} error={errors.name} placeholder="e.g. Canvas Print" />
       <Input label="Slug" value={slug} onChange={(e) => setSlug(e.target.value)} error={errors.slug} placeholder="e.g. canvas-print" />
-      <Select label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} options={categories.map((category) => ({ value: category.id, label: category.name }))} error={errors.categoryId} />
+      <Select label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} options={categories.map((category) => ({ value: category._id, label: category.name }))} error={errors.categoryId} />
       <Select label="Product Type" value={productType} onChange={(e) => setProductType(e.target.value as ProductType)} options={productTypeOptions} error={errors.productType} />
       <Textarea label="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="Describe the product..." />
       <Select label="Product Scope" value={scope} onChange={(e) => setScope(e.target.value as ProductScope)} options={scopeOptions} />
       {scope === 'merchant' && selectedMerchant && <p className="rounded-md bg-purple-50 p-3 text-sm text-purple-700 ring-1 ring-inset ring-purple-200">This product will belong to {selectedMerchant.name}.</p>}
       <Select label="Status" value={status} onChange={(e) => setStatus(e.target.value as ProductStatus)} options={statusOptions} />
       <Input label="Base Price" type="number" step="0.01" min="0" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} error={errors.basePrice} placeholder="0.00" />
-      <ThumbnailUpload value={thumbnailUrl} onChange={setThumbnailUrl} productId={product.id} />
+      <ThumbnailUpload value={thumbnailUrl} onChange={setThumbnailUrl} productId={product._id} />
 
       <div className="flex items-center gap-3 pt-2">
         <button type="submit" disabled={!isValid} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors disabled:cursor-not-allowed disabled:bg-slate-300">

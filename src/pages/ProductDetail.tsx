@@ -30,7 +30,7 @@ export function ProductDetail() {
   const [importError, setImportError] = useState('');
   const [importScope, setImportScope] = useState<ProductScope>('shared');
 
-  const product = products.find((p) => p.id === id);
+  const product = products.find((p) => p._id === id);
 
   if (!product) {
     return (
@@ -43,7 +43,7 @@ export function ProductDetail() {
 
   const currentProduct = product;
   const defaultTab = searchParams.get('tab') ?? 'basic';
-  const merchantName = merchants.find((merchant) => merchant.id === currentProduct.merchantId)?.name ?? selectedMerchant?.name ?? 'selected merchant';
+  const merchantName = merchants.find((merchant) => merchant._id === currentProduct.merchantId)?.name ?? selectedMerchant?.name ?? 'selected merchant';
 
   function showMessage(type: 'success' | 'error', text: string) {
     setMessage({ type, text });
@@ -55,7 +55,7 @@ export function ProductDetail() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${currentProduct.slug || currentProduct.id}-configuration.json`;
+    link.download = `${currentProduct.slug || currentProduct._id}-configuration.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -63,9 +63,9 @@ export function ProductDetail() {
     showMessage('success', 'Product configuration exported.');
   }
 
-  function handleDuplicateProduct() {
+  async function handleDuplicateProduct() {
     const targetScope: ProductScope = currentProduct.scope === 'shared' && !confirm('Duplicate as shared product? Choose Cancel to duplicate as merchant custom for the selected merchant.') ? 'merchant' : currentProduct.scope;
-    const newId = duplicateProduct(currentProduct.id, targetScope);
+    const newId = await duplicateProduct(currentProduct._id, targetScope);
     if (!newId) {
       showMessage('error', 'Could not duplicate product.');
       return;
@@ -74,9 +74,9 @@ export function ProductDetail() {
     navigate(`/products/${newId}`);
   }
 
-  function handleImportJson() {
+  async function handleImportJson() {
     const result = parseImportedProduct(importJson, {
-      accountId: account.id,
+      accountId: account._id,
       scope: importScope,
       merchantId: importScope === 'merchant' ? selectedMerchantId : null,
     });
@@ -84,24 +84,24 @@ export function ProductDetail() {
       setImportError(result.error ?? 'Import failed.');
       return;
     }
-    addProduct(result.product);
+    const saved = await addProduct(result.product);
     setImportOpen(false);
     setImportJson('');
     setImportError('');
     showMessage('success', 'Product configuration imported as a new draft product.');
-    navigate(`/products/${result.product.id}`);
+    navigate(`/products/${saved._id}`);
   }
 
   const tabs = [
-    { id: 'basic', label: 'Basic Info', content: <BasicInfoTab product={product} onSave={updateProduct} /> },
-    { id: 'options', label: 'Options', content: <OptionsTab product={product} onSave={updateProduct} /> },
-    { id: 'variants', label: 'Variants', content: <VariantsTab product={product} onSave={updateProduct} /> },
-    { id: 'surfaces', label: 'Surfaces', content: <SurfacesTab product={product} onSave={updateProduct} /> },
-    { id: 'editor-rules', label: 'Editor Rules', content: <EditorRulesTab product={product} onSave={updateProduct} /> },
-    { id: 'export-rules', label: 'Export Rules', content: <ExportRulesTab product={product} onSave={updateProduct} /> },
-    { id: 'templates', label: 'Templates', content: <TemplatesTab product={product} onSave={updateProduct} /> },
-    { id: 'preview', label: 'Preview', content: <PreviewTab product={product} /> },
-    { id: 'json', label: 'JSON', content: <JsonPreviewTab product={product} /> },
+    { _id: 'basic', label: 'Basic Info', content: <BasicInfoTab product={product} onSave={updateProduct} /> },
+    { _id: 'options', label: 'Options', content: <OptionsTab product={product} onSave={updateProduct} /> },
+    { _id: 'variants', label: 'Variants', content: <VariantsTab product={product} onSave={updateProduct} /> },
+    { _id: 'surfaces', label: 'Surfaces', content: <SurfacesTab product={product} onSave={updateProduct} /> },
+    { _id: 'editor-rules', label: 'Editor Rules', content: <EditorRulesTab product={product} onSave={updateProduct} /> },
+    { _id: 'export-rules', label: 'Export Rules', content: <ExportRulesTab product={product} onSave={updateProduct} /> },
+    { _id: 'templates', label: 'Templates', content: <TemplatesTab product={product} onSave={updateProduct} /> },
+    { _id: 'preview', label: 'Preview', content: <PreviewTab product={product} /> },
+    { _id: 'json', label: 'JSON', content: <JsonPreviewTab product={product} /> },
   ];
 
   return (

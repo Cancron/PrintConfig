@@ -44,7 +44,7 @@ export function VariantsTab({ product, onSave }: Props) {
 
   const errors = useMemo(
     () => validateVariant({
-      id: editingId,
+      _id: editingId,
       name: form.name,
       sku: form.sku,
       price: form.price,
@@ -52,7 +52,7 @@ export function VariantsTab({ product, onSave }: Props) {
       height: form.height,
       unit: form.unit,
       dpi: form.dpi,
-      existingSkus: product.variants.map((variant) => ({ id: variant.id, sku: variant.sku })),
+      existingSkus: product.variants.map((variant) => ({ _id: variant._id, sku: variant.sku })),
     }),
     [editingId, form.dpi, form.height, form.name, form.price, form.sku, form.unit, form.width, product.variants]
   );
@@ -94,7 +94,7 @@ export function VariantsTab({ product, onSave }: Props) {
       thumbnailImageUrl: variant.thumbnailImageUrl,
       options: Object.entries(variant.options).length > 0 ? Object.entries(variant.options).map(([key, value]) => ({ key, value })) : [{ key: '', value: '' }],
     });
-    setEditingId(variant.id);
+    setEditingId(variant._id);
     setIsAdding(false);
   }
 
@@ -124,10 +124,11 @@ export function VariantsTab({ product, onSave }: Props) {
     }
 
     const now = new Date().toISOString();
-    const existing = product.variants.find((variant) => variant.id === editingId);
+    const existing = product.variants.find((variant) => variant._id === editingId);
     const variant: ProductVariant = {
-      id: editingId ?? `v-${Date.now()}`,
-      productId: product.id,
+      _id: editingId ?? '',
+      clientId: existing?.clientId ?? (editingId ? undefined : crypto.randomUUID()),
+      productId: product._id,
       name: form.name.trim(),
       sku: form.sku.trim(),
       price: Number(form.price),
@@ -143,7 +144,7 @@ export function VariantsTab({ product, onSave }: Props) {
       updatedAt: now,
     };
 
-    const variants = editingId ? product.variants.map((item) => (item.id === editingId ? variant : item)) : [...product.variants, variant];
+    const variants = editingId ? product.variants.map((item) => (item._id === editingId ? variant : item)) : [...product.variants, variant];
     onSave({ ...product, variants, updatedAt: now });
     cancelEdit();
   }
@@ -151,7 +152,7 @@ export function VariantsTab({ product, onSave }: Props) {
   function handleDelete(id: string) {
     if (!confirm('Are you sure you want to delete this variant?')) return;
     const now = new Date().toISOString();
-    onSave({ ...product, variants: product.variants.filter((variant) => variant.id !== id), updatedAt: now });
+    onSave({ ...product, variants: product.variants.filter((variant) => variant._id !== id), updatedAt: now });
   }
 
   const isFormOpen = isAdding || editingId !== null;
@@ -224,7 +225,7 @@ export function VariantsTab({ product, onSave }: Props) {
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
               {product.variants.map((variant) => (
-                <tr key={variant.id}>
+                <tr key={variant._id}>
                   <td className="px-4 py-3">{variant.thumbnailImageUrl ? <img src={variant.thumbnailImageUrl} alt={variant.name} className="h-10 w-10 rounded-md object-cover ring-1 ring-gray-200" /> : <div className="h-10 w-10 rounded-md bg-gray-100 ring-1 ring-gray-200" />}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">{variant.name}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{variant.sku}</td>
@@ -237,7 +238,7 @@ export function VariantsTab({ product, onSave }: Props) {
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => setPreviewVariant(variant)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900" title="Preview"><Eye className="h-4 w-4" /></button>
                       <button onClick={() => startEdit(variant)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900" title="Edit"><Pencil className="h-4 w-4" /></button>
-                      <button onClick={() => handleDelete(variant.id)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                      <button onClick={() => handleDelete(variant._id)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Delete"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   </td>
                 </tr>

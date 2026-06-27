@@ -46,7 +46,7 @@ export function CreateProduct() {
   const { categories } = useCategories();
   const { selectedMerchant } = useWorkspace();
 
-  const initialCategoryId = searchParams.get('categoryId') ?? categories[0]?.id ?? '';
+  const initialCategoryId = searchParams.get('categoryId') ?? categories[0]?._id ?? '';
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [productType, setProductType] = useState<ProductType>('Canvas Print');
@@ -68,16 +68,16 @@ export function CreateProduct() {
     setSlug(value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!isValid) return;
 
     const now = new Date().toISOString();
     const product: Product = {
-      id: `p-${Date.now()}`,
-      accountId: account.id,
+      _id: '',
+      accountId: account._id,
       scope,
-      merchantId: scope === 'merchant' ? selectedMerchant?.id ?? null : null,
+      merchantId: scope === 'merchant' ? selectedMerchant?._id ?? null : null,
       name: name.trim(),
       slug: slug.trim(),
       productType,
@@ -86,7 +86,7 @@ export function CreateProduct() {
       basePrice: Number(basePrice),
       thumbnailUrl: thumbnailUrl.trim(),
       categoryId,
-      categorySnapshot: categories.find((category) => category.id === categoryId),
+      categorySnapshot: categories.find((category) => category._id === categoryId),
       editorRules: createDefaultEditorRules(),
       exportRules: createDefaultExportRules(),
       surface: null,
@@ -97,8 +97,8 @@ export function CreateProduct() {
       updatedAt: now,
     };
 
-    addProduct(product);
-    navigate('/products');
+    const saved = await addProduct(product);
+    navigate(`/products/${saved._id}`);
   }
 
   return (
@@ -112,7 +112,7 @@ export function CreateProduct() {
       <form onSubmit={handleSubmit} className="max-w-2xl bg-white rounded-lg shadow-sm ring-1 ring-gray-200 p-6 space-y-6">
         <Input label="Product Name" value={name} onChange={(e) => handleNameChange(e.target.value)} error={errors.name} placeholder="e.g. Canvas Print" />
         <Input label="Slug" value={slug} onChange={(e) => setSlug(e.target.value)} error={errors.slug} placeholder="e.g. canvas-print" />
-        <Select label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} options={categories.map((category) => ({ value: category.id, label: category.name }))} error={errors.categoryId} />
+        <Select label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} options={categories.map((category) => ({ value: category._id, label: category.name }))} error={errors.categoryId} />
         <Select label="Product Type" value={productType} onChange={(e) => setProductType(e.target.value as ProductType)} options={productTypeOptions} error={errors.productType} />
         <Textarea label="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="Describe the product..." />
         <Select label="Product Scope" value={scope} onChange={(e) => setScope(e.target.value as ProductScope)} options={scopeOptions} />

@@ -44,7 +44,7 @@ export function validateProductBasicInfo(input: {
 }
 
 export function validateVariant(input: {
-  id?: string | null;
+  _id?: string | null;
   name: string;
   sku: string;
   price: string | number;
@@ -52,7 +52,7 @@ export function validateVariant(input: {
   height: string | number;
   unit: string;
   dpi: string | number;
-  existingSkus: { id: string; sku: string }[];
+  existingSkus: { _id: string; sku: string }[];
 }): ValidationErrors {
   const errors: ValidationErrors = {};
   const price = Number(input.price);
@@ -64,7 +64,7 @@ export function validateVariant(input: {
   if (!input.name.trim()) errors.name = 'Variant name is required.';
   if (!input.sku.trim()) {
     errors.sku = 'SKU is required.';
-  } else if (input.existingSkus.some((item) => item.id !== input.id && item.sku.trim().toLowerCase() === sku)) {
+  } else if (input.existingSkus.some((item) => item._id !== input._id && item.sku.trim().toLowerCase() === sku)) {
     errors.sku = 'SKU must be unique within this product.';
   }
   if (input.price === '' || Number.isNaN(price) || price < 0) errors.price = 'Price must be zero or greater.';
@@ -176,7 +176,7 @@ export function normalizeUnit(value: unknown): ProductUnit {
 }
 
 export function validateCategory(input: {
-  id?: string | null;
+  _id?: string | null;
   name: string;
   slug: string;
   status: string;
@@ -194,7 +194,7 @@ export function validateCategory(input: {
     errors.slug = 'Slug is required.';
   } else if (!URL_SAFE_SLUG.test(slug)) {
     errors.slug = 'Use lowercase letters, numbers, and hyphens only.';
-  } else if (input.existingCategories.some((category) => category.id !== input.id && category.slug.toLowerCase() === slug && category.accountId === category.accountId && category.scope === input.scope && (category.scope === 'shared' || category.merchantId === input.merchantId))) {
+  } else if (input.existingCategories.some((category) => category._id !== input._id && category.slug.toLowerCase() === slug && category.accountId === category.accountId && category.scope === input.scope && (category.scope === 'shared' || category.merchantId === input.merchantId))) {
     errors.slug = 'Slug must be unique in this category scope.';
   }
   if (input.status !== 'active' && input.status !== 'draft' && input.status !== 'archived') errors.status = 'Status is required.';

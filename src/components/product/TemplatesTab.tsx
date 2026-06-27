@@ -31,23 +31,23 @@ export function TemplatesTab({ product, onSave }: Props) {
   const firstSurface = product.surface;
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<ProductTemplate>(() => createTemplate(product.id, firstVariant?.id ?? '', firstSurface?.id ?? ''));
+  const [form, setForm] = useState<ProductTemplate>(() => createTemplate(product._id, firstVariant?._id ?? '', firstSurface?._id ?? ''));
 
-  const selectedVariant = product.variants.find((variant) => variant.id === form.variantId);
-  const selectedSurface = product.surface?.id === form.surfaceId ? product.surface : product.surface;
+  const selectedVariant = product.variants.find((variant) => variant._id === form.variantId);
+  const selectedSurface = product.surface?._id === form.surfaceId ? product.surface : product.surface;
   const errors = useMemo(() => validateTemplate(form), [form]);
   const isValid = Object.keys(errors).length === 0;
 
   function startCreate() {
     const variant = product.variants[0];
-    setForm(createTemplate(product.id, variant?.id ?? '', product.surface?.id ?? ''));
+    setForm(createTemplate(product._id, variant?._id ?? '', product.surface?._id ?? ''));
     setEditingId(null);
     setIsFormOpen(true);
   }
 
   function startEdit(template: ProductTemplate) {
     setForm({ ...template, elements: template.elements.map((element) => ({ ...element })) });
-    setEditingId(template.id);
+    setEditingId(entityKey(template));
     setIsFormOpen(true);
   }
 
@@ -64,7 +64,7 @@ export function TemplatesTab({ product, onSave }: Props) {
     setForm((prev) => ({
       ...prev,
       variantId,
-      surfaceId: product.surface?.id ?? '',
+      surfaceId: product.surface?._id ?? '',
     }));
   }
 
@@ -78,14 +78,14 @@ export function TemplatesTab({ product, onSave }: Props) {
   function updateElement<K extends keyof TemplateElement>(id: string, field: K, value: TemplateElement[K]) {
     setForm((prev) => ({
       ...prev,
-      elements: prev.elements.map((element) => (element.id === id ? { ...element, [field]: value } : element)),
+      elements: prev.elements.map((element) => (entityKey(element) === id ? { ...element, [field]: value } : element)),
     }));
   }
 
   function deleteElement(id: string) {
     setForm((prev) => ({
       ...prev,
-      elements: prev.elements.filter((element) => element.id !== id),
+      elements: prev.elements.filter((element) => entityKey(element) !== id),
     }));
   }
 
@@ -109,7 +109,7 @@ export function TemplatesTab({ product, onSave }: Props) {
     };
 
     const templates = editingId
-      ? product.templates.map((item) => (item.id === editingId ? template : item))
+      ? product.templates.map((item) => (item._id === editingId ? template : item))
       : [...product.templates, template];
 
     onSave({ ...product, templates });
@@ -118,7 +118,7 @@ export function TemplatesTab({ product, onSave }: Props) {
 
   function deleteTemplate(id: string) {
     if (!confirm('Are you sure you want to delete this template?')) return;
-    onSave({ ...product, templates: product.templates.filter((template) => template.id !== id) });
+    onSave({ ...product, templates: product.templates.filter((template) => entityKey(template) !== id) });
   }
 
   return (
@@ -172,10 +172,10 @@ export function TemplatesTab({ product, onSave }: Props) {
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
               {product.templates.map((template) => {
-                const variant = product.variants.find((item) => item.id === template.variantId);
-                const surface = product.surface?.id === template.surfaceId ? product.surface : product.surface;
+                const variant = product.variants.find((item) => item._id === template.variantId);
+                const surface = product.surface?._id === template.surfaceId ? product.surface : product.surface;
                 return (
-                  <tr key={template.id}>
+                  <tr key={entityKey(template)}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {template.thumbnailUrl ? (
@@ -195,7 +195,7 @@ export function TemplatesTab({ product, onSave }: Props) {
                         <button type="button" onClick={() => startEdit(template)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900" title="Edit">
                           <Pencil className="h-4 w-4" />
                         </button>
-                        <button type="button" onClick={() => deleteTemplate(template.id)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Delete">
+                        <button type="button" onClick={() => deleteTemplate(entityKey(template))} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Delete">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -219,7 +219,7 @@ export function TemplatesTab({ product, onSave }: Props) {
                   label="Assigned Product Variant"
                   value={form.variantId}
                   onChange={(event) => updateVariant(event.target.value)}
-                  options={product.variants.length > 0 ? product.variants.map((variant) => ({ value: variant.id, label: `${variant.name} (${variant.sku})` })) : [{ value: '', label: 'No variants available' }]}
+                  options={product.variants.length > 0 ? product.variants.map((variant) => ({ value: variant._id, label: `${variant.name} (${variant.sku})` })) : [{ value: '', label: 'No variants available' }]}
                   error={errors.variantId}
                   disabled={product.variants.length === 0}
                 />
@@ -227,7 +227,7 @@ export function TemplatesTab({ product, onSave }: Props) {
                   label="Assigned Surface"
                   value={form.surfaceId}
                   onChange={(event) => update('surfaceId', event.target.value)}
-                  options={product.surface ? [{ value: product.surface.id, label: `${product.surface.name} (${product.surface.code})` }] : [{ value: '', label: 'No surface configured' }]}
+                  options={product.surface ? [{ value: product.surface._id, label: `${product.surface.name} (${product.surface.code})` }] : [{ value: '', label: 'No surface configured' }]}
                   error={errors.surfaceId}
                   disabled={!product.surface}
                 />
@@ -256,23 +256,23 @@ export function TemplatesTab({ product, onSave }: Props) {
                 ) : (
                   <div className="space-y-3">
                     {form.elements.map((element, index) => (
-                      <div key={element.id} className="rounded-lg bg-white p-4 ring-1 ring-gray-200">
+                      <div key={entityKey(element)} className="rounded-lg bg-white p-4 ring-1 ring-gray-200">
                         <div className="mb-4 flex items-center justify-between gap-3">
                           <h4 className="text-sm font-semibold text-gray-900">Placeholder {index + 1}</h4>
-                          <button type="button" onClick={() => deleteElement(element.id)} className="rounded-md p-2 text-gray-500 hover:bg-red-50 hover:text-red-600" title="Delete placeholder">
+                          <button type="button" onClick={() => deleteElement(entityKey(element))} className="rounded-md p-2 text-gray-500 hover:bg-red-50 hover:text-red-600" title="Delete placeholder">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                          <Input label="Name" value={element.name} onChange={(event) => updateElement(element.id, 'name', event.target.value)} error={errors[`element.${element.id}.name`]} />
-                          <Select label="Type" value={element.type} onChange={(event) => updateElement(element.id, 'type', event.target.value as TemplateElementType)} options={typeOptions} />
-                          <Input label="X %" type="number" min="0" max="100" value={element.x} onChange={(event) => updateElement(element.id, 'x', Number(event.target.value))} error={errors[`element.${element.id}.x`]} />
-                          <Input label="Y %" type="number" min="0" max="100" value={element.y} onChange={(event) => updateElement(element.id, 'y', Number(event.target.value))} error={errors[`element.${element.id}.y`]} />
-                          <Input label="Width %" type="number" min="0" max="100" value={element.width} onChange={(event) => updateElement(element.id, 'width', Number(event.target.value))} error={errors[`element.${element.id}.width`]} />
-                          <Input label="Height %" type="number" min="0" max="100" value={element.height} onChange={(event) => updateElement(element.id, 'height', Number(event.target.value))} error={errors[`element.${element.id}.height`]} />
-                          <Select label="Required" value={element.required ? 'yes' : 'no'} onChange={(event) => updateElement(element.id, 'required', event.target.value === 'yes')} options={yesNoOptions} />
-                          <Select label="Locked" value={element.locked ? 'yes' : 'no'} onChange={(event) => updateElement(element.id, 'locked', event.target.value === 'yes')} options={yesNoOptions} />
-                          <Select label="Editable" value={element.editable ? 'yes' : 'no'} onChange={(event) => updateElement(element.id, 'editable', event.target.value === 'yes')} options={yesNoOptions} />
+                          <Input label="Name" value={element.name} onChange={(event) => updateElement(entityKey(element), 'name', event.target.value)} error={errors[`element.${entityKey(element)}.name`]} />
+                          <Select label="Type" value={element.type} onChange={(event) => updateElement(entityKey(element), 'type', event.target.value as TemplateElementType)} options={typeOptions} />
+                          <Input label="X %" type="number" min="0" max="100" value={element.x} onChange={(event) => updateElement(entityKey(element), 'x', Number(event.target.value))} error={errors[`element.${entityKey(element)}.x`]} />
+                          <Input label="Y %" type="number" min="0" max="100" value={element.y} onChange={(event) => updateElement(entityKey(element), 'y', Number(event.target.value))} error={errors[`element.${entityKey(element)}.y`]} />
+                          <Input label="Width %" type="number" min="0" max="100" value={element.width} onChange={(event) => updateElement(entityKey(element), 'width', Number(event.target.value))} error={errors[`element.${entityKey(element)}.width`]} />
+                          <Input label="Height %" type="number" min="0" max="100" value={element.height} onChange={(event) => updateElement(entityKey(element), 'height', Number(event.target.value))} error={errors[`element.${entityKey(element)}.height`]} />
+                          <Select label="Required" value={element.required ? 'yes' : 'no'} onChange={(event) => updateElement(entityKey(element), 'required', event.target.value === 'yes')} options={yesNoOptions} />
+                          <Select label="Locked" value={element.locked ? 'yes' : 'no'} onChange={(event) => updateElement(entityKey(element), 'locked', event.target.value === 'yes')} options={yesNoOptions} />
+                          <Select label="Editable" value={element.editable ? 'yes' : 'no'} onChange={(event) => updateElement(entityKey(element), 'editable', event.target.value === 'yes')} options={yesNoOptions} />
                         </div>
                       </div>
                     ))}
@@ -320,7 +320,7 @@ function TemplatePreview({ variant, elements }: { variant?: ProductVariant; elem
     <div className="relative rounded-md bg-white shadow-sm ring-1 ring-gray-300" style={{ width, height }}>
       {elements.map((element) => (
         <div
-          key={element.id}
+          key={entityKey(element)}
           className={`absolute flex items-center justify-center border-2 border-dashed text-center text-xs font-medium ${element.type === 'photo' ? 'border-blue-500 bg-blue-50/80 text-blue-700' : 'border-emerald-500 bg-emerald-50/80 text-emerald-700'}`}
           style={{
             left: `${element.x}%`,
@@ -340,7 +340,8 @@ function TemplatePreview({ variant, elements }: { variant?: ProductVariant; elem
 function createTemplate(productId: string, variantId: string, surfaceId: string): ProductTemplate {
   const now = new Date().toISOString();
   return {
-    id: `tpl-${Date.now()}`,
+    _id: '',
+    clientId: crypto.randomUUID(),
     productId,
     name: '',
     status: 'Draft',
@@ -355,7 +356,8 @@ function createTemplate(productId: string, variantId: string, surfaceId: string)
 
 function createElement(type: TemplateElementType): TemplateElement {
   return {
-    id: `el-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    _id: '',
+    clientId: crypto.randomUUID(),
     name: type === 'photo' ? 'Photo placeholder' : 'Text placeholder',
     type,
     x: 10,
@@ -375,13 +377,13 @@ function validateTemplate(template: ProductTemplate) {
   if (!template.surfaceId) errors.surfaceId = 'Assign a surface.';
 
   for (const element of template.elements) {
-    if (!element.name.trim()) errors[`element.${element.id}.name`] = 'Name is required.';
-    if (!isPercent(element.x)) errors[`element.${element.id}.x`] = 'Use 0 to 100.';
-    if (!isPercent(element.y)) errors[`element.${element.id}.y`] = 'Use 0 to 100.';
-    if (!isPercent(element.width) || element.width <= 0) errors[`element.${element.id}.width`] = 'Use more than 0 and up to 100.';
-    if (!isPercent(element.height) || element.height <= 0) errors[`element.${element.id}.height`] = 'Use more than 0 and up to 100.';
-    if (element.x + element.width > 100) errors[`element.${element.id}.width`] = 'X plus width must stay within 100%.';
-    if (element.y + element.height > 100) errors[`element.${element.id}.height`] = 'Y plus height must stay within 100%.';
+    if (!element.name.trim()) errors[`element.${entityKey(element)}.name`] = 'Name is required.';
+    if (!isPercent(element.x)) errors[`element.${entityKey(element)}.x`] = 'Use 0 to 100.';
+    if (!isPercent(element.y)) errors[`element.${entityKey(element)}.y`] = 'Use 0 to 100.';
+    if (!isPercent(element.width) || element.width <= 0) errors[`element.${entityKey(element)}.width`] = 'Use more than 0 and up to 100.';
+    if (!isPercent(element.height) || element.height <= 0) errors[`element.${entityKey(element)}.height`] = 'Use more than 0 and up to 100.';
+    if (element.x + element.width > 100) errors[`element.${entityKey(element)}.width`] = 'X plus width must stay within 100%.';
+    if (element.y + element.height > 100) errors[`element.${entityKey(element)}.height`] = 'Y plus height must stay within 100%.';
   }
 
   return errors;
@@ -398,3 +400,7 @@ function clampPercent(value: number) {
 
 
 
+
+function entityKey(entity: { _id: string; clientId?: string }) {
+  return entity._id || entity.clientId || '';
+}

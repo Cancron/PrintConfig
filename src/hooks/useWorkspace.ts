@@ -13,7 +13,7 @@ export function useWorkspace() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.listMerchants(account.id)
+    api.listMerchants(account._id)
       .then((items) => {
         if (!cancelled) {
           setMerchants(items);
@@ -28,16 +28,16 @@ export function useWorkspace() {
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [account.id]);
+  }, [account._id]);
 
   useEffect(() => {
-    if (!merchants.some((merchant) => merchant.id === selectedMerchantId) && merchants[0]) {
-      setSelectedMerchantIdState(merchants[0].id);
-      saveSelectedMerchantId(merchants[0].id);
+    if (!merchants.some((merchant) => merchant._id === selectedMerchantId) && merchants[0]) {
+      setSelectedMerchantIdState(merchants[0]._id);
+      saveSelectedMerchantId(merchants[0]._id);
     }
   }, [merchants, selectedMerchantId]);
 
-  const selectedMerchant = useMemo(() => merchants.find((merchant) => merchant.id === selectedMerchantId) ?? merchants[0], [merchants, selectedMerchantId]);
+  const selectedMerchant = useMemo(() => merchants.find((merchant) => merchant._id === selectedMerchantId) ?? merchants[0], [merchants, selectedMerchantId]);
 
   const setSelectedMerchantId = useCallback((merchantId: string) => {
     setSelectedMerchantIdState(merchantId);
@@ -45,9 +45,9 @@ export function useWorkspace() {
   }, []);
 
   const updateMerchant = useCallback((merchant: Merchant) => {
-    setMerchants((prev) => prev.map((item) => (item.id === merchant.id ? merchant : item)));
-    api.updateMerchant(merchant).then((saved) => setMerchants((prev) => prev.map((item) => (item.id === saved.id ? saved : item)))).catch(() => setMerchants(persistMerchant(merchant)));
+    setMerchants((prev) => prev.map((item) => (item._id === merchant._id ? merchant : item)));
+    api.updateMerchant(merchant).then((saved) => setMerchants((prev) => prev.map((item) => (item._id === saved._id ? saved : item)))).catch(() => setMerchants(persistMerchant(merchant)));
   }, []);
 
-  return { account, merchants, selectedMerchant, selectedMerchantId: selectedMerchant?.id ?? selectedMerchantId, setSelectedMerchantId, updateMerchant, loading, error };
+  return { account, merchants, selectedMerchant, selectedMerchantId: selectedMerchant?._id ?? selectedMerchantId, setSelectedMerchantId, updateMerchant, loading, error };
 }

@@ -16,12 +16,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 function idOf(value: any) {
-  return String(value?.id ?? value?._id ?? '');
+  return String(value?._id ?? '');
 }
 
 function normalizeMerchant(raw: any): Merchant {
   return {
-    id: idOf(raw),
+    _id: idOf(raw),
     accountId: String(raw.accountId ?? 'acct-1'),
     name: raw.name ?? '',
     slug: raw.slug ?? '',
@@ -37,7 +37,7 @@ function normalizeMerchant(raw: any): Merchant {
 
 function normalizeCategory(raw: any): ProductCategory {
   return {
-    id: idOf(raw),
+    _id: idOf(raw),
     accountId: String(raw.accountId ?? 'acct-1'),
     merchantId: raw.merchantId ? String(raw.merchantId) : null,
     scope: raw.scope === 'merchant' ? 'merchant' : 'shared',
@@ -53,33 +53,33 @@ function normalizeCategory(raw: any): ProductCategory {
 }
 
 function normalizeSurface(raw: any) {
-  return raw ? { ...raw, id: idOf(raw), productId: String(raw.productId ?? '') } : null;
+  return raw ? { ...raw, _id: idOf(raw), productId: String(raw.productId ?? '') } : null;
 }
 
 function normalizeOptionGroups(groups: any[] = []) {
   return groups.map((group) => ({
     ...group,
-    id: idOf(group),
+    _id: idOf(group),
     productId: String(group.productId ?? ''),
-    values: (group.values ?? []).map((value: any) => ({ ...value, id: idOf(value), optionGroupId: String(value.optionGroupId ?? group._id ?? group.id ?? '') })),
+    values: (group.values ?? []).map((value: any) => ({ ...value, _id: idOf(value), optionGroupId: String(value.optionGroupId ?? group._id ?? group._id ?? '') })),
   }));
 }
 
 function normalizeTemplates(templates: any[] = []) {
   return templates.map((template) => ({
     ...template,
-    id: idOf(template),
+    _id: idOf(template),
     productId: String(template.productId ?? ''),
     variantId: String(template.variantId ?? ''),
     surfaceId: String(template.surfaceId ?? ''),
-    elements: (template.elements ?? []).map((element: any) => ({ ...element, id: idOf(element) })),
+    elements: (template.elements ?? []).map((element: any) => ({ ...element, _id: idOf(element) })),
   }));
 }
 
 function normalizeProduct(raw: any): Product {
   return {
     ...raw,
-    id: idOf(raw),
+    _id: idOf(raw),
     accountId: String(raw.accountId ?? 'acct-1'),
     merchantId: raw.merchantId ? String(raw.merchantId) : null,
     categoryId: String(raw.categoryId ?? ''),
@@ -87,7 +87,7 @@ function normalizeProduct(raw: any): Product {
     status: raw.status === 'active' || raw.status === 'Active' ? 'Active' : 'Draft',
     surface: normalizeSurface(raw.surface),
     optionGroups: normalizeOptionGroups(raw.optionGroups),
-    variants: (raw.variants ?? []).map((variant: any) => ({ ...variant, id: idOf(variant), productId: String(variant.productId ?? ''), status: variant.status === 'active' || variant.status === 'Active' ? 'Active' : 'Draft', options: variant.options ?? {} })),
+    variants: (raw.variants ?? []).map((variant: any) => ({ ...variant, _id: idOf(variant), productId: String(variant.productId ?? ''), status: variant.status === 'active' || variant.status === 'Active' ? 'Active' : 'Draft', options: variant.options ?? {} })),
     editorRules: raw.editorRules ?? {},
     exportRules: raw.exportRules ?? {},
     templates: normalizeTemplates(raw.templates),
@@ -96,22 +96,41 @@ function normalizeProduct(raw: any): Product {
   };
 }
 
-function productPayload(product: Product) {
-  return { ...product, status: product.status === 'Active' ? 'active' : 'draft', variants: product.variants.map((variant) => ({ ...variant, status: variant.status === 'Active' ? 'active' : 'draft' })) };
+function apiPayload<T>(value: T): T {
+  if (Array.isArray(value)) return value.map(apiPayload) as T;
+  if (value && typeof value === 'object') {
+    const output: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value)) {
+      if (key === 'clientId' || key === 'id' || (key === '_id' && !child)) continue;
+      if (!child && ['productId', 'optionGroupId', 'variantId', 'surfaceId'].includes(key)) continue;
+      output[key] = apiPayload(child);
+    }
+    return output as T;
+  }
+  return value;
 }
 
+function withoutRootId<T extends { _id: string }>(value: T) {
+  const payload = { ...value } as Omit<T, '_id'> & { _id?: string };
+  delete payload._id;
+  return payload;
+}
+
+function productPayload(product: Product) {
+  return apiPayload({ ...withoutRootId(product), status: product.status === 'Active' ? 'active' : 'draft', variants: product.variants.map((variant) => ({ ...variant, status: variant.status === 'Active' ? 'active' : 'draft' })) });
+}
 export const api = {
   health: () => request<{ ok: boolean }>('/health'),
   listMerchants: (accountId: string) => request<any[]>(`/merchants?accountId=${encodeURIComponent(accountId)}`).then((items) => items.map(normalizeMerchant)),
-  updateMerchant: (merchant: Merchant) => request<any>(`/merchants/${merchant.id}`, { method: 'PUT', body: JSON.stringify(merchant) }).then(normalizeMerchant),
+  updateMerchant: (merchant: Merchant) => request<any>(`/merchants/${merchant._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(merchant))) }).then(normalizeMerchant),
   listCategories: (accountId: string, merchantId: string) => request<any[]>(`/categories?accountId=${encodeURIComponent(accountId)}&merchantId=${encodeURIComponent(merchantId)}`).then((items) => items.map(normalizeCategory)),
-  createCategory: (category: ProductCategory) => request<any>('/categories', { method: 'POST', body: JSON.stringify(category) }).then(normalizeCategory),
-  updateCategory: (category: ProductCategory) => request<any>(`/categories/${category.id}`, { method: 'PUT', body: JSON.stringify(category) }).then(normalizeCategory),
+  createCategory: (category: ProductCategory) => request<any>('/categories', { method: 'POST', body: JSON.stringify(apiPayload(withoutRootId(category))) }).then(normalizeCategory),
+  updateCategory: (category: ProductCategory) => request<any>(`/categories/${category._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(category))) }).then(normalizeCategory),
   deleteCategory: (id: string) => request(`/categories/${id}`, { method: 'DELETE' }),
-  duplicateCategory: (id: string, includeProducts: boolean) => request<any>(`/categories/${id}/duplicate`, { method: 'POST', body: JSON.stringify({ includeProducts }) }),
+  duplicateCategory: (id: string, includeProducts: boolean) => request<any>(`/categories/${id}/duplicate`, { method: 'POST', body: JSON.stringify({ includeProducts }) }).then((result) => ({ category: normalizeCategory(result.category), products: (result.products ?? []).map(normalizeProduct) })),
   listProducts: (accountId: string, merchantId: string) => request<any[]>(`/products?accountId=${encodeURIComponent(accountId)}&merchantId=${encodeURIComponent(merchantId)}`).then((items) => items.map(normalizeProduct)),
   createProduct: (product: Product) => request<any>('/products', { method: 'POST', body: JSON.stringify(productPayload(product)) }).then(normalizeProduct),
-  updateProduct: (product: Product) => request<any>(`/products/${product.id}`, { method: 'PUT', body: JSON.stringify(productPayload(product)) }).then(normalizeProduct),
+  updateProduct: (product: Product) => request<any>(`/products/${product._id}`, { method: 'PUT', body: JSON.stringify(productPayload(product)) }).then(normalizeProduct),
   deleteProduct: (id: string) => request(`/products/${id}`, { method: 'DELETE' }),
   duplicateProduct: (id: string, scope: string, merchantId: string | null) => request<any>(`/products/${id}/duplicate`, { method: 'POST', body: JSON.stringify({ scope, merchantId }) }).then(normalizeProduct),
   exportProduct: (id: string) => request<any>(`/products/${id}/export`).then(normalizeProduct),

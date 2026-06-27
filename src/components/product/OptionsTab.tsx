@@ -40,11 +40,11 @@ export function OptionsTab({ product, onSave }: Props) {
 
   function startAddGroup() {
     setEditingGroupId(null);
-    setForm(createGroup(product.id, sortedGroups.length + 1));
+    setForm(createGroup(product._id, sortedGroups.length + 1));
   }
 
   function startEditGroup(group: ProductOptionGroup) {
-    setEditingGroupId(group.id);
+    setEditingGroupId(entityKey(group));
     setForm({ ...group, values: group.values.map((value) => ({ ...value, metadata: { ...value.metadata } })) });
   }
 
@@ -65,7 +65,7 @@ export function OptionsTab({ product, onSave }: Props) {
         updatedAt: now,
       })),
     };
-    const optionGroups = editingGroupId ? product.optionGroups.map((group) => (group.id === editingGroupId ? nextGroup : group)) : [...product.optionGroups, nextGroup];
+    const optionGroups = editingGroupId ? product.optionGroups.map((group) => (entityKey(group) === editingGroupId ? nextGroup : group)) : [...product.optionGroups, nextGroup];
     onSave({ ...product, optionGroups });
     setForm(null);
     setEditingGroupId(null);
@@ -73,19 +73,20 @@ export function OptionsTab({ product, onSave }: Props) {
 
   function deleteGroup(groupId: string) {
     if (!confirm('Delete this option group?')) return;
-    onSave({ ...product, optionGroups: product.optionGroups.filter((group) => group.id !== groupId) });
+    onSave({ ...product, optionGroups: product.optionGroups.filter((group) => entityKey(group) !== groupId) });
   }
 
   function duplicateGroup(group: ProductOptionGroup) {
     const now = new Date().toISOString();
-    const groupId = `og-${Date.now()}`;
+    const clientId = crypto.randomUUID();
     const copy: ProductOptionGroup = {
       ...group,
-      id: groupId,
+      _id: '',
+      clientId,
       name: `${group.name} Copy`,
       code: `${group.code}-copy`,
       sortOrder: sortedGroups.length + 1,
-      values: group.values.map((value) => ({ ...value, id: `ov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, optionGroupId: groupId, createdAt: now, updatedAt: now })),
+      values: group.values.map((value) => ({ ...value, _id: '', clientId: crypto.randomUUID(), optionGroupId: '', createdAt: now, updatedAt: now })),
       createdAt: now,
       updatedAt: now,
     };
@@ -93,7 +94,7 @@ export function OptionsTab({ product, onSave }: Props) {
   }
 
   function moveGroup(groupId: string, direction: -1 | 1) {
-    const index = sortedGroups.findIndex((group) => group.id === groupId);
+    const index = sortedGroups.findIndex((group) => entityKey(group) === groupId);
     const target = index + direction;
     if (target < 0 || target >= sortedGroups.length) return;
     const next = [...sortedGroups];
@@ -106,14 +107,14 @@ export function OptionsTab({ product, onSave }: Props) {
   }
 
   function addValue() {
-    setForm((prev) => (prev ? { ...prev, values: [...prev.values, createValue(prev.id, prev.values.length + 1)] } : prev));
+    setForm((prev) => (prev ? { ...prev, values: [...prev.values, createValue(prev._id, prev.values.length + 1)] } : prev));
   }
 
   function updateValue<K extends keyof ProductOptionValue>(id: string, field: K, value: ProductOptionValue[K]) {
     setForm((prev) => {
       if (!prev) return prev;
       const values = prev.values.map((item) => {
-        if (item.id !== id) return field === 'isDefault' && value === true ? { ...item, isDefault: false } : item;
+        if (entityKey(item) !== id) return field === 'isDefault' && value === true ? { ...item, isDefault: false } : item;
         return { ...item, [field]: value };
       });
       return { ...prev, values };
@@ -121,11 +122,11 @@ export function OptionsTab({ product, onSave }: Props) {
   }
 
   function updateValueMetadata(id: string, field: keyof ProductOptionValue['metadata'], value: string) {
-    setForm((prev) => prev ? { ...prev, values: prev.values.map((item) => item.id === id ? { ...item, metadata: { ...item.metadata, [field]: value } } : item) } : prev);
+    setForm((prev) => prev ? { ...prev, values: prev.values.map((item) => entityKey(item) === id ? { ...item, metadata: { ...item.metadata, [field]: value } } : item) } : prev);
   }
 
   function deleteValue(id: string) {
-    setForm((prev) => (prev ? { ...prev, values: prev.values.filter((value) => value.id !== id) } : prev));
+    setForm((prev) => (prev ? { ...prev, values: prev.values.filter((value) => entityKey(value) !== id) } : prev));
   }
 
   return (
@@ -158,26 +159,26 @@ export function OptionsTab({ product, onSave }: Props) {
 
           <div className="mt-3 space-y-4">
             {form.values.map((value) => (
-              <div key={value.id} className="rounded-lg bg-white p-4 ring-1 ring-gray-200">
+              <div key={entityKey(value)} className="rounded-lg bg-white p-4 ring-1 ring-gray-200">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <Input label="Label" value={value.label} onChange={(e) => updateValue(value.id, 'label', e.target.value)} error={errors[`value.${value.id}.label`]} />
-                  <Input label="Value" value={value.value} onChange={(e) => updateValue(value.id, 'value', slugify(e.target.value))} error={errors[`value.${value.id}.value`]} />
-                  <Input label="SKU Code" value={value.skuCode} onChange={(e) => updateValue(value.id, 'skuCode', e.target.value)} />
-                  <Select label="Price Modifier Type" value={value.priceModifierType} onChange={(e) => updateValue(value.id, 'priceModifierType', e.target.value as PriceModifierType)} options={modifierOptions} />
-                  <Input label="Price Modifier" type="number" step="0.01" value={value.priceModifier} onChange={(e) => updateValue(value.id, 'priceModifier', Number(e.target.value))} error={errors[`value.${value.id}.priceModifier`]} />
-                  <Select label="Default" value={value.isDefault ? 'yes' : 'no'} onChange={(e) => updateValue(value.id, 'isDefault', e.target.value === 'yes')} options={yesNoOptions} />
-                  <Select label="Active" value={value.isActive ? 'yes' : 'no'} onChange={(e) => updateValue(value.id, 'isActive', e.target.value === 'yes')} options={yesNoOptions} />
-                  <Input label="Sort Order" type="number" value={value.sortOrder} onChange={(e) => updateValue(value.id, 'sortOrder', Number(e.target.value))} />
-                  <Input label="Preview Image URL" value={value.previewImageUrl} onChange={(e) => updateValue(value.id, 'previewImageUrl', e.target.value)} />
-                  <Input label="Thumbnail Image URL" value={value.thumbnailImageUrl} onChange={(e) => updateValue(value.id, 'thumbnailImageUrl', e.target.value)} />
-                  <Input label="Color Hex" value={value.metadata.colorHex ?? ''} onChange={(e) => updateValueMetadata(value.id, 'colorHex', e.target.value)} error={errors[`value.${value.id}.colorHex`]} />
-                  <Input label="Production Code" value={value.metadata.productionCode ?? ''} onChange={(e) => updateValueMetadata(value.id, 'productionCode', e.target.value)} />
+                  <Input label="Label" value={value.label} onChange={(e) => updateValue(entityKey(value), 'label', e.target.value)} error={errors[`value.${entityKey(value)}.label`]} />
+                  <Input label="Value" value={value.value} onChange={(e) => updateValue(entityKey(value), 'value', slugify(e.target.value))} error={errors[`value.${entityKey(value)}.value`]} />
+                  <Input label="SKU Code" value={value.skuCode} onChange={(e) => updateValue(entityKey(value), 'skuCode', e.target.value)} />
+                  <Select label="Price Modifier Type" value={value.priceModifierType} onChange={(e) => updateValue(entityKey(value), 'priceModifierType', e.target.value as PriceModifierType)} options={modifierOptions} />
+                  <Input label="Price Modifier" type="number" step="0.01" value={value.priceModifier} onChange={(e) => updateValue(entityKey(value), 'priceModifier', Number(e.target.value))} error={errors[`value.${entityKey(value)}.priceModifier`]} />
+                  <Select label="Default" value={value.isDefault ? 'yes' : 'no'} onChange={(e) => updateValue(entityKey(value), 'isDefault', e.target.value === 'yes')} options={yesNoOptions} />
+                  <Select label="Active" value={value.isActive ? 'yes' : 'no'} onChange={(e) => updateValue(entityKey(value), 'isActive', e.target.value === 'yes')} options={yesNoOptions} />
+                  <Input label="Sort Order" type="number" value={value.sortOrder} onChange={(e) => updateValue(entityKey(value), 'sortOrder', Number(e.target.value))} />
+                  <Input label="Preview Image URL" value={value.previewImageUrl} onChange={(e) => updateValue(entityKey(value), 'previewImageUrl', e.target.value)} />
+                  <Input label="Thumbnail Image URL" value={value.thumbnailImageUrl} onChange={(e) => updateValue(entityKey(value), 'thumbnailImageUrl', e.target.value)} />
+                  <Input label="Color Hex" value={value.metadata.colorHex ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'colorHex', e.target.value)} error={errors[`value.${entityKey(value)}.colorHex`]} />
+                  <Input label="Production Code" value={value.metadata.productionCode ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'productionCode', e.target.value)} />
                 </div>
                 <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Textarea label="Description" value={value.metadata.description ?? ''} onChange={(e) => updateValueMetadata(value.id, 'description', e.target.value)} rows={2} />
-                  <Textarea label="Export Notes" value={value.metadata.exportNotes ?? ''} onChange={(e) => updateValueMetadata(value.id, 'exportNotes', e.target.value)} rows={2} />
+                  <Textarea label="Description" value={value.metadata.description ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'description', e.target.value)} rows={2} />
+                  <Textarea label="Export Notes" value={value.metadata.exportNotes ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'exportNotes', e.target.value)} rows={2} />
                 </div>
-                <div className="mt-3 flex justify-end"><button type="button" onClick={() => deleteValue(value.id)} className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /> Delete Value</button></div>
+                <div className="mt-3 flex justify-end"><button type="button" onClick={() => deleteValue(entityKey(value))} className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /> Delete Value</button></div>
               </div>
             ))}
           </div>
@@ -191,7 +192,7 @@ export function OptionsTab({ product, onSave }: Props) {
 
       <div className="space-y-4">
         {sortedGroups.map((group, index) => (
-          <div key={group.id} className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-gray-200">
+          <div key={entityKey(group)} className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-gray-200">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -202,10 +203,10 @@ export function OptionsTab({ product, onSave }: Props) {
                 <p className="mt-1 text-sm text-gray-500">Code: {group.code} � {group.values.length} values</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => moveGroup(group.id, -1)} disabled={index === 0} className="rounded-md p-2 text-gray-500 hover:bg-gray-100 disabled:opacity-40"><GripVertical className="h-4 w-4" /></button>
+                <button type="button" onClick={() => moveGroup(entityKey(group), -1)} disabled={index === 0} className="rounded-md p-2 text-gray-500 hover:bg-gray-100 disabled:opacity-40"><GripVertical className="h-4 w-4" /></button>
                 <button type="button" onClick={() => startEditGroup(group)} className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"><Pencil className="h-4 w-4" /> Edit</button>
                 <button type="button" onClick={() => duplicateGroup(group)} className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"><Copy className="h-4 w-4" /> Duplicate</button>
-                <button type="button" onClick={() => deleteGroup(group.id)} className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /> Delete</button>
+                <button type="button" onClick={() => deleteGroup(entityKey(group))} className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /> Delete</button>
               </div>
             </div>
 
@@ -225,7 +226,7 @@ function OptionValueTable({ group }: { group: ProductOptionGroup }) {
         <thead className="bg-gray-50"><tr><th className="px-4 py-3 text-xs font-semibold uppercase text-gray-500">Preview</th><th className="px-4 py-3 text-xs font-semibold uppercase text-gray-500">Value</th><th className="px-4 py-3 text-xs font-semibold uppercase text-gray-500">Price</th><th className="px-4 py-3 text-xs font-semibold uppercase text-gray-500">Status</th></tr></thead>
         <tbody className="divide-y divide-gray-200 bg-white">
           {[...group.values].sort((a, b) => a.sortOrder - b.sortOrder).map((value) => (
-            <tr key={value.id}>
+            <tr key={entityKey(value)}>
               <td className="px-4 py-3">{(value.thumbnailImageUrl || value.previewImageUrl) ? <img src={value.thumbnailImageUrl || value.previewImageUrl} alt="" className="h-10 w-12 rounded object-cover" /> : value.metadata.colorHex ? <span className="block h-8 w-8 rounded-full ring-1 ring-gray-300" style={{ backgroundColor: value.metadata.colorHex }} /> : <span className="text-xs text-gray-400">None</span>}</td>
               <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">{value.label}</p><p className="text-xs text-gray-500">{value.value}</p></td>
               <td className="px-4 py-3 text-sm text-gray-700">{formatModifier(value)}</td>
@@ -244,11 +245,11 @@ function OptionCustomerPreview({ group }: { group: ProductOptionGroup }) {
     <div className="mt-4 rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200">
       <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Customer Preview</p>
       <div className="mt-3 flex flex-wrap gap-3">
-        {group.displayType === 'Dropdown' && <select className="rounded-md border-0 px-3 py-2 text-sm ring-1 ring-gray-300">{values.map((value) => <option key={value.id}>{value.label} ({formatModifier(value)})</option>)}</select>}
-        {group.displayType === 'Image Swatches' && values.map((value) => <div key={value.id} className="w-32 rounded-lg bg-white p-2 ring-1 ring-gray-200"><div className="h-20 rounded bg-gray-100">{(value.previewImageUrl || value.thumbnailImageUrl) && <img src={value.previewImageUrl || value.thumbnailImageUrl} alt="" className="h-full w-full rounded object-cover" />}</div><p className="mt-2 text-sm font-medium text-gray-900">{value.label}</p><p className="text-xs text-gray-500">{formatModifier(value)}</p></div>)}
-        {group.displayType === 'Color Swatches' && values.map((value) => <div key={value.id} className="flex items-center gap-2 rounded-md bg-white px-3 py-2 ring-1 ring-gray-200"><span className="h-6 w-6 rounded-full ring-1 ring-gray-300" style={{ backgroundColor: value.metadata.colorHex || '#ffffff' }} /><span className="text-sm">{value.label} � {formatModifier(value)}</span></div>)}
-        {group.displayType === 'Text Buttons' && values.map((value) => <button key={value.id} type="button" className="rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300">{value.label} � {formatModifier(value)}</button>)}
-        {group.displayType === 'Radio Buttons' && values.map((value) => <label key={value.id} className="flex items-center gap-2 text-sm text-gray-700"><input type="radio" name={group.id} defaultChecked={value.isDefault} /> {value.label} � {formatModifier(value)}</label>)}
+        {group.displayType === 'Dropdown' && <select className="rounded-md border-0 px-3 py-2 text-sm ring-1 ring-gray-300">{values.map((value) => <option key={entityKey(value)}>{value.label} ({formatModifier(value)})</option>)}</select>}
+        {group.displayType === 'Image Swatches' && values.map((value) => <div key={entityKey(value)} className="w-32 rounded-lg bg-white p-2 ring-1 ring-gray-200"><div className="h-20 rounded bg-gray-100">{(value.previewImageUrl || value.thumbnailImageUrl) && <img src={value.previewImageUrl || value.thumbnailImageUrl} alt="" className="h-full w-full rounded object-cover" />}</div><p className="mt-2 text-sm font-medium text-gray-900">{value.label}</p><p className="text-xs text-gray-500">{formatModifier(value)}</p></div>)}
+        {group.displayType === 'Color Swatches' && values.map((value) => <div key={entityKey(value)} className="flex items-center gap-2 rounded-md bg-white px-3 py-2 ring-1 ring-gray-200"><span className="h-6 w-6 rounded-full ring-1 ring-gray-300" style={{ backgroundColor: value.metadata.colorHex || '#ffffff' }} /><span className="text-sm">{value.label} � {formatModifier(value)}</span></div>)}
+        {group.displayType === 'Text Buttons' && values.map((value) => <button key={entityKey(value)} type="button" className="rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300">{value.label} � {formatModifier(value)}</button>)}
+        {group.displayType === 'Radio Buttons' && values.map((value) => <label key={entityKey(value)} className="flex items-center gap-2 text-sm text-gray-700"><input type="radio" name={entityKey(group)} defaultChecked={value.isDefault} /> {value.label} � {formatModifier(value)}</label>)}
       </div>
     </div>
   );
@@ -260,7 +261,7 @@ function PricePreview({ basePrice, selectedDefaults, finalPrice }: { basePrice: 
       <h3 className="text-sm font-semibold text-slate-900">Price Calculator Preview</h3>
       <div className="mt-3 space-y-2 text-sm text-slate-700">
         <div className="flex justify-between"><span>Base price</span><span className="font-medium">${basePrice.toFixed(2)}</span></div>
-        {selectedDefaults.map(({ group, value }) => <div key={group.id} className="flex justify-between"><span>{group.name}: {value.label}</span><span>{formatModifier(value)}</span></div>)}
+        {selectedDefaults.map(({ group, value }) => <div key={entityKey(group)} className="flex justify-between"><span>{group.name}: {value.label}</span><span>{formatModifier(value)}</span></div>)}
         <div className="border-t border-slate-200 pt-2 flex justify-between text-base font-semibold text-slate-900"><span>Final price</span><span>${finalPrice.toFixed(2)}</span></div>
       </div>
     </div>
@@ -272,32 +273,32 @@ function validateGroup(group: ProductOptionGroup, groups: ProductOptionGroup[], 
   if (!group.name.trim()) errors.name = 'Option group name is required.';
   if (!group.code.trim()) errors.code = 'Option group code is required.';
   if (group.code.trim() && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(group.code.trim())) errors.code = 'Use lowercase letters, numbers, and hyphens only.';
-  if (groups.some((item) => item.id !== editingId && item.code.trim().toLowerCase() === group.code.trim().toLowerCase())) errors.code = 'Code must be unique within this product.';
+  if (groups.some((item) => entityKey(item) !== editingId && item.code.trim().toLowerCase() === group.code.trim().toLowerCase())) errors.code = 'Code must be unique within this product.';
   if (group.required && !group.values.some((value) => value.isActive)) errors.activeValues = 'Required groups need at least one active value.';
   if (group.values.filter((value) => value.isDefault).length > 1) errors.activeValues = 'Only one value can be default.';
   const seen = new Set<string>();
   for (const value of group.values) {
-    if (!value.label.trim()) errors[`value.${value.id}.label`] = 'Label is required.';
-    if (!value.value.trim()) errors[`value.${value.id}.value`] = 'Value is required.';
-    if (value.value.trim() && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value.value.trim())) errors[`value.${value.id}.value`] = 'Use slug-safe lowercase text.';
-    if (seen.has(value.value.trim().toLowerCase())) errors[`value.${value.id}.value`] = 'Value must be unique in this group.';
+    if (!value.label.trim()) errors[`value.${entityKey(value)}.label`] = 'Label is required.';
+    if (!value.value.trim()) errors[`value.${entityKey(value)}.value`] = 'Value is required.';
+    if (value.value.trim() && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value.value.trim())) errors[`value.${entityKey(value)}.value`] = 'Use slug-safe lowercase text.';
+    if (seen.has(value.value.trim().toLowerCase())) errors[`value.${entityKey(value)}.value`] = 'Value must be unique in this group.';
     seen.add(value.value.trim().toLowerCase());
-    if (!Number.isFinite(Number(value.priceModifier))) errors[`value.${value.id}.priceModifier`] = 'Price modifier must be numeric.';
-    if (value.priceModifierType === 'none' && Number(value.priceModifier) !== 0) errors[`value.${value.id}.priceModifier`] = 'No extra charge must use 0.';
-    if ((value.priceModifierType === 'fixed' || value.priceModifierType === 'percentage') && Number(value.priceModifier) < 0) errors[`value.${value.id}.priceModifier`] = 'Price modifier must be zero or greater.';
-    if (value.metadata.colorHex && !/^#[0-9a-f]{6}$/i.test(value.metadata.colorHex)) errors[`value.${value.id}.colorHex`] = 'Use a valid hex color.';
+    if (!Number.isFinite(Number(value.priceModifier))) errors[`value.${entityKey(value)}.priceModifier`] = 'Price modifier must be numeric.';
+    if (value.priceModifierType === 'none' && Number(value.priceModifier) !== 0) errors[`value.${entityKey(value)}.priceModifier`] = 'No extra charge must use 0.';
+    if ((value.priceModifierType === 'fixed' || value.priceModifierType === 'percentage') && Number(value.priceModifier) < 0) errors[`value.${entityKey(value)}.priceModifier`] = 'Price modifier must be zero or greater.';
+    if (value.metadata.colorHex && !/^#[0-9a-f]{6}$/i.test(value.metadata.colorHex)) errors[`value.${entityKey(value)}.colorHex`] = 'Use a valid hex color.';
   }
   return errors;
 }
 
 function createGroup(productId: string, sortOrder: number): ProductOptionGroup {
   const now = new Date().toISOString();
-  return { id: `og-${Date.now()}`, productId, name: '', code: '', displayType: 'Dropdown', required: true, sortOrder, values: [], createdAt: now, updatedAt: now };
+  return { _id: '', clientId: crypto.randomUUID(), productId, name: '', code: '', displayType: 'Dropdown', required: true, sortOrder, values: [], createdAt: now, updatedAt: now };
 }
 
 function createValue(optionGroupId: string, sortOrder: number): ProductOptionValue {
   const now = new Date().toISOString();
-  return { id: `ov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, optionGroupId, label: '', value: '', skuCode: '', priceModifierType: 'none', priceModifier: 0, isDefault: sortOrder === 1, isActive: true, sortOrder, previewImageUrl: '', thumbnailImageUrl: '', metadata: {}, createdAt: now, updatedAt: now };
+  return { _id: '', clientId: crypto.randomUUID(), optionGroupId, label: '', value: '', skuCode: '', priceModifierType: 'none', priceModifier: 0, isDefault: sortOrder === 1, isActive: true, sortOrder, previewImageUrl: '', thumbnailImageUrl: '', metadata: {}, createdAt: now, updatedAt: now };
 }
 
 function getModifierAmount(basePrice: number, value: ProductOptionValue) {
@@ -319,4 +320,8 @@ function Pill({ children, tone = 'gray' }: { children: React.ReactNode; tone?: '
 
 function slugify(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function entityKey(entity: { _id: string; clientId?: string }) {
+  return entity._id || entity.clientId || '';
 }

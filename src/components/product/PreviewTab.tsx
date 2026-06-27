@@ -12,8 +12,8 @@ interface Props {
 export function PreviewTab({ product }: Props) {
   const activeVariants = product.variants.filter((variant) => variant.status === 'Active');
   const variantsForSelection = activeVariants.length > 0 ? activeVariants : product.variants;
-  const [selectedVariantId, setSelectedVariantId] = useState(variantsForSelection[0]?.id ?? '');
-  const selectedVariant = variantsForSelection.find((variant) => variant.id === selectedVariantId) ?? variantsForSelection[0];
+  const [selectedVariantId, setSelectedVariantId] = useState(variantsForSelection[0]?._id ?? '');
+  const selectedVariant = variantsForSelection.find((variant) => variant._id === selectedVariantId) ?? variantsForSelection[0];
   const [testConfig, setTestConfig] = useState<object | null>(null);
   const dimensions = useMemo(() => (selectedVariant ? calculateDimensions(product.surface, selectedVariant) : null), [product.surface, selectedVariant]);
   const warnings = useMemo(() => getWarnings(product, activeVariants, selectedVariant), [activeVariants, product, selectedVariant]);
@@ -44,9 +44,9 @@ export function PreviewTab({ product }: Props) {
 
       <Select
         label="Variant"
-        value={selectedVariant?.id ?? ''}
+        value={selectedVariant?._id ?? ''}
         onChange={(event) => handleVariantChange(event.target.value)}
-        options={variantsForSelection.length > 0 ? variantsForSelection.map((variant) => ({ value: variant.id, label: `${variant.name} (${variant.sku})` })) : [{ value: '', label: 'No variants available' }]}
+        options={variantsForSelection.length > 0 ? variantsForSelection.map((variant) => ({ value: variant._id, label: `${variant.name} (${variant.sku})` })) : [{ value: '', label: 'No variants available' }]}
         disabled={variantsForSelection.length === 0}
       />
 
@@ -147,11 +147,11 @@ function hasTightSafeArea(surface: ProductSurface, variant: ProductVariant) {
 }
 
 function summarizeProduct(product: Product) {
-  return { id: product.id, name: product.name, slug: product.slug, productType: product.productType, status: product.status, basePrice: product.basePrice };
+  return { _id: product._id, name: product.name, slug: product.slug, productType: product.productType, status: product.status, basePrice: product.basePrice };
 }
 
 function summarizeVariant(variant: ProductVariant) {
-  return { id: variant.id, name: variant.name, sku: variant.sku, status: variant.status, price: variant.price, width: variant.width, height: variant.height, unit: variant.unit, dpi: variant.dpi, previewImageUrl: variant.previewImageUrl, thumbnailImageUrl: variant.thumbnailImageUrl, options: variant.options };
+  return { _id: variant._id, name: variant.name, sku: variant.sku, status: variant.status, price: variant.price, width: variant.width, height: variant.height, unit: variant.unit, dpi: variant.dpi, previewImageUrl: variant.previewImageUrl, thumbnailImageUrl: variant.thumbnailImageUrl, options: variant.options };
 }
 
 function yesNo(value: boolean) {

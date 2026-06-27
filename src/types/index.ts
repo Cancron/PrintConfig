@@ -23,12 +23,12 @@ export type ProductOptionDisplayType = 'Dropdown' | 'Radio Buttons' | 'Color Swa
 export type PriceModifierType = 'none' | 'fixed' | 'percentage';
 
 export interface Account {
-  id: string;
+  _id: string;
   name: string;
 }
 
 export interface Merchant {
-  id: string;
+  _id: string;
   accountId: string;
   name: string;
   slug: string;
@@ -42,7 +42,7 @@ export interface Merchant {
 }
 
 export interface ProductCategory {
-  id: string;
+  _id: string;
   accountId: string;
   merchantId?: string | null;
   scope: ProductScope;
@@ -64,7 +64,8 @@ export interface ProductOptionValueMetadata {
 }
 
 export interface ProductOptionValue {
-  id: string;
+  _id: string;
+  clientId?: string;
   optionGroupId: string;
   label: string;
   value: string;
@@ -82,7 +83,8 @@ export interface ProductOptionValue {
 }
 
 export interface ProductOptionGroup {
-  id: string;
+  _id: string;
+  clientId?: string;
   productId: string;
   name: string;
   code: string;
@@ -111,7 +113,8 @@ export interface SafeAreaSettings {
 }
 
 export interface ProductSurface {
-  id: string;
+  _id: string;
+  clientId?: string;
   productId: string;
   name: string;
   code: string;
@@ -157,7 +160,8 @@ export interface ExportRules {
 export type TemplateElementType = 'photo' | 'text';
 
 export interface TemplateElement {
-  id: string;
+  _id: string;
+  clientId?: string;
   name: string;
   type: TemplateElementType;
   x: number;
@@ -170,7 +174,8 @@ export interface TemplateElement {
 }
 
 export interface ProductTemplate {
-  id: string;
+  _id: string;
+  clientId?: string;
   productId: string;
   name: string;
   status: ProductStatus;
@@ -183,7 +188,8 @@ export interface ProductTemplate {
 }
 
 export interface ProductVariant {
-  id: string;
+  _id: string;
+  clientId?: string;
   productId: string;
   name: string;
   sku: string;
@@ -201,7 +207,7 @@ export interface ProductVariant {
 }
 
 export interface Product {
-  id: string;
+  _id: string;
   accountId: string;
   merchantId?: string | null;
   scope: ProductScope;
