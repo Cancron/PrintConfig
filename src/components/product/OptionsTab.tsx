@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Check, Copy, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
-import { Textarea } from '../ui/Textarea';
 import type { PriceModifierType, Product, ProductOptionDisplayType, ProductOptionGroup, ProductOptionValue } from '../../types';
 
 interface Props {

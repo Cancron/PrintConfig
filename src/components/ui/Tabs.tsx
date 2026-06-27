@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 interface Tab {
   _id: string;
@@ -13,6 +13,10 @@ interface TabsProps {
 
 export function Tabs({ tabs, defaultTab }: TabsProps) {
   const [active, setActive] = useState(defaultTab ?? tabs[0]?._id);
+
+  useEffect(() => {
+    if (defaultTab) setActive(defaultTab);
+  }, [defaultTab]);
 
   return (
     <div>

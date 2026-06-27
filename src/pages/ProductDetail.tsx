@@ -100,7 +100,7 @@ export function ProductDetail() {
     { _id: 'editor-rules', label: 'Editor Rules', content: <EditorRulesTab product={product} onSave={updateProduct} /> },
     { _id: 'export-rules', label: 'Export Rules', content: <ExportRulesTab product={product} onSave={updateProduct} /> },
     { _id: 'templates', label: 'Templates', content: <TemplatesTab product={product} onSave={updateProduct} /> },
-    { _id: 'preview', label: 'Preview', content: <PreviewTab product={product} /> },
+    { _id: 'preview', label: 'Preview', content: <PreviewTab product={product} onSave={updateProduct} /> },
     { _id: 'json', label: 'JSON', content: <JsonPreviewTab product={product} /> },
   ];
 
@@ -190,6 +190,12 @@ function ProductReadinessPanel({ product }: { product: Product }) {
       </div>
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {checks.map((check) => { const Icon = check.value ? CheckCircle : XCircle; return <div key={check.label} className="flex items-center gap-2 text-sm text-gray-700"><Icon className={`h-4 w-4 ${check.value ? 'text-emerald-600' : 'text-amber-600'}`} /><span>{check.label}</span></div>; })}
+      </div>
+      <div className="mt-5 border-t border-gray-200 pt-4">
+        <p className="text-sm font-medium text-gray-900">Optional room preview enhancements</p>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {[{ label: 'At least one variant has room preview images', value: readiness.hasAnyRoomPreviews }, { label: 'Each active variant has at least one room preview', value: readiness.activeVariantsHaveRoomPreviews }, { label: 'Each active variant has a default room preview', value: readiness.activeVariantsHaveDefaultRoomPreview }].map((check) => { const Icon = check.value ? CheckCircle : XCircle; return <div key={check.label} className="flex items-center gap-2 text-sm text-gray-700"><Icon className={`h-4 w-4 ${check.value ? 'text-emerald-600' : 'text-gray-400'}`} /><span>{check.label}</span></div>; })}
+        </div>
       </div>
       {!readiness.ready && <div className="mt-4 rounded-md bg-amber-50 p-3 ring-1 ring-inset ring-amber-200"><p className="text-sm font-medium text-amber-900">Missing</p><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-800">{readiness.missing.map((item) => <li key={item}>{item}</li>)}</ul></div>}
     </section>

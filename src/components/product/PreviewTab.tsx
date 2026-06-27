@@ -1,22 +1,31 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, FileJson } from 'lucide-react';
 import { SurfacePreview } from './SurfacePreview';
+import { RoomPreviewsPanel } from './RoomPreviewsPanel';
 import { Select } from '../ui/Select';
 import { toPixels } from '../../lib/validation';
 import type { Product, ProductSurface, ProductVariant } from '../../types';
 
 interface Props {
   product: Product;
+  onSave: (product: Product) => void;
 }
 
-export function PreviewTab({ product }: Props) {
+export function PreviewTab({ product, onSave }: Props) {
+  const [searchParams] = useSearchParams();
   const activeVariants = product.variants.filter((variant) => variant.status === 'Active');
-  const variantsForSelection = activeVariants.length > 0 ? activeVariants : product.variants;
-  const [selectedVariantId, setSelectedVariantId] = useState(variantsForSelection[0]?._id ?? '');
+  const variantsForSelection = product.variants;
+  const requestedVariantId = searchParams.get('variantId');
+  const [selectedVariantId, setSelectedVariantId] = useState(requestedVariantId ?? variantsForSelection[0]?._id ?? '');
   const selectedVariant = variantsForSelection.find((variant) => variant._id === selectedVariantId) ?? variantsForSelection[0];
   const [testConfig, setTestConfig] = useState<object | null>(null);
   const dimensions = useMemo(() => (selectedVariant ? calculateDimensions(product.surface, selectedVariant) : null), [product.surface, selectedVariant]);
   const warnings = useMemo(() => getWarnings(product, activeVariants, selectedVariant), [activeVariants, product, selectedVariant]);
+
+  useEffect(() => {
+    if (requestedVariantId && product.variants.some((variant) => variant._id === requestedVariantId)) setSelectedVariantId(requestedVariantId);
+  }, [product.variants, requestedVariantId]);
 
   function handleVariantChange(variantId: string) {
     setSelectedVariantId(variantId);
@@ -87,6 +96,8 @@ export function PreviewTab({ product }: Props) {
         </div>
       </div>
 
+      <RoomPreviewsPanel product={product} variant={selectedVariant} onSave={onSave} />
+
       <div className="rounded-lg bg-slate-50 p-4 ring-1 ring-slate-200">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div><h3 className="text-sm font-semibold text-slate-900">Test Configuration</h3><p className="mt-1 text-sm text-slate-600">This is only a configuration test, not a real print export.</p></div>
@@ -151,7 +162,7 @@ function summarizeProduct(product: Product) {
 }
 
 function summarizeVariant(variant: ProductVariant) {
-  return { _id: variant._id, name: variant.name, sku: variant.sku, status: variant.status, price: variant.price, width: variant.width, height: variant.height, unit: variant.unit, dpi: variant.dpi, previewImageUrl: variant.previewImageUrl, thumbnailImageUrl: variant.thumbnailImageUrl, options: variant.options };
+  return { _id: variant._id, name: variant.name, sku: variant.sku, status: variant.status, price: variant.price, width: variant.width, height: variant.height, unit: variant.unit, dpi: variant.dpi, previewImageUrl: variant.previewImageUrl, thumbnailImageUrl: variant.thumbnailImageUrl, options: variant.options, roomPreviews: variant.roomPreviews };
 }
 
 function yesNo(value: boolean) {

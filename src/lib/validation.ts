@@ -137,6 +137,9 @@ export function getProductReadiness(product: Product) {
   const surfaceValid = hasSurface && surfaceHasValidSettings(product.surface, previewVariant);
   const hasExportRules = !!product.exportRules;
   const hasEditorRules = !!product.editorRules;
+  const hasAnyRoomPreviews = product.variants.some((variant) => variant.roomPreviews.length > 0);
+  const activeVariantsHaveRoomPreviews = activeVariants.length > 0 && activeVariants.every((variant) => variant.roomPreviews.length > 0);
+  const activeVariantsHaveDefaultRoomPreview = activeVariants.length > 0 && activeVariants.every((variant) => variant.roomPreviews.some((room) => room.isDefault));
 
   if (Object.keys(basicErrors).length > 0) missing.push('Complete valid product name, slug, type, and base price.');
   if (activeVariants.length === 0) missing.push('Add at least one active variant.');
@@ -154,6 +157,9 @@ export function getProductReadiness(product: Product) {
     surfaceValid,
     hasExportRules,
     hasEditorRules,
+    hasAnyRoomPreviews,
+    activeVariantsHaveRoomPreviews,
+    activeVariantsHaveDefaultRoomPreview,
     ready: missing.length === 0,
     missing,
   };

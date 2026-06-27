@@ -238,6 +238,7 @@ function normalizeVariant(variant: LegacyVariant, productId: string): ProductVar
     dpi: numberOr(variant.dpi, numberOr(legacySurface?.dpi, 300)),
     previewImageUrl: typeof variant.previewImageUrl === 'string' ? variant.previewImageUrl : '',
     thumbnailImageUrl: typeof variant.thumbnailImageUrl === 'string' ? variant.thumbnailImageUrl : '',
+    roomPreviews: variant.roomPreviews ?? [],
     createdAt: typeof variant.createdAt === 'string' ? variant.createdAt : now,
     updatedAt: typeof variant.updatedAt === 'string' ? variant.updatedAt : now,
   };

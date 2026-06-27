@@ -187,6 +187,22 @@ export interface ProductTemplate {
   updatedAt: string;
 }
 
+export interface VariantRoomPreview {
+  _id: string;
+  clientId?: string;
+  variantId: string;
+  name: string;
+  roomImageUrl: string;
+  roomWidthMeters: number;
+  roomHeightMeters?: number;
+  centerLeftPercent: number;
+  centerTopPercent: number;
+  zoom: number;
+  isDefault: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
 export interface ProductVariant {
   _id: string;
   clientId?: string;
@@ -202,6 +218,7 @@ export interface ProductVariant {
   dpi: number;
   previewImageUrl: string;
   thumbnailImageUrl: string;
+  roomPreviews: VariantRoomPreview[];
   createdAt: string;
   updatedAt: string;
 }

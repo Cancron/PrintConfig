@@ -24,6 +24,21 @@ const surfaceSchema = new Schema(
   { timestamps: true }
 );
 
+const variantRoomPreviewSchema = new Schema(
+  {
+    variantId: { type: Schema.Types.ObjectId },
+    name: { type: String, required: true, trim: true },
+    roomImageUrl: { type: String, required: true, trim: true },
+    roomWidthMeters: { type: Number, required: true, min: 0.01 },
+    roomHeightMeters: { type: Number, min: 0.01 },
+    centerLeftPercent: { type: Number, default: 50, min: 0, max: 100 },
+    centerTopPercent: { type: Number, default: 40, min: 0, max: 100 },
+    zoom: { type: Number, default: 1, min: 0.01 },
+    isDefault: { type: Boolean, default: false },
+    sortOrder: { type: Number, default: 0 },
+  },
+  { timestamps: true }
+);
 const variantSchema = new Schema(
   {
     productId: { type: Schema.Types.ObjectId, ref: 'Product' },
@@ -38,6 +53,7 @@ const variantSchema = new Schema(
     dpi: { type: Number, required: true, min: 0.0001 },
     previewImageUrl: { type: String, default: '' },
     thumbnailImageUrl: { type: String, default: '' },
+    roomPreviews: { type: [variantRoomPreviewSchema], default: [] },
   },
   { timestamps: true }
 );
@@ -163,5 +179,10 @@ const productSchema = new Schema(
   { timestamps: true }
 );
 
+productSchema.pre('validate', function setVariantRoomPreviewRefs() {
+  for (const variant of this.variants ?? []) {
+    for (const roomPreview of variant.roomPreviews ?? []) roomPreview.variantId = variant._id;
+  }
+});
 productSchema.index({ accountId: 1, scope: 1, merchantId: 1, categoryId: 1, slug: 1 }, { unique: true });
 export const ProductModel = model('Product', productSchema);

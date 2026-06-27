@@ -3,6 +3,7 @@ import * as controller from '../controllers/product.controller.js';
 
 export const productRoutes = Router();
 productRoutes.get('/', controller.list);
+productRoutes.get('/public/:id/config', controller.publicConfig);
 productRoutes.get('/:id', controller.get);
 productRoutes.post('/', controller.create);
 productRoutes.put('/:id', controller.update);

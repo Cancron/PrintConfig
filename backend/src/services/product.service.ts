@@ -27,7 +27,23 @@ function validateProductShape(data: Record<string, any>) {
     if (skus.has(String(variant.sku).toLowerCase())) throw new ApiError(400, 'Variant SKU must be unique within product.');
     skus.add(String(variant.sku).toLowerCase());
     if (!(variant.width > 0) || !(variant.height > 0)) throw new ApiError(400, 'Variant width and height must be greater than 0.');
-    if (!(variant.dpi > 0)) throw new ApiError(400, 'Variant dpi must be greater than 0.');
+if (!(variant.dpi > 0)) throw new ApiError(400, 'Variant dpi must be greater than 0.');
+    let defaultRoomPreviewCount = 0;
+    for (const room of variant.roomPreviews ?? []) {
+      if (!String(room.name ?? '').trim()) throw new ApiError(400, 'Room preview name is required.');
+      try {
+        const url = new URL(String(room.roomImageUrl ?? ''));
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error();
+      } catch {
+        throw new ApiError(400, 'Room preview image must be a valid HTTP or HTTPS URL.');
+      }
+      if (!(room.roomWidthMeters > 0)) throw new ApiError(400, 'Room preview width must be greater than 0.');
+      if (room.roomHeightMeters !== undefined && !(room.roomHeightMeters > 0)) throw new ApiError(400, 'Room preview height must be greater than 0.');
+      if (room.centerLeftPercent < 0 || room.centerLeftPercent > 100 || room.centerTopPercent < 0 || room.centerTopPercent > 100) throw new ApiError(400, 'Room preview center position must be between 0 and 100.');
+      if (!(room.zoom > 0)) throw new ApiError(400, 'Room preview zoom must be greater than 0.');
+      if (room.isDefault) defaultRoomPreviewCount += 1;
+    }
+    if (defaultRoomPreviewCount > 1) throw new ApiError(400, 'Only one room preview can be default per variant.');
   }
   const groupCodes = new Set<string>();
   for (const group of data.optionGroups ?? []) {
@@ -111,6 +127,49 @@ export async function importProduct(payload: Record<string, any>) {
   return createProduct({ ...stripIds(payload), status: 'draft', slug: `${payload.slug || slugify(payload.name)}-import-${Date.now()}` });
 }
 
+export async function getPublicProductConfig(id: string) {
+  const product = await ProductModel.findById(id).lean();
+  if (!product) throw new ApiError(404, 'Product not found.');
+  if (product.status !== 'active') throw new ApiError(404, 'Product not found.');
+  const activeVariants = (product.variants ?? []).filter((variant: any) => variant.status === 'active').map((variant: any) => ({
+    _id: variant._id,
+    name: variant.name,
+    sku: variant.sku,
+    price: variant.price,
+    options: variant.options,
+    width: variant.width,
+    height: variant.height,
+    unit: variant.unit,
+    dpi: variant.dpi,
+    previewImageUrl: variant.previewImageUrl,
+    thumbnailImageUrl: variant.thumbnailImageUrl,
+    roomPreviews: (variant.roomPreviews ?? []).slice().sort((a: any, b: any) => a.sortOrder - b.sortOrder).map((room: any) => ({
+      id: room._id,
+      name: room.name,
+      roomImageUrl: room.roomImageUrl,
+      roomWidthMeters: room.roomWidthMeters,
+      roomHeightMeters: room.roomHeightMeters,
+      centerLeftPercent: room.centerLeftPercent,
+      centerTopPercent: room.centerTopPercent,
+      zoom: room.zoom,
+      isDefault: room.isDefault,
+      sortOrder: room.sortOrder,
+    })),
+  }));
+  return {
+    _id: product._id,
+    name: product.name,
+    slug: product.slug,
+    description: product.description,
+    productType: product.productType,
+    basePrice: product.basePrice,
+    thumbnailUrl: product.thumbnailUrl,
+    surface: product.surface,
+    editorRules: product.editorRules,
+    exportRules: product.exportRules,
+    variants: activeVariants,
+  };
+}
 export async function calculatePrice(id: string, variantId: string, selectedOptions: Record<string, string>) {
   const product = await ProductModel.findById(id).lean();
   if (!product) throw new ApiError(404, 'Product not found.');

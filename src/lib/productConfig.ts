@@ -66,7 +66,7 @@ function clearImportedIds(product: Product): Product {
       productId: '',
       values: group.values.map((value) => ({ ...value, _id: '', clientId: crypto.randomUUID(), optionGroupId: '' })),
     })),
-    variants: product.variants.map((variant) => ({ ...variant, _id: '', clientId: crypto.randomUUID(), productId: '' })),
+    variants: product.variants.map((variant) => ({ ...variant, _id: '', clientId: crypto.randomUUID(), productId: '', roomPreviews: variant.roomPreviews.map((room) => ({ ...room, _id: '', clientId: crypto.randomUUID(), variantId: '' })) })),
     templates: product.templates.map((template) => ({
       ...template,
       _id: '',
@@ -216,11 +216,30 @@ function normalizeVariant(input: Record<string, unknown>, productId: string, now
     dpi: numberOr(input.dpi, isRecord(legacySurface) ? numberOr(legacySurface.dpi, 300) : 300),
     previewImageUrl: typeof input.previewImageUrl === 'string' ? input.previewImageUrl : '',
     thumbnailImageUrl: typeof input.thumbnailImageUrl === 'string' ? input.thumbnailImageUrl : '',
+    roomPreviews: Array.isArray(input.roomPreviews) ? input.roomPreviews.filter(isRecord).map((room) => normalizeRoomPreview(room, now)) : [],
     createdAt: now,
     updatedAt: now,
   };
 }
 
+function normalizeRoomPreview(input: Record<string, unknown>, now: string): ProductVariant['roomPreviews'][number] {
+  return {
+    _id: typeof input._id === 'string' ? input._id : '',
+    clientId: crypto.randomUUID(),
+    variantId: typeof input.variantId === 'string' ? input.variantId : '',
+    name: typeof input.name === 'string' ? input.name : '',
+    roomImageUrl: typeof input.roomImageUrl === 'string' ? input.roomImageUrl : '',
+    roomWidthMeters: numberOr(input.roomWidthMeters, 0),
+    roomHeightMeters: typeof input.roomHeightMeters === 'number' ? input.roomHeightMeters : undefined,
+    centerLeftPercent: numberOr(input.centerLeftPercent, 50),
+    centerTopPercent: numberOr(input.centerTopPercent, 40),
+    zoom: numberOr(input.zoom, 1),
+    isDefault: input.isDefault === true,
+    sortOrder: numberOr(input.sortOrder, 0),
+    createdAt: typeof input.createdAt === 'string' ? input.createdAt : now,
+    updatedAt: now,
+  };
+}
 function normalizeTemplate(input: Record<string, unknown>, productId: string, surfaceId: string, now: string, index: number): ProductTemplate {
   return {
     _id: typeof input._id === 'string' ? input._id : '',

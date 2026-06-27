@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Check, Eye, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { SurfacePreview } from './SurfacePreview';
 import { Badge } from '../ui/Badge';
@@ -140,6 +141,7 @@ export function VariantsTab({ product, onSave }: Props) {
       dpi: Number(form.dpi),
       previewImageUrl: form.previewImageUrl.trim(),
       thumbnailImageUrl: form.thumbnailImageUrl.trim(),
+      roomPreviews: existing?.roomPreviews ?? [],
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
@@ -220,6 +222,7 @@ export function VariantsTab({ product, onSave }: Props) {
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Size</th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Pixels</th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Options</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Room Previews</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
               </tr>
             </thead>
@@ -234,6 +237,7 @@ export function VariantsTab({ product, onSave }: Props) {
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{variant.width} x {variant.height} {variant.unit} at {variant.dpi} DPI</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{Math.round(toPixels(variant.width, variant.unit, variant.dpi))} x {Math.round(toPixels(variant.height, variant.unit, variant.dpi))} px</td>
                   <td className="px-4 py-3 text-sm text-gray-700"><div className="flex flex-wrap gap-1">{Object.entries(variant.options).map(([key, value]) => <span key={key} className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">{key}: {value}</span>)}</div></td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm"><p className="text-gray-700">{variant.roomPreviews.length} {variant.roomPreviews.length === 1 ? 'preview' : 'previews'}</p><Link to={`?tab=preview&variantId=${variant._id}`} className="mt-1 inline-block font-medium text-slate-700 hover:text-slate-900">Manage Room Previews</Link></td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => setPreviewVariant(variant)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900" title="Preview"><Eye className="h-4 w-4" /></button>
