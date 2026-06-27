@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Save } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Input } from '../components/ui/Input';
@@ -15,21 +15,26 @@ const statusOptions = [
 
 export function MerchantSettings() {
   const { selectedMerchant, updateMerchant } = useWorkspace();
-  const [form, setForm] = useState<Merchant>(() => selectedMerchant);
+  const [form, setForm] = useState<Merchant | undefined>(() => selectedMerchant);
   const [saved, setSaved] = useState(false);
 
-  const errors = useMemo(() => validateMerchant(form), [form]);
+  useEffect(() => {
+    setForm(selectedMerchant);
+    // setSaved(false);
+  }, [selectedMerchant]);
+
+  const errors = useMemo(() => (form ? validateMerchant(form) : {}), [form]);
   const isValid = Object.keys(errors).length === 0;
 
-  if (!selectedMerchant) return <div className="text-sm text-gray-500">No merchant selected.</div>;
+  if (!selectedMerchant || !form) return <div className="text-sm text-gray-500">No merchant selected.</div>;
 
   function update<K extends keyof Merchant>(field: K, value: Merchant[K]) {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => (prev ? { ...prev, [field]: value } : prev));
   }
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!isValid) return;
+    if (!form || !isValid) return;
     updateMerchant({ ...form, name: form.name.trim(), slug: form.slug.trim() });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -43,7 +48,7 @@ export function MerchantSettings() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input label="Merchant Name" value={form.name} onChange={(e) => update('name', e.target.value)} error={errors.name} />
             <Input label="Slug" value={form.slug} onChange={(e) => update('slug', e.target.value)} error={errors.slug} />
-            <ImageField label="Logo URL" url={form.logoUrl} assetId={form.logoAssetId} onChange={(url, assetId) => setForm((prev) => ({ ...prev, logoUrl: url, logoAssetId: assetId }))} />
+            <ImageField label="Logo URL" url={form.logoUrl} assetId={form.logoAssetId} onChange={(url, assetId) => setForm((prev) => (prev ? { ...prev, logoUrl: url, logoAssetId: assetId } : prev))} />
             <Select label="Status" value={form.status} onChange={(e) => update('status', e.target.value as MerchantStatus)} options={statusOptions} />
             <ColorField label="Editor Primary Color" value={form.editorPrimaryColor} error={errors.editorPrimaryColor} onChange={(value) => update('editorPrimaryColor', value)} />
             <ColorField label="Editor Secondary Color" value={form.editorSecondaryColor} error={errors.editorSecondaryColor} onChange={(value) => update('editorSecondaryColor', value)} />
@@ -51,12 +56,12 @@ export function MerchantSettings() {
           </div>
 
           <Textarea label="Custom CSS" value={form.customCss} onChange={(e) => update('customCss', e.target.value)} rows={6} placeholder="/* Optional CSS for the future embedded editor */" />
-          <div>
+          {/* <div>
             <Textarea label="Custom JavaScript" value={form.customJavascript} onChange={(e) => update('customJavascript', e.target.value)} rows={6} placeholder="// Stored only. Not executed in admin." />
             <p className="mt-2 rounded-md bg-amber-50 p-3 text-sm text-amber-800 ring-1 ring-inset ring-amber-200">
               Custom JavaScript is stored as configuration only. It is not executed in this admin app and should only be used later in the embedded customer editor after sandboxing is implemented.
             </p>
-          </div>
+          </div> */}
 
           <div className="flex items-center gap-3">
             <button type="submit" disabled={!isValid} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">
