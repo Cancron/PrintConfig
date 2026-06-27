@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, Folder, Grid2X2, Image as ImageIcon, List, Loader2, Search, X } from 'lucide-react';
+import { ArrowLeft, Folder, Grid2X2, Image as ImageIcon, List, Loader2, Search, Upload, X } from 'lucide-react';
 import { useImageLibrary } from '../../hooks/useImageLibrary';
+import { GalleryUploadModal } from './GalleryUploadModal';
 import type { ImageAsset, ImagePickerValue } from '../../types';
 
 export function ImagePicker({ onSelect, onClose }: { onSelect: (value: ImagePickerValue) => void; onClose: () => void }) {
@@ -9,6 +10,7 @@ export function ImagePicker({ onSelect, onClose }: { onSelect: (value: ImagePick
   const [view, setView] = useState<"grid" | "list">("grid");
   const [foldersFirst, setFoldersFirst] = useState(true);
   const [selected, setSelected] = useState<ImageAsset | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const library = useImageLibrary(folderId, search);
   const currentFolder = library.allFolders.find((folder) => folder._id === folderId);
   const items = useMemo(() => {
@@ -84,6 +86,7 @@ export function ImagePicker({ onSelect, onClose }: { onSelect: (value: ImagePick
               <List className="h-4 w-4" />
             </button>
           </div>
+          <button type="button" onClick={() => setUploadOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"><Upload className="h-4 w-4" /> Upload</button>
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input
               type="checkbox"
@@ -195,6 +198,21 @@ export function ImagePicker({ onSelect, onClose }: { onSelect: (value: ImagePick
           </button>
         </div>
       </div>
+      {uploadOpen && (
+        <GalleryUploadModal
+          folderId={folderId}
+          defaultScope={currentFolder?.scope}
+          folders={library.allFolders}
+          accountId={library.account._id}
+          merchantId={library.selectedMerchantId}
+          onClose={() => setUploadOpen(false)}
+          onUploaded={async (asset) => {
+            setUploadOpen(false);
+            await library.refresh();
+            choose(asset);
+          }}
+        />
+      )}
     </div>
   );
 }
