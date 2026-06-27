@@ -61,6 +61,25 @@ const variantSchema = new Schema(
   { timestamps: true }
 );
 
+const variantOptionDefinitionSchema = new Schema(
+  {
+    productId: { type: Schema.Types.ObjectId, ref: 'Product' },
+    name: { type: String, required: true, trim: true },
+    key: { type: String, required: true, trim: true },
+    required: { type: Boolean, default: false },
+    groupBy: { type: Boolean, default: false },
+    sortOrder: { type: Number, default: 0 },
+  },
+  { timestamps: true }
+);
+
+const defaultVariantOptionDefinitions = () => ['Size', 'Orientation', 'Ratio'].map((name, index) => ({
+  name,
+  key: name,
+  required: false,
+  groupBy: false,
+  sortOrder: index + 1,
+}));
 const optionValueSchema = new Schema(
   {
     optionGroupId: { type: Schema.Types.ObjectId },
@@ -177,6 +196,7 @@ const productSchema = new Schema(
     thumbnailAssetId: { type: Schema.Types.ObjectId, ref: 'ImageAsset' },
     surface: { type: surfaceSchema, default: null },
     optionGroups: { type: [optionGroupSchema], default: [] },
+    variantOptionDefinitions: { type: [variantOptionDefinitionSchema], default: defaultVariantOptionDefinitions },
     variants: { type: [variantSchema], default: [] },
     editorRules: { type: editorRulesSchema, default: () => ({}) },
     exportRules: { type: exportRulesSchema, default: () => ({}) },
@@ -185,7 +205,8 @@ const productSchema = new Schema(
   { timestamps: true }
 );
 
-productSchema.pre('validate', function setVariantRoomPreviewRefs() {
+productSchema.pre('validate', function setNestedProductRefs() {
+  for (const definition of this.variantOptionDefinitions ?? []) definition.productId = this._id;
   for (const variant of this.variants ?? []) {
     for (const roomPreview of variant.roomPreviews ?? []) roomPreview.variantId = variant._id;
   }

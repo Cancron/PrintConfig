@@ -3,12 +3,13 @@ import { Upload, X } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Textarea } from '../ui/Textarea';
-import type { ProductStatus, ProductUnit, ProductVariant } from '../../types';
+import type { ProductStatus, ProductUnit, ProductVariant, VariantOptionDefinition } from '../../types';
 
 interface BulkVariantInput {
   w?: unknown;
   h?: unknown;
   price?: unknown;
+  options?: unknown;
 }
 
 interface ParsedBatch {
@@ -20,6 +21,7 @@ interface ParsedBatch {
 interface Props {
   productId: string;
   existingVariants: ProductVariant[];
+  optionDefinitions: VariantOptionDefinition[];
   onClose: () => void;
   onImport: (variants: ProductVariant[]) => void;
 }
@@ -37,7 +39,7 @@ const unitOptions = [
 
 const dpiOptions = ['72', '150', '300', '600'].map((value) => ({ value, label: `${value} DPI` }));
 
-export function BulkVariantsModal({ productId, existingVariants, onClose, onImport }: Props) {
+export function BulkVariantsModal({ productId, existingVariants, optionDefinitions, onClose, onImport }: Props) {
   const [json, setJson] = useState('[\n  { "w": 10, "h": 10, "price": 55 }\n]');
   const [namePrefix, setNamePrefix] = useState('');
   const [skuPrefix, setSkuPrefix] = useState('cpccd');
@@ -46,8 +48,8 @@ export function BulkVariantsModal({ productId, existingVariants, onClose, onImpo
   const [dpi, setDpi] = useState('300');
 
   const batch = useMemo(
-    () => parseBatch({ json, namePrefix, skuPrefix, status, unit, dpi: Number(dpi), productId, existingVariants }),
-    [dpi, existingVariants, json, namePrefix, productId, skuPrefix, status, unit],
+    () => parseBatch({ json, namePrefix, skuPrefix, status, unit, dpi: Number(dpi), productId, existingVariants, optionDefinitions }),
+    [dpi, existingVariants, json, namePrefix, optionDefinitions, productId, skuPrefix, status, unit],
   );
 
   return (
@@ -80,7 +82,7 @@ export function BulkVariantsModal({ productId, existingVariants, onClose, onImpo
             className="font-mono"
             error={batch.errors.length ? batch.errors.join(' ') : undefined}
           />
-          <p className="text-sm text-gray-500">Expected format: an array of objects containing numeric <code>w</code>, <code>h</code>, and <code>price</code> values.</p>
+          <p className="text-sm text-gray-500">Expected format: an array of objects containing numeric <code>w</code>, <code>h</code>, and <code>price</code> values. Add an optional <code>options</code> object for custom values.</p>
 
           {!batch.errors.length && (
             <div className="rounded-md bg-gray-50 p-4 text-sm ring-1 ring-gray-200">
@@ -120,6 +122,7 @@ function parseBatch(input: {
   dpi: number;
   productId: string;
   existingVariants: ProductVariant[];
+  optionDefinitions: VariantOptionDefinition[];
 }): ParsedBatch {
   let rows: BulkVariantInput[];
   try {
@@ -160,6 +163,22 @@ function parseBatch(input: {
       return;
     }
     seenSkus.add(sku.toLowerCase());
+    const rowOptions = isStringRecord(row.options) ? row.options : {};
+    if (row.options !== undefined && !isStringRecord(row.options)) {
+      errors.push(`Row ${index + 1}: options must be an object containing text or numeric values.`);
+      return;
+    }
+    const options: Record<string, string> = {
+      ...Object.fromEntries(Object.entries(rowOptions).map(([key, value]) => [key, String(value)])),
+      Size: size,
+      Orientation: getOrientation(width, height),
+      Ratio: getRatio(width, height),
+    };
+    const missing = input.optionDefinitions.filter((definition) => definition.required && !String(options[definition.key] ?? '').trim());
+    if (missing.length > 0) {
+      errors.push(`Row ${index + 1}: missing required options ${missing.map((definition) => definition.name).join(', ')}.`);
+      return;
+    }
     const now = new Date().toISOString();
     variants.push({
       _id: '',
@@ -169,11 +188,7 @@ function parseBatch(input: {
       sku,
       price,
       status: input.status,
-      options: {
-        Size: size,
-        Orientation: getOrientation(width, height),
-        Ratio: getRatio(width, height),
-      },
+      options,
       width,
       height,
       unit: input.unit,
@@ -187,6 +202,10 @@ function parseBatch(input: {
   });
 
   return { variants, skippedSkus, errors };
+}
+
+function isStringRecord(value: unknown): value is Record<string, string | number> {
+  return !!value && typeof value === 'object' && !Array.isArray(value) && Object.values(value).every((item) => typeof item === 'string' || typeof item === 'number');
 }
 
 function getOrientation(width: number, height: number) {

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { ImageAsset, ImageFolder, Merchant, Product, ProductCategory } from '../types';
+import { normalizeVariantOptionDefinitions } from './variantOptions';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api';
 
@@ -105,6 +106,7 @@ function normalizeProduct(raw: any): Product {
     status: raw.status === 'active' || raw.status === 'Active' ? 'Active' : 'Draft',
     surface: normalizeSurface(raw.surface),
     optionGroups: normalizeOptionGroups(raw.optionGroups),
+    variantOptionDefinitions: normalizeVariantOptionDefinitions(raw.variantOptionDefinitions, idOf(raw)),
     variants: (raw.variants ?? []).map((variant: any) => ({ ...variant, _id: idOf(variant), productId: String(variant.productId ?? ''), status: variant.status === 'active' || variant.status === 'Active' ? 'Active' : 'Draft', options: variant.options ?? {}, roomPreviews: (variant.roomPreviews ?? []).map((room: any) => ({ ...room, _id: idOf(room), variantId: String(room.variantId ?? variant._id ?? '') })) })),
     editorRules: raw.editorRules ?? {},
     exportRules: raw.exportRules ?? {},

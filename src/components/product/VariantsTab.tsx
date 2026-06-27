@@ -3,12 +3,13 @@ import { Link } from 'react-router-dom';
 import { Check, Eye, ListPlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { SurfacePreview } from './SurfacePreview';
 import { BulkVariantsModal } from './BulkVariantsModal';
+import { VariantOptionDefinitions } from './VariantOptionDefinitions';
 import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { ImageField } from '../gallery/ImageField';
-import { toPixels, validateVariant } from '../../lib/validation';
+import { toPixels, validateVariant, validateVariantOptions } from '../../lib/validation';
 import type { Product, ProductStatus, ProductUnit, ProductVariant } from '../../types';
 
 interface Props {
@@ -45,22 +46,29 @@ export function VariantsTab({ product, onSave }: Props) {
     previewImageAssetId: undefined as string | undefined,
     thumbnailImageUrl: '',
     thumbnailImageAssetId: undefined as string | undefined,
-    options: [{ key: '', value: '' }],
+    options: [...product.variantOptionDefinitions.map((definition) => ({ key: definition.key, value: '' })), { key: '', value: '' }],
   });
 
+  const sortedDefinitions = useMemo(() => [...product.variantOptionDefinitions].sort((a, b) => a.sortOrder - b.sortOrder), [product.variantOptionDefinitions]);
+  const definitionKeys = useMemo(() => new Set(product.variantOptionDefinitions.map((definition) => definition.key)), [product.variantOptionDefinitions]);
+  const formOptions = useMemo(() => Object.fromEntries(form.options.filter((option) => option.key.trim()).map((option) => [option.key.trim(), option.value])), [form.options]);
+
   const errors = useMemo(
-    () => validateVariant({
-      _id: editingId,
-      name: form.name,
-      sku: form.sku,
-      price: form.price,
-      width: form.width,
-      height: form.height,
-      unit: form.unit,
-      dpi: form.dpi,
-      existingSkus: product.variants.map((variant) => ({ _id: variant._id, sku: variant.sku })),
+    () => ({
+      ...validateVariant({
+        _id: editingId,
+        name: form.name,
+        sku: form.sku,
+        price: form.price,
+        width: form.width,
+        height: form.height,
+        unit: form.unit,
+        dpi: form.dpi,
+        existingSkus: product.variants.map((variant) => ({ _id: variant._id, sku: variant.sku })),
+      }),
+      ...validateVariantOptions(formOptions, product.variantOptionDefinitions),
     }),
-    [editingId, form.dpi, form.height, form.name, form.price, form.sku, form.unit, form.width, product.variants]
+    [editingId, form.dpi, form.height, form.name, form.price, form.sku, form.unit, form.width, formOptions, product.variantOptionDefinitions, product.variants]
   );
   const isValid = Object.keys(errors).length === 0;
 
@@ -78,7 +86,7 @@ export function VariantsTab({ product, onSave }: Props) {
       previewImageAssetId: undefined,
       thumbnailImageUrl: '',
       thumbnailImageAssetId: undefined,
-      options: [{ key: '', value: '' }],
+      options: [...product.variantOptionDefinitions.map((definition) => ({ key: definition.key, value: '' })), { key: '', value: '' }],
     });
   }
 
@@ -102,7 +110,11 @@ export function VariantsTab({ product, onSave }: Props) {
       previewImageAssetId: variant.previewImageAssetId,
       thumbnailImageUrl: variant.thumbnailImageUrl,
       thumbnailImageAssetId: variant.thumbnailImageAssetId,
-      options: Object.entries(variant.options).length > 0 ? Object.entries(variant.options).map(([key, value]) => ({ key, value })) : [{ key: '', value: '' }],
+      options: [
+        ...product.variantOptionDefinitions.map((definition) => ({ key: definition.key, value: variant.options[definition.key] ?? '' })),
+        ...Object.entries(variant.options).filter(([key]) => !product.variantOptionDefinitions.some((definition) => definition.key === key)).map(([key, value]) => ({ key, value })),
+        { key: '', value: '' },
+      ],
     });
     setEditingId(variant._id);
     setIsAdding(false);
@@ -118,6 +130,13 @@ export function VariantsTab({ product, onSave }: Props) {
     setForm((prev) => ({ ...prev, options: [...prev.options, { key: '', value: '' }] }));
   }
 
+  function updateDefinitionOption(key: string, value: string) {
+    setForm((prev) => {
+      const index = prev.options.findIndex((option) => option.key === key);
+      if (index < 0) return { ...prev, options: [...prev.options, { key, value }] };
+      return { ...prev, options: prev.options.map((option, optionIndex) => optionIndex === index ? { ...option, value } : option) };
+    });
+  }
   function removeOptionField(index: number) {
     setForm((prev) => ({ ...prev, options: prev.options.filter((_, i) => i !== index) }));
   }
@@ -192,6 +211,8 @@ export function VariantsTab({ product, onSave }: Props) {
         )}
       </div>
 
+      <VariantOptionDefinitions product={product} onSave={onSave} />
+
       {isFormOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
           <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
@@ -217,14 +238,35 @@ export function VariantsTab({ product, onSave }: Props) {
                 <ImageField label="Thumbnail Image URL" url={form.thumbnailImageUrl} assetId={form.thumbnailImageAssetId} onChange={(url, assetId) => setForm((prev) => ({ ...prev, thumbnailImageUrl: url, thumbnailImageAssetId: assetId }))} />
               </div>
 
-              <div className="mt-5">
-                <label className="mb-2 block text-sm font-medium text-gray-700">Options</label>
-                <div className="space-y-2">
-                  {form.options.map((opt, index) => (
+              <div className="mt-6">
+                <h4 className="text-sm font-semibold text-gray-900">Configured Options</h4>
+                <p className="mt-1 text-sm text-gray-500">Values use the definitions configured on this product.</p>
+                {sortedDefinitions.length === 0 ? (
+                  <p className="mt-3 text-sm text-gray-500">No configured option definitions.</p>
+                ) : (
+                  <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {sortedDefinitions.map((definition) => (
+                      <Input
+                        key={definition._id || definition.clientId || definition.key}
+                        label={`${definition.name}${definition.required ? ' *' : ''}`}
+                        value={formOptions[definition.key] ?? ''}
+                        onChange={(event) => updateDefinitionOption(definition.key, event.target.value)}
+                        error={errors[`options.${definition.key}`]}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 border-t border-gray-200 pt-5">
+                <h4 className="text-sm font-semibold text-gray-900">Additional Options</h4>
+                <p className="mt-1 text-sm text-gray-500">Store optional variant values that are not part of the configured definitions.</p>
+                <div className="mt-3 space-y-2">
+                  {form.options.map((opt, index) => definitionKeys.has(opt.key) ? null : (
                     <div key={index} className="flex items-center gap-2">
-                      <input type="text" placeholder="Key (e.g. size)" value={opt.key} onChange={(event) => updateOption(index, 'key', event.target.value)} className="flex-1 rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm" />
-                      <input type="text" placeholder="Value (e.g. 16x20)" value={opt.value} onChange={(event) => updateOption(index, 'value', event.target.value)} className="flex-1 rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm" />
-                      {form.options.length > 1 && <button type="button" onClick={() => removeOptionField(index)} className="rounded-md p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>}
+                      <input type="text" placeholder="Key" value={opt.key} onChange={(event) => updateOption(index, 'key', event.target.value)} className="flex-1 rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm" />
+                      <input type="text" placeholder="Value" value={opt.value} onChange={(event) => updateOption(index, 'value', event.target.value)} className="flex-1 rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm" />
+                      <button type="button" onClick={() => removeOptionField(index)} title="Remove option" className="rounded-md p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   ))}
                 </div>
@@ -286,7 +328,7 @@ export function VariantsTab({ product, onSave }: Props) {
       )}
 
       {previewVariant && <VariantPreviewModal product={product} variant={previewVariant} onClose={() => setPreviewVariant(null)} />}
-      {bulkOpen && <BulkVariantsModal productId={product._id} existingVariants={product.variants} onClose={() => setBulkOpen(false)} onImport={handleBulkImport} />}
+      {bulkOpen && <BulkVariantsModal productId={product._id} existingVariants={product.variants} optionDefinitions={product.variantOptionDefinitions} onClose={() => setBulkOpen(false)} onImport={handleBulkImport} />}
     </div>
   );
 }
@@ -302,7 +344,7 @@ function VariantPreviewModal({ product, variant, onClose }: { product: Product; 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-lg bg-white shadow-xl ring-1 ring-gray-200">
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-          <div><h3 className="text-lg font-semibold text-gray-900">{variant.name}</h3><p className="mt-1 text-sm text-gray-500">{variant.sku} ï¿½ {variant.width} x {variant.height} {variant.unit} ï¿½ {variant.dpi} DPI</p></div>
+          <div><h3 className="text-lg font-semibold text-gray-900">{variant.name}</h3><p className="mt-1 text-sm text-gray-500">{variant.sku} | {variant.width} x {variant.height} {variant.unit} | {variant.dpi} DPI</p></div>
           <button type="button" onClick={onClose} className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900"><X className="h-5 w-5" /></button>
         </div>
         <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-2">

@@ -1,4 +1,5 @@
 import { createDefaultEditorRules, createDefaultExportRules } from './storage';
+import { createDefaultVariantOptionDefinitions } from './variantOptions';
 import { normalizeUnit } from './validation';
 import type {
   Product,
@@ -12,6 +13,7 @@ import type {
   ProductTemplate,
   ProductType,
   ProductVariant,
+  VariantOptionDefinition,
   TemplateElement,
 } from '../types';
 
@@ -59,6 +61,7 @@ function clearImportedIds(product: Product): Product {
     ...product,
     _id: '',
     surface: product.surface ? { ...product.surface, _id: '', clientId: crypto.randomUUID(), productId: '' } : null,
+    variantOptionDefinitions: product.variantOptionDefinitions.map((definition) => ({ ...definition, _id: '', clientId: crypto.randomUUID(), productId: '' })),
     optionGroups: product.optionGroups.map((group) => ({
       ...group,
       _id: '',
@@ -104,6 +107,7 @@ function buildImportCandidate(input: Record<string, unknown>): Product {
     editorRules: isRecord(input.editorRules) ? { ...createDefaultEditorRules(), ...input.editorRules } : createDefaultEditorRules(),
     exportRules: isRecord(input.exportRules) ? { ...createDefaultExportRules(), ...input.exportRules } : createDefaultExportRules(),
     optionGroups: Array.isArray(input.optionGroups) ? input.optionGroups.filter(isRecord).map((group, index) => normalizeOptionGroup(group, id, now, index)) : [],
+    variantOptionDefinitions: Array.isArray(input.variantOptionDefinitions) ? input.variantOptionDefinitions.filter(isRecord).map((definition, index) => normalizeVariantOptionDefinition(definition, id, now, index)) : createDefaultVariantOptionDefinitions(id),
     templates: Array.isArray(input.templates) ? input.templates.filter(isRecord).map((template, index) => normalizeTemplate(template, id, surface?._id ?? '', now, index)) : [],
     variants: variants.map((variant, index) => normalizeVariant(variant, id, now, index)),
     createdAt: now,
@@ -155,6 +159,20 @@ function normalizeSurface(input: Record<string, unknown>, productId: string, now
   };
 }
 
+function normalizeVariantOptionDefinition(input: Record<string, unknown>, productId: string, now: string, index: number): VariantOptionDefinition {
+  const name = typeof input.name === 'string' ? input.name : `Option ${index + 1}`;
+  return {
+    _id: typeof input._id === 'string' ? input._id : '',
+    productId,
+    name,
+    key: typeof input.key === 'string' ? input.key : name,
+    required: input.required === true,
+    groupBy: input.groupBy === true,
+    sortOrder: numberOr(input.sortOrder, index + 1),
+    createdAt: typeof input.createdAt === 'string' ? input.createdAt : now,
+    updatedAt: typeof input.updatedAt === 'string' ? input.updatedAt : now,
+  };
+}
 function normalizeOptionGroup(input: Record<string, unknown>, productId: string, now: string, index: number): ProductOptionGroup {
   const id = typeof input._id === 'string' ? input._id : '';
   return {

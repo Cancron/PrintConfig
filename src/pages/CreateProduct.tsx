@@ -11,6 +11,7 @@ import { useCategories } from '../hooks/useCategories';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { createDefaultEditorRules, createDefaultExportRules } from '../lib/storage';
 import { validateProductBasicInfo } from '../lib/validation';
+import { createDefaultVariantOptionDefinitions } from '../lib/variantOptions';
 import type { Product, ProductScope, ProductType, ProductStatus } from '../types';
 
 const productTypeOptions: { value: ProductType; label: ProductType }[] = [
@@ -94,6 +95,7 @@ export function CreateProduct() {
       exportRules: createDefaultExportRules(),
       surface: null,
       optionGroups: [],
+      variantOptionDefinitions: createDefaultVariantOptionDefinitions(),
       templates: [],
       variants: [],
       createdAt: now,

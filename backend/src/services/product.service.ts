@@ -22,12 +22,28 @@ async function normalizeRefs(data: Record<string, unknown>) {
 
 function validateProductShape(data: Record<string, any>) {
   if (data.surface && !data.surface.code) throw new ApiError(400, 'Surface code is required.');
+  const definitionKeys = new Set<string>();
+  let groupByCount = 0;
+  for (const definition of data.variantOptionDefinitions ?? []) {
+    const key = String(definition.key ?? '').trim();
+    if (!String(definition.name ?? '').trim()) throw new ApiError(400, 'Variant option definition name is required.');
+    if (!key) throw new ApiError(400, 'Variant option definition key is required.');
+    const normalizedKey = key.toLowerCase();
+    if (definitionKeys.has(normalizedKey)) throw new ApiError(400, 'Variant option definition keys must be unique within product.');
+    definitionKeys.add(normalizedKey);
+    if (definition.groupBy) groupByCount += 1;
+  }
+  if (groupByCount > 1) throw new ApiError(400, 'Only one variant option definition can be used for grouping.');
+  const requiredDefinitions = (data.variantOptionDefinitions ?? []).filter((definition: Record<string, unknown>) => definition.required === true);
   const skus = new Set<string>();
   for (const variant of data.variants ?? []) {
     if (skus.has(String(variant.sku).toLowerCase())) throw new ApiError(400, 'Variant SKU must be unique within product.');
     skus.add(String(variant.sku).toLowerCase());
+    for (const definition of requiredDefinitions) {
+      if (!String(variant.options?.[definition.key] ?? '').trim()) throw new ApiError(400, `Variant ${variant.sku || variant.name || ''} is missing required option ${definition.name}.`);
+    }
     if (!(variant.width > 0) || !(variant.height > 0)) throw new ApiError(400, 'Variant width and height must be greater than 0.');
-if (!(variant.dpi > 0)) throw new ApiError(400, 'Variant dpi must be greater than 0.');
+    if (!(variant.dpi > 0)) throw new ApiError(400, 'Variant dpi must be greater than 0.');
     let defaultRoomPreviewCount = 0;
     for (const room of variant.roomPreviews ?? []) {
       if (!String(room.name ?? '').trim()) throw new ApiError(400, 'Room preview name is required.');
@@ -165,6 +181,7 @@ export async function getPublicProductConfig(id: string) {
     basePrice: product.basePrice,
     thumbnailUrl: product.thumbnailUrl,
     surface: product.surface,
+    variantOptionDefinitions: product.variantOptionDefinitions,
     editorRules: product.editorRules,
     exportRules: product.exportRules,
     variants: activeVariants,

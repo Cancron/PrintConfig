@@ -1,4 +1,5 @@
 import { normalizeUnit } from './validation';
+import { normalizeVariantOptionDefinitions } from './variantOptions';
 import type {
   Account,
   BleedSettings,
@@ -165,6 +166,7 @@ export function normalizeProduct(product: Product): Product {
     categorySnapshot: product.categorySnapshot,
     surface,
     optionGroups: product.optionGroups ?? [],
+    variantOptionDefinitions: normalizeVariantOptionDefinitions(product.variantOptionDefinitions, product._id),
     editorRules: { ...defaultEditorRules, ...(product.editorRules ?? {}) },
     exportRules: { ...defaultExportRules, ...(product.exportRules ?? {}) },
     templates: (product.templates ?? []).map((template) => ({ ...template, surfaceId: surface?._id ?? template.surfaceId ?? '' })),
