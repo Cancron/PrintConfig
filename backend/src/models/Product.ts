@@ -1,7 +1,13 @@
 import { Schema, model } from 'mongoose';
 
 const boxSchema = new Schema(
-  { top: { type: Number, default: 0 }, right: { type: Number, default: 0 }, bottom: { type: Number, default: 0 }, left: { type: Number, default: 0 } },
+  { 
+    top: { type: Number, default: 0 }, 
+    right: { type: Number, default: 0 }, 
+    bottom: { type: Number, default: 0 }, 
+    left: { type: Number, default: 0 }, 
+    unit: { type: String, enum: ['inch', 'mm', 'px'], default: 'inch' },
+  },
   { _id: false }
 );
 

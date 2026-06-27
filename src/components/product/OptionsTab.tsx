@@ -163,21 +163,21 @@ export function OptionsTab({ product, onSave }: Props) {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <Input label="Label" value={value.label} onChange={(e) => updateValue(entityKey(value), 'label', e.target.value)} error={errors[`value.${entityKey(value)}.label`]} />
                   <Input label="Value" value={value.value} onChange={(e) => updateValue(entityKey(value), 'value', slugify(e.target.value))} error={errors[`value.${entityKey(value)}.value`]} />
-                  <Input label="SKU Code" value={value.skuCode} onChange={(e) => updateValue(entityKey(value), 'skuCode', e.target.value)} />
-                  <Select label="Price Modifier Type" value={value.priceModifierType} onChange={(e) => updateValue(entityKey(value), 'priceModifierType', e.target.value as PriceModifierType)} options={modifierOptions} />
-                  <Input label="Price Modifier" type="number" step="0.01" value={value.priceModifier} onChange={(e) => updateValue(entityKey(value), 'priceModifier', Number(e.target.value))} error={errors[`value.${entityKey(value)}.priceModifier`]} />
+                  {/* <Input label="SKU Code" value={value.skuCode} onChange={(e) => updateValue(entityKey(value), 'skuCode', e.target.value)} /> */}
                   <Select label="Default" value={value.isDefault ? 'yes' : 'no'} onChange={(e) => updateValue(entityKey(value), 'isDefault', e.target.value === 'yes')} options={yesNoOptions} />
                   <Select label="Active" value={value.isActive ? 'yes' : 'no'} onChange={(e) => updateValue(entityKey(value), 'isActive', e.target.value === 'yes')} options={yesNoOptions} />
+                  <Select label="Price Modifier Type" value={value.priceModifierType} onChange={(e) => updateValue(entityKey(value), 'priceModifierType', e.target.value as PriceModifierType)} options={modifierOptions} />
+                  <Input label="Price Modifier" type="number" step="0.01" value={value.priceModifier} onChange={(e) => updateValue(entityKey(value), 'priceModifier', Number(e.target.value))} error={errors[`value.${entityKey(value)}.priceModifier`]} />
                   <Input label="Sort Order" type="number" value={value.sortOrder} onChange={(e) => updateValue(entityKey(value), 'sortOrder', Number(e.target.value))} />
-                  <Input label="Preview Image URL" value={value.previewImageUrl} onChange={(e) => updateValue(entityKey(value), 'previewImageUrl', e.target.value)} />
+                  {/* <Input label="Preview Image URL" value={value.previewImageUrl} onChange={(e) => updateValue(entityKey(value), 'previewImageUrl', e.target.value)} /> */}
                   <Input label="Thumbnail Image URL" value={value.thumbnailImageUrl} onChange={(e) => updateValue(entityKey(value), 'thumbnailImageUrl', e.target.value)} />
                   <Input label="Color Hex" value={value.metadata.colorHex ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'colorHex', e.target.value)} error={errors[`value.${entityKey(value)}.colorHex`]} />
-                  <Input label="Production Code" value={value.metadata.productionCode ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'productionCode', e.target.value)} />
+                  {/* <Input label="Production Code" value={value.metadata.productionCode ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'productionCode', e.target.value)} /> */}
                 </div>
-                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {/* <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Textarea label="Description" value={value.metadata.description ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'description', e.target.value)} rows={2} />
                   <Textarea label="Export Notes" value={value.metadata.exportNotes ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'exportNotes', e.target.value)} rows={2} />
-                </div>
+                </div> */}
                 <div className="mt-3 flex justify-end"><button type="button" onClick={() => deleteValue(entityKey(value))} className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /> Delete Value</button></div>
               </div>
             ))}
@@ -200,7 +200,7 @@ export function OptionsTab({ product, onSave }: Props) {
                   <Pill>{group.displayType}</Pill>
                   <Pill tone={group.required ? 'amber' : 'gray'}>{group.required ? 'Required' : 'Optional'}</Pill>
                 </div>
-                <p className="mt-1 text-sm text-gray-500">Code: {group.code} · {group.values.length} values</p>
+                <p className="mt-1 text-sm text-gray-500">Code: {group.code} ï¿½ {group.values.length} values</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={() => moveGroup(entityKey(group), -1)} disabled={index === 0} className="rounded-md p-2 text-gray-500 hover:bg-gray-100 disabled:opacity-40"><GripVertical className="h-4 w-4" /></button>
@@ -247,9 +247,9 @@ function OptionCustomerPreview({ group }: { group: ProductOptionGroup }) {
       <div className="mt-3 flex flex-wrap gap-3">
         {group.displayType === 'Dropdown' && <select className="rounded-md border-0 px-3 py-2 text-sm ring-1 ring-gray-300">{values.map((value) => <option key={entityKey(value)}>{value.label} ({formatModifier(value)})</option>)}</select>}
         {group.displayType === 'Image Swatches' && values.map((value) => <div key={entityKey(value)} className="w-32 rounded-lg bg-white p-2 ring-1 ring-gray-200"><div className="h-20 rounded bg-gray-100">{(value.previewImageUrl || value.thumbnailImageUrl) && <img src={value.previewImageUrl || value.thumbnailImageUrl} alt="" className="h-full w-full rounded object-cover" />}</div><p className="mt-2 text-sm font-medium text-gray-900">{value.label}</p><p className="text-xs text-gray-500">{formatModifier(value)}</p></div>)}
-        {group.displayType === 'Color Swatches' && values.map((value) => <div key={entityKey(value)} className="flex items-center gap-2 rounded-md bg-white px-3 py-2 ring-1 ring-gray-200"><span className="h-6 w-6 rounded-full ring-1 ring-gray-300" style={{ backgroundColor: value.metadata.colorHex || '#ffffff' }} /><span className="text-sm">{value.label} · {formatModifier(value)}</span></div>)}
-        {group.displayType === 'Text Buttons' && values.map((value) => <button key={entityKey(value)} type="button" className="rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300">{value.label} · {formatModifier(value)}</button>)}
-        {group.displayType === 'Radio Buttons' && values.map((value) => <label key={entityKey(value)} className="flex items-center gap-2 text-sm text-gray-700"><input type="radio" name={entityKey(group)} defaultChecked={value.isDefault} /> {value.label} · {formatModifier(value)}</label>)}
+        {group.displayType === 'Color Swatches' && values.map((value) => <div key={entityKey(value)} className="flex items-center gap-2 rounded-md bg-white px-3 py-2 ring-1 ring-gray-200"><span className="h-6 w-6 rounded-full ring-1 ring-gray-300" style={{ backgroundColor: value.metadata.colorHex || '#ffffff' }} /><span className="text-sm">{value.label} ï¿½ {formatModifier(value)}</span></div>)}
+        {group.displayType === 'Text Buttons' && values.map((value) => <button key={entityKey(value)} type="button" className="rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300">{value.label} ï¿½ {formatModifier(value)}</button>)}
+        {group.displayType === 'Radio Buttons' && values.map((value) => <label key={entityKey(value)} className="flex items-center gap-2 text-sm text-gray-700"><input type="radio" name={entityKey(group)} defaultChecked={value.isDefault} /> {value.label} ï¿½ {formatModifier(value)}</label>)}
       </div>
     </div>
   );
