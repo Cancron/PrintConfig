@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Eye, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Check, Eye, ListPlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { SurfacePreview } from './SurfacePreview';
+import { BulkVariantsModal } from './BulkVariantsModal';
 import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
 import { Input } from '../ui/Input';
@@ -29,6 +30,7 @@ const unitOptions: { value: ProductUnit; label: string }[] = [
 export function VariantsTab({ product, onSave }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [previewVariant, setPreviewVariant] = useState<ProductVariant | null>(null);
   const [form, setForm] = useState({
     name: '',
@@ -166,6 +168,12 @@ export function VariantsTab({ product, onSave }: Props) {
     onSave({ ...product, variants: product.variants.filter((variant) => variant._id !== id), updatedAt: now });
   }
 
+  function handleBulkImport(variants: ProductVariant[]) {
+    const now = new Date().toISOString();
+    onSave({ ...product, variants: [...product.variants, ...variants], updatedAt: now });
+    setBulkOpen(false);
+  }
+
   const isFormOpen = isAdding || editingId !== null;
 
   return (
@@ -173,9 +181,14 @@ export function VariantsTab({ product, onSave }: Props) {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium text-gray-900">Variants</h2>
         {!isFormOpen && (
-          <button onClick={startAdd} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800">
-            <Plus className="h-4 w-4" /> Add Variant
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setBulkOpen(true)} className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 transition-colors hover:bg-gray-50">
+              <ListPlus className="h-4 w-4" /> Bulk Add
+            </button>
+            <button onClick={startAdd} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800">
+              <Plus className="h-4 w-4" /> Add Variant
+            </button>
+          </div>
         )}
       </div>
 
@@ -262,6 +275,7 @@ export function VariantsTab({ product, onSave }: Props) {
       )}
 
       {previewVariant && <VariantPreviewModal product={product} variant={previewVariant} onClose={() => setPreviewVariant(null)} />}
+      {bulkOpen && <BulkVariantsModal productId={product._id} existingVariants={product.variants} onClose={() => setBulkOpen(false)} onImport={handleBulkImport} />}
     </div>
   );
 }
@@ -277,7 +291,7 @@ function VariantPreviewModal({ product, variant, onClose }: { product: Product; 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-lg bg-white shadow-xl ring-1 ring-gray-200">
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-          <div><h3 className="text-lg font-semibold text-gray-900">{variant.name}</h3><p className="mt-1 text-sm text-gray-500">{variant.sku} · {variant.width} x {variant.height} {variant.unit} · {variant.dpi} DPI</p></div>
+          <div><h3 className="text-lg font-semibold text-gray-900">{variant.name}</h3><p className="mt-1 text-sm text-gray-500">{variant.sku} ï¿½ {variant.width} x {variant.height} {variant.unit} ï¿½ {variant.dpi} DPI</p></div>
           <button type="button" onClick={onClose} className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900"><X className="h-5 w-5" /></button>
         </div>
         <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-2">
