@@ -134,7 +134,7 @@ export function VariantsTab({ product, onSave }: Props) {
     }
 
     const now = new Date().toISOString();
-    const existing = product.variants.find((variant) => variant._id === editingId);
+    const existing = product.variants.find((variant) => String(variant._id) === String(editingId));
     const variant: ProductVariant = {
       _id: editingId ?? '',
       clientId: existing?.clientId ?? (editingId ? undefined : crypto.randomUUID()),
@@ -157,7 +157,7 @@ export function VariantsTab({ product, onSave }: Props) {
       updatedAt: now,
     };
 
-    const variants = editingId ? product.variants.map((item) => (item._id === editingId ? variant : item)) : [...product.variants, variant];
+    const variants = editingId ? product.variants.map((item) => (String(item._id) === String(editingId) ? variant : item)) : [...product.variants, variant];
     onSave({ ...product, variants, updatedAt: now });
     cancelEdit();
   }
@@ -193,38 +193,49 @@ export function VariantsTab({ product, onSave }: Props) {
       </div>
 
       {isFormOpen && (
-        <div className="rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200">
-          <h3 className="mb-4 text-sm font-medium text-gray-900">{editingId ? 'Edit Variant' : 'New Variant'}</h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Input label="Variant Name" value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} error={errors.name} placeholder="e.g. 16x20 Canvas" />
-            <Input label="SKU" value={form.sku} onChange={(event) => setForm((prev) => ({ ...prev, sku: event.target.value }))} error={errors.sku} placeholder="e.g. CANVAS-16X20" />
-            <Input label="Price" type="number" step="0.01" min="0" value={form.price} onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))} error={errors.price} placeholder="0.00" />
-            <Select label="Status" value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value as ProductStatus }))} options={statusOptions} />
-            <Input label="Width" type="number" step="0.01" min="0" value={form.width} onChange={(event) => setForm((prev) => ({ ...prev, width: event.target.value }))} error={errors.width} />
-            <Input label="Height" type="number" step="0.01" min="0" value={form.height} onChange={(event) => setForm((prev) => ({ ...prev, height: event.target.value }))} error={errors.height} />
-            <Select label="Unit" value={form.unit} onChange={(event) => setForm((prev) => ({ ...prev, unit: event.target.value as ProductUnit }))} options={unitOptions} error={errors.unit} />
-            <Input label="DPI" type="number" min="1" value={form.dpi} onChange={(event) => setForm((prev) => ({ ...prev, dpi: event.target.value }))} error={errors.dpi} />
-            <ImageField label="Preview Image URL" url={form.previewImageUrl} assetId={form.previewImageAssetId} onChange={(url, assetId) => setForm((prev) => ({ ...prev, previewImageUrl: url, previewImageAssetId: assetId }))} />
-            <ImageField label="Thumbnail Image URL" url={form.thumbnailImageUrl} assetId={form.thumbnailImageAssetId} onChange={(url, assetId) => setForm((prev) => ({ ...prev, thumbnailImageUrl: url, thumbnailImageAssetId: assetId }))} />
-          </div>
-
-          <div className="mt-5">
-            <label className="mb-2 block text-sm font-medium text-gray-700">Options</label>
-            <div className="space-y-2">
-              {form.options.map((opt, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <input type="text" placeholder="Key (e.g. size)" value={opt.key} onChange={(event) => updateOption(index, 'key', event.target.value)} className="flex-1 rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm" />
-                  <input type="text" placeholder="Value (e.g. 16x20)" value={opt.value} onChange={(event) => updateOption(index, 'value', event.target.value)} className="flex-1 rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm" />
-                  {form.options.length > 1 && <button type="button" onClick={() => removeOptionField(index)} className="rounded-md p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>}
-                </div>
-              ))}
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">{editingId ? 'Edit Variant' : 'New Variant'}</h3>
+                <p className="mt-1 text-sm text-gray-500">Configure pricing, production dimensions, images, and options.</p>
+              </div>
+              <button type="button" onClick={cancelEdit} title="Close" className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900"><X className="h-5 w-5" /></button>
             </div>
-            <button type="button" onClick={addOptionField} className="mt-2 text-sm font-medium text-slate-700 hover:text-slate-900">+ Add option</button>
-          </div>
 
-          <div className="mt-5 flex items-center gap-3">
-            <button onClick={handleSave} disabled={!isValid} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"><Check className="h-4 w-4" /> Save Variant</button>
-            <button onClick={cancelEdit} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 transition-colors hover:bg-gray-50"><X className="h-4 w-4" /> Cancel</button>
+            <div className="overflow-y-auto p-5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Input label="Variant Name" value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} error={errors.name} placeholder="e.g. 16x20 Canvas" />
+                <Input label="SKU" value={form.sku} onChange={(event) => setForm((prev) => ({ ...prev, sku: event.target.value }))} error={errors.sku} placeholder="e.g. CANVAS-16X20" />
+                <Input label="Price" type="number" step="0.01" min="0" value={form.price} onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))} error={errors.price} placeholder="0.00" />
+                <Select label="Status" value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value as ProductStatus }))} options={statusOptions} />
+                <Input label="Width" type="number" step="0.01" min="0" value={form.width} onChange={(event) => setForm((prev) => ({ ...prev, width: event.target.value }))} error={errors.width} />
+                <Input label="Height" type="number" step="0.01" min="0" value={form.height} onChange={(event) => setForm((prev) => ({ ...prev, height: event.target.value }))} error={errors.height} />
+                <Select label="Unit" value={form.unit} onChange={(event) => setForm((prev) => ({ ...prev, unit: event.target.value as ProductUnit }))} options={unitOptions} error={errors.unit} />
+                <Input label="DPI" type="number" min="1" value={form.dpi} onChange={(event) => setForm((prev) => ({ ...prev, dpi: event.target.value }))} error={errors.dpi} />
+                <ImageField label="Preview Image URL" url={form.previewImageUrl} assetId={form.previewImageAssetId} onChange={(url, assetId) => setForm((prev) => ({ ...prev, previewImageUrl: url, previewImageAssetId: assetId }))} />
+                <ImageField label="Thumbnail Image URL" url={form.thumbnailImageUrl} assetId={form.thumbnailImageAssetId} onChange={(url, assetId) => setForm((prev) => ({ ...prev, thumbnailImageUrl: url, thumbnailImageAssetId: assetId }))} />
+              </div>
+
+              <div className="mt-5">
+                <label className="mb-2 block text-sm font-medium text-gray-700">Options</label>
+                <div className="space-y-2">
+                  {form.options.map((opt, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <input type="text" placeholder="Key (e.g. size)" value={opt.key} onChange={(event) => updateOption(index, 'key', event.target.value)} className="flex-1 rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm" />
+                      <input type="text" placeholder="Value (e.g. 16x20)" value={opt.value} onChange={(event) => updateOption(index, 'value', event.target.value)} className="flex-1 rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm" />
+                      {form.options.length > 1 && <button type="button" onClick={() => removeOptionField(index)} className="rounded-md p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>}
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={addOptionField} className="mt-2 text-sm font-medium text-slate-700 hover:text-slate-900">+ Add option</button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-5 py-4">
+              <button type="button" onClick={cancelEdit} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 transition-colors hover:bg-gray-50"><X className="h-4 w-4" /> Cancel</button>
+              <button type="button" onClick={handleSave} disabled={!isValid} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"><Check className="h-4 w-4" /> Save Variant</button>
+            </div>
           </div>
         </div>
       )}
@@ -291,7 +302,7 @@ function VariantPreviewModal({ product, variant, onClose }: { product: Product; 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-lg bg-white shadow-xl ring-1 ring-gray-200">
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-          <div><h3 className="text-lg font-semibold text-gray-900">{variant.name}</h3><p className="mt-1 text-sm text-gray-500">{variant.sku} � {variant.width} x {variant.height} {variant.unit} � {variant.dpi} DPI</p></div>
+          <div><h3 className="text-lg font-semibold text-gray-900">{variant.name}</h3><p className="mt-1 text-sm text-gray-500">{variant.sku} ï¿½ {variant.width} x {variant.height} {variant.unit} ï¿½ {variant.dpi} DPI</p></div>
           <button type="button" onClick={onClose} className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900"><X className="h-5 w-5" /></button>
         </div>
         <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-2">

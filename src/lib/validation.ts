@@ -64,7 +64,7 @@ export function validateVariant(input: {
   if (!input.name.trim()) errors.name = 'Variant name is required.';
   if (!input.sku.trim()) {
     errors.sku = 'SKU is required.';
-  } else if (input.existingSkus.some((item) => item._id !== input._id && item.sku.trim().toLowerCase() === sku)) {
+  } else if (input.existingSkus.some((item) => String(item._id) !== String(input._id ?? '') && item.sku.trim().toLowerCase() === sku)) {
     errors.sku = 'SKU must be unique within this product.';
   }
   if (input.price === '' || Number.isNaN(price) || price < 0) errors.price = 'Price must be zero or greater.';
