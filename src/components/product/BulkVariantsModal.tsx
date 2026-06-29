@@ -169,10 +169,10 @@ function parseBatch(input: {
       return;
     }
     const options: Record<string, string> = {
-      ...Object.fromEntries(Object.entries(rowOptions).map(([key, value]) => [key, String(value)])),
       Size: size,
       Orientation: getOrientation(width, height),
       Ratio: getRatio(width, height),
+      ...Object.fromEntries(Object.entries(rowOptions).map(([key, value]) => [key, String(value)])),
     };
     const missing = input.optionDefinitions.filter((definition) => definition.required && !String(options[definition.key] ?? '').trim());
     if (missing.length > 0) {
