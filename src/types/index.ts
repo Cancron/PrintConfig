@@ -104,6 +104,18 @@ export interface ProductCategory {
   updatedAt: string;
 }
 
+export interface VariantOptionDefinition {
+  _id: string;
+  clientId?: string;
+  productId: string;
+  name: string;
+  key: string;
+  required: boolean;
+  groupBy: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
 export interface ProductOptionValueMetadata {
   colorHex?: string;
   description?: string;
@@ -293,6 +305,7 @@ export interface Product {
   categorySnapshot?: ProductCategory;
   surface: ProductSurface | null;
   optionGroups: ProductOptionGroup[];
+  variantOptionDefinitions: VariantOptionDefinition[];
   editorRules: EditorRules;
   exportRules: ExportRules;
   templates: ProductTemplate[];

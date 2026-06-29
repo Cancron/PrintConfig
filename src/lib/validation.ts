@@ -1,4 +1,5 @@
-import type { Product, ProductCategory, ProductSurface, ProductType, ProductUnit, ProductVariant } from '../types';
+import type { Product, ProductCategory, ProductSurface, ProductType, ProductUnit, ProductVariant, VariantOptionDefinition } from '../types';
+import { missingRequiredVariantOptions } from './variantOptions';
 
 export type ValidationErrors = Record<string, string>;
 
@@ -64,7 +65,7 @@ export function validateVariant(input: {
   if (!input.name.trim()) errors.name = 'Variant name is required.';
   if (!input.sku.trim()) {
     errors.sku = 'SKU is required.';
-  } else if (input.existingSkus.some((item) => item._id !== input._id && item.sku.trim().toLowerCase() === sku)) {
+  } else if (input.existingSkus.some((item) => String(item._id) !== String(input._id ?? '') && item.sku.trim().toLowerCase() === sku)) {
     errors.sku = 'SKU must be unique within this product.';
   }
   if (input.price === '' || Number.isNaN(price) || price < 0) errors.price = 'Price must be zero or greater.';
@@ -76,6 +77,13 @@ export function validateVariant(input: {
   return errors;
 }
 
+export function validateVariantOptions(options: Record<string, string>, definitions: VariantOptionDefinition[]): ValidationErrors {
+  const errors: ValidationErrors = {};
+  for (const definition of missingRequiredVariantOptions({ options }, definitions)) {
+    errors[`options.${definition.key}`] = `${definition.name} is required.`;
+  }
+  return errors;
+}
 export function validateSurface(surface: ProductSurface, previewVariant?: Pick<ProductVariant, 'width' | 'height'> | null): ValidationErrors {
   const errors: ValidationErrors = {};
 
@@ -137,6 +145,7 @@ export function getProductReadiness(product: Product) {
   const surfaceValid = hasSurface && surfaceHasValidSettings(product.surface, previewVariant);
   const hasExportRules = !!product.exportRules;
   const hasEditorRules = !!product.editorRules;
+  const variantsHaveRequiredOptions = product.variants.every((variant) => missingRequiredVariantOptions(variant, product.variantOptionDefinitions).length === 0);
   const hasAnyRoomPreviews = product.variants.some((variant) => variant.roomPreviews.length > 0);
   const activeVariantsHaveRoomPreviews = activeVariants.length > 0 && activeVariants.every((variant) => variant.roomPreviews.length > 0);
   const activeVariantsHaveDefaultRoomPreview = activeVariants.length > 0 && activeVariants.every((variant) => variant.roomPreviews.some((room) => room.isDefault));
@@ -148,6 +157,7 @@ export function getProductReadiness(product: Product) {
   if (hasSurface && !surfaceValid) missing.push('Fix invalid surface bleed, safe area, code, or background color settings.');
   if (!hasExportRules) missing.push('Configure export rules.');
   if (!hasEditorRules) missing.push('Configure editor rules.');
+  if (!variantsHaveRequiredOptions) missing.push('Fill every required option value on all variants.');
 
   return {
     hasBasicInfo: Object.keys(basicErrors).length === 0,
@@ -157,6 +167,7 @@ export function getProductReadiness(product: Product) {
     surfaceValid,
     hasExportRules,
     hasEditorRules,
+    variantsHaveRequiredOptions,
     hasAnyRoomPreviews,
     activeVariantsHaveRoomPreviews,
     activeVariantsHaveDefaultRoomPreview,

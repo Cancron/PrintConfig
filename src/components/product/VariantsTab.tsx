@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Eye, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Check, Eye, ListPlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { SurfacePreview } from './SurfacePreview';
+import { BulkVariantsModal } from './BulkVariantsModal';
+import { VariantOptionDefinitions } from './VariantOptionDefinitions';
 import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { ImageField } from '../gallery/ImageField';
-import { toPixels, validateVariant } from '../../lib/validation';
+import { toPixels, validateVariant, validateVariantOptions } from '../../lib/validation';
 import type { Product, ProductStatus, ProductUnit, ProductVariant } from '../../types';
 
 interface Props {
@@ -29,6 +31,7 @@ const unitOptions: { value: ProductUnit; label: string }[] = [
 export function VariantsTab({ product, onSave }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [previewVariant, setPreviewVariant] = useState<ProductVariant | null>(null);
   const [form, setForm] = useState({
     name: '',
@@ -43,22 +46,29 @@ export function VariantsTab({ product, onSave }: Props) {
     previewImageAssetId: undefined as string | undefined,
     thumbnailImageUrl: '',
     thumbnailImageAssetId: undefined as string | undefined,
-    options: [{ key: '', value: '' }],
+    options: [...product.variantOptionDefinitions.map((definition) => ({ key: definition.key, value: '' })), { key: '', value: '' }],
   });
 
+  const sortedDefinitions = useMemo(() => [...product.variantOptionDefinitions].sort((a, b) => a.sortOrder - b.sortOrder), [product.variantOptionDefinitions]);
+  const definitionKeys = useMemo(() => new Set(product.variantOptionDefinitions.map((definition) => definition.key)), [product.variantOptionDefinitions]);
+  const formOptions = useMemo(() => Object.fromEntries(form.options.filter((option) => option.key.trim()).map((option) => [option.key.trim(), option.value])), [form.options]);
+
   const errors = useMemo(
-    () => validateVariant({
-      _id: editingId,
-      name: form.name,
-      sku: form.sku,
-      price: form.price,
-      width: form.width,
-      height: form.height,
-      unit: form.unit,
-      dpi: form.dpi,
-      existingSkus: product.variants.map((variant) => ({ _id: variant._id, sku: variant.sku })),
+    () => ({
+      ...validateVariant({
+        _id: editingId,
+        name: form.name,
+        sku: form.sku,
+        price: form.price,
+        width: form.width,
+        height: form.height,
+        unit: form.unit,
+        dpi: form.dpi,
+        existingSkus: product.variants.map((variant) => ({ _id: variant._id, sku: variant.sku })),
+      }),
+      ...validateVariantOptions(formOptions, product.variantOptionDefinitions),
     }),
-    [editingId, form.dpi, form.height, form.name, form.price, form.sku, form.unit, form.width, product.variants]
+    [editingId, form.dpi, form.height, form.name, form.price, form.sku, form.unit, form.width, formOptions, product.variantOptionDefinitions, product.variants]
   );
   const isValid = Object.keys(errors).length === 0;
 
@@ -76,7 +86,7 @@ export function VariantsTab({ product, onSave }: Props) {
       previewImageAssetId: undefined,
       thumbnailImageUrl: '',
       thumbnailImageAssetId: undefined,
-      options: [{ key: '', value: '' }],
+      options: [...product.variantOptionDefinitions.map((definition) => ({ key: definition.key, value: '' })), { key: '', value: '' }],
     });
   }
 
@@ -100,7 +110,11 @@ export function VariantsTab({ product, onSave }: Props) {
       previewImageAssetId: variant.previewImageAssetId,
       thumbnailImageUrl: variant.thumbnailImageUrl,
       thumbnailImageAssetId: variant.thumbnailImageAssetId,
-      options: Object.entries(variant.options).length > 0 ? Object.entries(variant.options).map(([key, value]) => ({ key, value })) : [{ key: '', value: '' }],
+      options: [
+        ...product.variantOptionDefinitions.map((definition) => ({ key: definition.key, value: variant.options[definition.key] ?? '' })),
+        ...Object.entries(variant.options).filter(([key]) => !product.variantOptionDefinitions.some((definition) => definition.key === key)).map(([key, value]) => ({ key, value })),
+        { key: '', value: '' },
+      ],
     });
     setEditingId(variant._id);
     setIsAdding(false);
@@ -116,6 +130,13 @@ export function VariantsTab({ product, onSave }: Props) {
     setForm((prev) => ({ ...prev, options: [...prev.options, { key: '', value: '' }] }));
   }
 
+  function updateDefinitionOption(key: string, value: string) {
+    setForm((prev) => {
+      const index = prev.options.findIndex((option) => option.key === key);
+      if (index < 0) return { ...prev, options: [...prev.options, { key, value }] };
+      return { ...prev, options: prev.options.map((option, optionIndex) => optionIndex === index ? { ...option, value } : option) };
+    });
+  }
   function removeOptionField(index: number) {
     setForm((prev) => ({ ...prev, options: prev.options.filter((_, i) => i !== index) }));
   }
@@ -132,7 +153,7 @@ export function VariantsTab({ product, onSave }: Props) {
     }
 
     const now = new Date().toISOString();
-    const existing = product.variants.find((variant) => variant._id === editingId);
+    const existing = product.variants.find((variant) => String(variant._id) === String(editingId));
     const variant: ProductVariant = {
       _id: editingId ?? '',
       clientId: existing?.clientId ?? (editingId ? undefined : crypto.randomUUID()),
@@ -155,7 +176,7 @@ export function VariantsTab({ product, onSave }: Props) {
       updatedAt: now,
     };
 
-    const variants = editingId ? product.variants.map((item) => (item._id === editingId ? variant : item)) : [...product.variants, variant];
+    const variants = editingId ? product.variants.map((item) => (String(item._id) === String(editingId) ? variant : item)) : [...product.variants, variant];
     onSave({ ...product, variants, updatedAt: now });
     cancelEdit();
   }
@@ -166,6 +187,12 @@ export function VariantsTab({ product, onSave }: Props) {
     onSave({ ...product, variants: product.variants.filter((variant) => variant._id !== id), updatedAt: now });
   }
 
+  function handleBulkImport(variants: ProductVariant[]) {
+    const now = new Date().toISOString();
+    onSave({ ...product, variants: [...product.variants, ...variants], updatedAt: now });
+    setBulkOpen(false);
+  }
+
   const isFormOpen = isAdding || editingId !== null;
 
   return (
@@ -173,45 +200,84 @@ export function VariantsTab({ product, onSave }: Props) {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium text-gray-900">Variants</h2>
         {!isFormOpen && (
-          <button onClick={startAdd} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800">
-            <Plus className="h-4 w-4" /> Add Variant
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setBulkOpen(true)} className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 transition-colors hover:bg-gray-50">
+              <ListPlus className="h-4 w-4" /> Bulk Add
+            </button>
+            <button onClick={startAdd} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800">
+              <Plus className="h-4 w-4" /> Add Variant
+            </button>
+          </div>
         )}
       </div>
 
+      <VariantOptionDefinitions product={product} onSave={onSave} />
+
       {isFormOpen && (
-        <div className="rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200">
-          <h3 className="mb-4 text-sm font-medium text-gray-900">{editingId ? 'Edit Variant' : 'New Variant'}</h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Input label="Variant Name" value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} error={errors.name} placeholder="e.g. 16x20 Canvas" />
-            <Input label="SKU" value={form.sku} onChange={(event) => setForm((prev) => ({ ...prev, sku: event.target.value }))} error={errors.sku} placeholder="e.g. CANVAS-16X20" />
-            <Input label="Price" type="number" step="0.01" min="0" value={form.price} onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))} error={errors.price} placeholder="0.00" />
-            <Select label="Status" value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value as ProductStatus }))} options={statusOptions} />
-            <Input label="Width" type="number" step="0.01" min="0" value={form.width} onChange={(event) => setForm((prev) => ({ ...prev, width: event.target.value }))} error={errors.width} />
-            <Input label="Height" type="number" step="0.01" min="0" value={form.height} onChange={(event) => setForm((prev) => ({ ...prev, height: event.target.value }))} error={errors.height} />
-            <Select label="Unit" value={form.unit} onChange={(event) => setForm((prev) => ({ ...prev, unit: event.target.value as ProductUnit }))} options={unitOptions} error={errors.unit} />
-            <Input label="DPI" type="number" min="1" value={form.dpi} onChange={(event) => setForm((prev) => ({ ...prev, dpi: event.target.value }))} error={errors.dpi} />
-            <ImageField label="Preview Image URL" url={form.previewImageUrl} assetId={form.previewImageAssetId} onChange={(url, assetId) => setForm((prev) => ({ ...prev, previewImageUrl: url, previewImageAssetId: assetId }))} />
-            <ImageField label="Thumbnail Image URL" url={form.thumbnailImageUrl} assetId={form.thumbnailImageAssetId} onChange={(url, assetId) => setForm((prev) => ({ ...prev, thumbnailImageUrl: url, thumbnailImageAssetId: assetId }))} />
-          </div>
-
-          <div className="mt-5">
-            <label className="mb-2 block text-sm font-medium text-gray-700">Options</label>
-            <div className="space-y-2">
-              {form.options.map((opt, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <input type="text" placeholder="Key (e.g. size)" value={opt.key} onChange={(event) => updateOption(index, 'key', event.target.value)} className="flex-1 rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm" />
-                  <input type="text" placeholder="Value (e.g. 16x20)" value={opt.value} onChange={(event) => updateOption(index, 'value', event.target.value)} className="flex-1 rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm" />
-                  {form.options.length > 1 && <button type="button" onClick={() => removeOptionField(index)} className="rounded-md p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>}
-                </div>
-              ))}
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">{editingId ? 'Edit Variant' : 'New Variant'}</h3>
+                <p className="mt-1 text-sm text-gray-500">Configure pricing, production dimensions, images, and options.</p>
+              </div>
+              <button type="button" onClick={cancelEdit} title="Close" className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900"><X className="h-5 w-5" /></button>
             </div>
-            <button type="button" onClick={addOptionField} className="mt-2 text-sm font-medium text-slate-700 hover:text-slate-900">+ Add option</button>
-          </div>
 
-          <div className="mt-5 flex items-center gap-3">
-            <button onClick={handleSave} disabled={!isValid} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"><Check className="h-4 w-4" /> Save Variant</button>
-            <button onClick={cancelEdit} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 transition-colors hover:bg-gray-50"><X className="h-4 w-4" /> Cancel</button>
+            <div className="overflow-y-auto p-5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Input label="Variant Name" value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} error={errors.name} placeholder="e.g. 16x20 Canvas" />
+                <Input label="SKU" value={form.sku} onChange={(event) => setForm((prev) => ({ ...prev, sku: event.target.value }))} error={errors.sku} placeholder="e.g. CANVAS-16X20" />
+                <Input label="Price" type="number" step="0.01" min="0" value={form.price} onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))} error={errors.price} placeholder="0.00" />
+                <Select label="Status" value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value as ProductStatus }))} options={statusOptions} />
+                <Input label="Width" type="number" step="0.01" min="0" value={form.width} onChange={(event) => setForm((prev) => ({ ...prev, width: event.target.value }))} error={errors.width} />
+                <Input label="Height" type="number" step="0.01" min="0" value={form.height} onChange={(event) => setForm((prev) => ({ ...prev, height: event.target.value }))} error={errors.height} />
+                <Select label="Unit" value={form.unit} onChange={(event) => setForm((prev) => ({ ...prev, unit: event.target.value as ProductUnit }))} options={unitOptions} error={errors.unit} />
+                <Input label="DPI" type="number" min="1" value={form.dpi} onChange={(event) => setForm((prev) => ({ ...prev, dpi: event.target.value }))} error={errors.dpi} />
+                <ImageField label="Preview Image URL" url={form.previewImageUrl} assetId={form.previewImageAssetId} onChange={(url, assetId) => setForm((prev) => ({ ...prev, previewImageUrl: url, previewImageAssetId: assetId }))} />
+                <ImageField label="Thumbnail Image URL" url={form.thumbnailImageUrl} assetId={form.thumbnailImageAssetId} onChange={(url, assetId) => setForm((prev) => ({ ...prev, thumbnailImageUrl: url, thumbnailImageAssetId: assetId }))} />
+              </div>
+
+              <div className="mt-6">
+                <h4 className="text-sm font-semibold text-gray-900">Configured Options</h4>
+                <p className="mt-1 text-sm text-gray-500">Values use the definitions configured on this product.</p>
+                {sortedDefinitions.length === 0 ? (
+                  <p className="mt-3 text-sm text-gray-500">No configured option definitions.</p>
+                ) : (
+                  <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {sortedDefinitions.map((definition) => (
+                      <Input
+                        key={definition._id || definition.clientId || definition.key}
+                        label={`${definition.name}${definition.required ? ' *' : ''}`}
+                        value={formOptions[definition.key] ?? ''}
+                        onChange={(event) => updateDefinitionOption(definition.key, event.target.value)}
+                        error={errors[`options.${definition.key}`]}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 border-t border-gray-200 pt-5">
+                <h4 className="text-sm font-semibold text-gray-900">Additional Options</h4>
+                <p className="mt-1 text-sm text-gray-500">Store optional variant values that are not part of the configured definitions.</p>
+                <div className="mt-3 space-y-2">
+                  {form.options.map((opt, index) => definitionKeys.has(opt.key) ? null : (
+                    <div key={index} className="flex items-center gap-2">
+                      <input type="text" placeholder="Key" value={opt.key} onChange={(event) => updateOption(index, 'key', event.target.value)} className="flex-1 rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm" />
+                      <input type="text" placeholder="Value" value={opt.value} onChange={(event) => updateOption(index, 'value', event.target.value)} className="flex-1 rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-slate-600 sm:text-sm" />
+                      <button type="button" onClick={() => removeOptionField(index)} title="Remove option" className="rounded-md p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={addOptionField} className="mt-2 text-sm font-medium text-slate-700 hover:text-slate-900">+ Add option</button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-5 py-4">
+              <button type="button" onClick={cancelEdit} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 transition-colors hover:bg-gray-50"><X className="h-4 w-4" /> Cancel</button>
+              <button type="button" onClick={handleSave} disabled={!isValid} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"><Check className="h-4 w-4" /> Save Variant</button>
+            </div>
           </div>
         </div>
       )}
@@ -262,6 +328,7 @@ export function VariantsTab({ product, onSave }: Props) {
       )}
 
       {previewVariant && <VariantPreviewModal product={product} variant={previewVariant} onClose={() => setPreviewVariant(null)} />}
+      {bulkOpen && <BulkVariantsModal productId={product._id} existingVariants={product.variants} optionDefinitions={product.variantOptionDefinitions} onClose={() => setBulkOpen(false)} onImport={handleBulkImport} />}
     </div>
   );
 }
@@ -277,7 +344,7 @@ function VariantPreviewModal({ product, variant, onClose }: { product: Product; 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-lg bg-white shadow-xl ring-1 ring-gray-200">
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-          <div><h3 className="text-lg font-semibold text-gray-900">{variant.name}</h3><p className="mt-1 text-sm text-gray-500">{variant.sku} · {variant.width} x {variant.height} {variant.unit} · {variant.dpi} DPI</p></div>
+          <div><h3 className="text-lg font-semibold text-gray-900">{variant.name}</h3><p className="mt-1 text-sm text-gray-500">{variant.sku} | {variant.width} x {variant.height} {variant.unit} | {variant.dpi} DPI</p></div>
           <button type="button" onClick={onClose} className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900"><X className="h-5 w-5" /></button>
         </div>
         <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-2">
