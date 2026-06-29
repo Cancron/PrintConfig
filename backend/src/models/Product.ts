@@ -40,6 +40,23 @@ const variantRoomPreviewSchema = new Schema(
   },
   { timestamps: true }
 );
+const roomOrientations = ['square', 'vertical', 'horizontal', 'pano-vertical', 'pano-horizontal'] as const;
+const productRoomPreviewSchema = new Schema(
+  {
+    productId: { type: Schema.Types.ObjectId, ref: 'Product' },
+    name: { type: String, required: true, trim: true },
+    roomImageUrl: { type: String, required: true, trim: true },
+    roomImageAssetId: { type: Schema.Types.ObjectId, ref: 'ImageAsset' },
+    orientations: { type: [{ type: String, enum: roomOrientations }], default: [] },
+    defaultOrientations: { type: [{ type: String, enum: roomOrientations }], default: [] },
+    centerLeftPercent: { type: Number, default: 50, min: 0, max: 100 },
+    centerTopPercent: { type: Number, default: 45, min: 0, max: 100 },
+    maxWidthPercent: { type: Number, default: 30, min: 0.01, max: 100 },
+    maxHeightPercent: { type: Number, default: 30, min: 0.01, max: 100 },
+    sortOrder: { type: Number, default: 0 },
+  },
+  { timestamps: true }
+);
 const variantSchema = new Schema(
   {
     productId: { type: Schema.Types.ObjectId, ref: 'Product' },
@@ -197,6 +214,7 @@ const productSchema = new Schema(
     surface: { type: surfaceSchema, default: null },
     optionGroups: { type: [optionGroupSchema], default: [] },
     variantOptionDefinitions: { type: [variantOptionDefinitionSchema], default: defaultVariantOptionDefinitions },
+    roomPreviews: { type: [productRoomPreviewSchema], default: [] },
     variants: { type: [variantSchema], default: [] },
     editorRules: { type: editorRulesSchema, default: () => ({}) },
     exportRules: { type: exportRulesSchema, default: () => ({}) },
@@ -207,6 +225,7 @@ const productSchema = new Schema(
 
 productSchema.pre('validate', function setNestedProductRefs() {
   for (const definition of this.variantOptionDefinitions ?? []) definition.productId = this._id;
+  for (const roomPreview of this.roomPreviews ?? []) roomPreview.productId = this._id;
   for (const variant of this.variants ?? []) {
     for (const roomPreview of variant.roomPreviews ?? []) roomPreview.variantId = variant._id;
   }

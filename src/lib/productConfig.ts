@@ -1,8 +1,10 @@
 import { createDefaultEditorRules, createDefaultExportRules } from './storage';
 import { createDefaultVariantOptionDefinitions } from './variantOptions';
+import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
 import { normalizeUnit } from './validation';
 import type {
   Product,
+  LegacyVariantRoomPreview,
   ProductCategory,
   ProductOptionDisplayType,
   ProductOptionGroup,
@@ -62,6 +64,7 @@ function clearImportedIds(product: Product): Product {
     _id: '',
     surface: product.surface ? { ...product.surface, _id: '', clientId: crypto.randomUUID(), productId: '' } : null,
     variantOptionDefinitions: product.variantOptionDefinitions.map((definition) => ({ ...definition, _id: '', clientId: crypto.randomUUID(), productId: '' })),
+    roomPreviews: product.roomPreviews.map((room) => ({ ...room, _id: '', clientId: crypto.randomUUID(), productId: '' })),
     optionGroups: product.optionGroups.map((group) => ({
       ...group,
       _id: '',
@@ -69,7 +72,7 @@ function clearImportedIds(product: Product): Product {
       productId: '',
       values: group.values.map((value) => ({ ...value, _id: '', clientId: crypto.randomUUID(), optionGroupId: '' })),
     })),
-    variants: product.variants.map((variant) => ({ ...variant, _id: '', clientId: crypto.randomUUID(), productId: '', roomPreviews: variant.roomPreviews.map((room) => ({ ...room, _id: '', clientId: crypto.randomUUID(), variantId: '' })) })),
+    variants: product.variants.map((variant) => ({ ...variant, _id: '', clientId: crypto.randomUUID(), productId: '', roomPreviews: undefined })),
     templates: product.templates.map((template) => ({
       ...template,
       _id: '',
@@ -88,7 +91,7 @@ function buildImportCandidate(input: Record<string, unknown>): Product {
   const surfaceSource = isRecord(input.surface) ? input.surface : findLegacySurface(variants);
   const surface = surfaceSource ? normalizeSurface(surfaceSource, id, now, 0) : null;
 
-  return {
+  const product: Product = {
     _id: id,
     accountId: typeof input.accountId === 'string' ? input.accountId : '',
     scope: input.scope === 'shared' ? 'shared' : 'merchant',
@@ -108,11 +111,15 @@ function buildImportCandidate(input: Record<string, unknown>): Product {
     exportRules: isRecord(input.exportRules) ? { ...createDefaultExportRules(), ...input.exportRules } : createDefaultExportRules(),
     optionGroups: Array.isArray(input.optionGroups) ? input.optionGroups.filter(isRecord).map((group, index) => normalizeOptionGroup(group, id, now, index)) : [],
     variantOptionDefinitions: Array.isArray(input.variantOptionDefinitions) ? input.variantOptionDefinitions.filter(isRecord).map((definition, index) => normalizeVariantOptionDefinition(definition, id, now, index)) : createDefaultVariantOptionDefinitions(id),
+    roomPreviews: Array.isArray(input.roomPreviews) ? input.roomPreviews.filter(isRecord).map((room, index) => normalizeSharedRoomPreview(room, id, index)) : [],
     templates: Array.isArray(input.templates) ? input.templates.filter(isRecord).map((template, index) => normalizeTemplate(template, id, surface?._id ?? '', now, index)) : [],
     variants: variants.map((variant, index) => normalizeVariant(variant, id, now, index)),
     createdAt: now,
     updatedAt: now,
   };
+  product.roomPreviews = liftLegacyRoomPreviews(product);
+  product.variants = product.variants.map((variant) => ({ ...variant, roomPreviews: undefined }));
+  return product;
 }
 
 function findLegacySurface(variants: Record<string, unknown>[]) {
@@ -246,7 +253,7 @@ function normalizeVariant(input: Record<string, unknown>, productId: string, now
   };
 }
 
-function normalizeRoomPreview(input: Record<string, unknown>, now: string): ProductVariant['roomPreviews'][number] {
+function normalizeRoomPreview(input: Record<string, unknown>, now: string): LegacyVariantRoomPreview {
   return {
     _id: typeof input._id === 'string' ? input._id : '',
     clientId: crypto.randomUUID(),

@@ -249,7 +249,27 @@ export interface ProductTemplate {
   updatedAt: string;
 }
 
-export interface VariantRoomPreview {
+export type RoomOrientation = 'square' | 'vertical' | 'horizontal' | 'pano-vertical' | 'pano-horizontal';
+
+export interface ProductRoomPreview {
+  _id: string;
+  clientId?: string;
+  productId: string;
+  name: string;
+  roomImageUrl: string;
+  roomImageAssetId?: string;
+  orientations: RoomOrientation[];
+  defaultOrientations: RoomOrientation[];
+  centerLeftPercent: number;
+  centerTopPercent: number;
+  maxWidthPercent: number;
+  maxHeightPercent: number;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LegacyVariantRoomPreview {
   _id: string;
   clientId?: string;
   variantId: string;
@@ -283,7 +303,7 @@ export interface ProductVariant {
   previewImageAssetId?: string;
   thumbnailImageUrl: string;
   thumbnailImageAssetId?: string;
-  roomPreviews: VariantRoomPreview[];
+  roomPreviews?: LegacyVariantRoomPreview[];
   createdAt: string;
   updatedAt: string;
 }
@@ -306,6 +326,7 @@ export interface Product {
   surface: ProductSurface | null;
   optionGroups: ProductOptionGroup[];
   variantOptionDefinitions: VariantOptionDefinition[];
+  roomPreviews: ProductRoomPreview[];
   editorRules: EditorRules;
   exportRules: ExportRules;
   templates: ProductTemplate[];

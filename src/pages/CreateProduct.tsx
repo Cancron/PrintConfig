@@ -96,6 +96,7 @@ export function CreateProduct() {
       surface: null,
       optionGroups: [],
       variantOptionDefinitions: createDefaultVariantOptionDefinitions(),
+      roomPreviews: [],
       templates: [],
       variants: [],
       createdAt: now,

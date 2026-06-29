@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { ImageAsset, ImageFolder, Merchant, Product, ProductCategory } from '../types';
 import { normalizeVariantOptionDefinitions } from './variantOptions';
+import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api';
 
@@ -96,9 +97,18 @@ function galleryQuery(input: { accountId: string; merchantId?: string; folderId?
   return params.toString();
 }
 function normalizeProduct(raw: any): Product {
-  return {
+  const productId = idOf(raw);
+  const variants = (raw.variants ?? []).map((variant: any) => ({
+    ...variant,
+    _id: idOf(variant),
+    productId: String(variant.productId ?? productId),
+    status: variant.status === 'active' || variant.status === 'Active' ? 'Active' : 'Draft',
+    options: variant.options ?? {},
+    roomPreviews: (variant.roomPreviews ?? []).map((room: any) => ({ ...room, _id: idOf(room), variantId: String(room.variantId ?? variant._id ?? '') })),
+  }));
+  const product: Product = {
     ...raw,
-    _id: idOf(raw),
+    _id: productId,
     accountId: String(raw.accountId ?? 'acct-1'),
     merchantId: raw.merchantId ? String(raw.merchantId) : null,
     categoryId: String(raw.categoryId ?? ''),
@@ -106,14 +116,18 @@ function normalizeProduct(raw: any): Product {
     status: raw.status === 'active' || raw.status === 'Active' ? 'Active' : 'Draft',
     surface: normalizeSurface(raw.surface),
     optionGroups: normalizeOptionGroups(raw.optionGroups),
-    variantOptionDefinitions: normalizeVariantOptionDefinitions(raw.variantOptionDefinitions, idOf(raw)),
-    variants: (raw.variants ?? []).map((variant: any) => ({ ...variant, _id: idOf(variant), productId: String(variant.productId ?? ''), status: variant.status === 'active' || variant.status === 'Active' ? 'Active' : 'Draft', options: variant.options ?? {}, roomPreviews: (variant.roomPreviews ?? []).map((room: any) => ({ ...room, _id: idOf(room), variantId: String(room.variantId ?? variant._id ?? '') })) })),
+    variantOptionDefinitions: normalizeVariantOptionDefinitions(raw.variantOptionDefinitions, productId),
+    roomPreviews: (raw.roomPreviews ?? []).map((room: any, index: number) => normalizeSharedRoomPreview(room, productId, index)),
+    variants,
     editorRules: raw.editorRules ?? {},
     exportRules: raw.exportRules ?? {},
     templates: normalizeTemplates(raw.templates),
     createdAt: raw.createdAt ?? new Date().toISOString(),
     updatedAt: raw.updatedAt ?? new Date().toISOString(),
   };
+  product.roomPreviews = liftLegacyRoomPreviews(product);
+  product.variants = product.variants.map((variant) => ({ ...variant, roomPreviews: undefined }));
+  return product;
 }
 
 function apiPayload<T>(value: T): T {

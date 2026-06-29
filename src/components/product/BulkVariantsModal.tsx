@@ -195,7 +195,6 @@ function parseBatch(input: {
       dpi: input.dpi,
       previewImageUrl: '',
       thumbnailImageUrl: '',
-      roomPreviews: [],
       createdAt: now,
       updatedAt: now,
     });

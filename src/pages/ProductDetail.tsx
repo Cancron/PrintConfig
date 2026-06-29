@@ -180,6 +180,8 @@ function ProductReadinessPanel({ product }: { product: Product }) {
     { label: 'Surface settings are valid', value: readiness.surfaceValid },
     { label: 'Export rules exist', value: readiness.hasExportRules },
     { label: 'Editor rules exist', value: readiness.hasEditorRules },
+    { label: 'Active variants have compatible shared rooms', value: readiness.activeVariantsHaveRoomPreviews },
+    { label: 'Active variant orientations have defaults', value: readiness.activeVariantsHaveDefaultRoomPreview },
   ];
 
   return (

@@ -5,6 +5,7 @@ import { ProductCategoryModel } from '../models/ProductCategory.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { applyModifier } from '../utils/pricing.js';
 import { slugify } from '../utils/slug.js';
+import { getVariantRoomOrientation, liftLegacyProductRooms, ROOM_ORIENTATIONS } from '../utils/roomPreview.js';
 import { visibleQuery } from './category.service.js';
 import { resolveAccountId } from './account.service.js';
 
@@ -20,6 +21,11 @@ async function normalizeRefs(data: Record<string, unknown>) {
   if (!data.categoryId || !Types.ObjectId.isValid(String(data.categoryId))) throw new ApiError(400, 'Product must have a valid categoryId.');
 }
 
+function normalizeRoomOwnership(data: Record<string, any>) {
+  const lifted = liftLegacyProductRooms(data);
+  data.roomPreviews = lifted.roomPreviews;
+  data.variants = lifted.variants;
+}
 function validateProductShape(data: Record<string, any>) {
   if (data.surface && !data.surface.code) throw new ApiError(400, 'Surface code is required.');
   const definitionKeys = new Set<string>();
@@ -44,24 +50,29 @@ function validateProductShape(data: Record<string, any>) {
     }
     if (!(variant.width > 0) || !(variant.height > 0)) throw new ApiError(400, 'Variant width and height must be greater than 0.');
     if (!(variant.dpi > 0)) throw new ApiError(400, 'Variant dpi must be greater than 0.');
-    let defaultRoomPreviewCount = 0;
-    for (const room of variant.roomPreviews ?? []) {
-      if (!String(room.name ?? '').trim()) throw new ApiError(400, 'Room preview name is required.');
-      try {
-        const url = new URL(String(room.roomImageUrl ?? ''));
-        if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error();
-      } catch {
-        throw new ApiError(400, 'Room preview image must be a valid HTTP or HTTPS URL.');
-      }
-      if (!(room.roomWidthMeters > 0)) throw new ApiError(400, 'Room preview width must be greater than 0.');
-      if (room.roomHeightMeters !== undefined && !(room.roomHeightMeters > 0)) throw new ApiError(400, 'Room preview height must be greater than 0.');
-      if (room.centerLeftPercent < 0 || room.centerLeftPercent > 100 || room.centerTopPercent < 0 || room.centerTopPercent > 100) throw new ApiError(400, 'Room preview center position must be between 0 and 100.');
-      if (!(room.zoom > 0)) throw new ApiError(400, 'Room preview zoom must be greater than 0.');
-      if (room.isDefault) defaultRoomPreviewCount += 1;
-    }
-    if (defaultRoomPreviewCount > 1) throw new ApiError(400, 'Only one room preview can be default per variant.');
+
   }
-  const groupCodes = new Set<string>();
+  const claimedRoomDefaults = new Set<string>();
+  for (const room of data.roomPreviews ?? []) {
+    if (!String(room.name ?? '').trim()) throw new ApiError(400, 'Room preview name is required.');
+    try {
+      const url = new URL(String(room.roomImageUrl ?? ''));
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error();
+    } catch {
+      throw new ApiError(400, 'Room preview image must be a valid HTTP or HTTPS URL.');
+    }
+    const orientations = Array.isArray(room.orientations) ? room.orientations : [];
+    const defaults = Array.isArray(room.defaultOrientations) ? room.defaultOrientations : [];
+    if (orientations.length === 0 || orientations.some((value: string) => !ROOM_ORIENTATIONS.includes(value as any))) throw new ApiError(400, 'Room preview must support at least one valid orientation.');
+    if (defaults.some((value: string) => !orientations.includes(value))) throw new ApiError(400, 'Room default orientations must also be supported orientations.');
+    for (const orientation of defaults) {
+      if (claimedRoomDefaults.has(orientation)) throw new ApiError(400, `Only one room preview can be default for ${orientation}.`);
+      claimedRoomDefaults.add(orientation);
+    }
+    if (room.centerLeftPercent < 0 || room.centerLeftPercent > 100 || room.centerTopPercent < 0 || room.centerTopPercent > 100) throw new ApiError(400, 'Room preview center position must be between 0 and 100.');
+    if (!(room.maxWidthPercent > 0) || room.maxWidthPercent > 100 || !(room.maxHeightPercent > 0) || room.maxHeightPercent > 100) throw new ApiError(400, 'Room preview maximum dimensions must be greater than 0 and no more than 100.');
+    if (room.centerLeftPercent - room.maxWidthPercent / 2 < 0 || room.centerLeftPercent + room.maxWidthPercent / 2 > 100 || room.centerTopPercent - room.maxHeightPercent / 2 < 0 || room.centerTopPercent + room.maxHeightPercent / 2 > 100) throw new ApiError(400, 'Room preview rectangle must stay inside the image.');
+  }  const groupCodes = new Set<string>();
   for (const group of data.optionGroups ?? []) {
     if (groupCodes.has(group.code)) throw new ApiError(400, 'Option group code must be unique within product.');
     groupCodes.add(group.code);
@@ -102,6 +113,7 @@ export async function createProduct(payload: Record<string, any>) {
   normalizeScope(payload);
   await normalizeRefs(payload);
   payload.slug = payload.slug || slugify(String(payload.name ?? 'product'));
+  normalizeRoomOwnership(payload);
   validateProductShape(payload);
   await assertUniqueSlug(payload);
   return ProductModel.create(payload);
@@ -111,6 +123,7 @@ export async function updateProduct(id: string, payload: Record<string, any>) {
   normalizeScope(payload);
   await normalizeRefs(payload);
   payload.slug = payload.slug || slugify(String(payload.name ?? 'product'));
+  normalizeRoomOwnership(payload);
   validateProductShape(payload);
   await assertUniqueSlug(payload, id);
   return ProductModel.findByIdAndUpdate(id, payload, { new: true, runValidators: true });
@@ -147,7 +160,8 @@ export async function getPublicProductConfig(id: string) {
   const product = await ProductModel.findById(id).lean();
   if (!product) throw new ApiError(404, 'Product not found.');
   if (product.status !== 'active') throw new ApiError(404, 'Product not found.');
-  const activeVariants = (product.variants ?? []).filter((variant: any) => variant.status === 'active').map((variant: any) => ({
+  const sharedRoomData = liftLegacyProductRooms(product);
+  const activeVariants = (sharedRoomData.variants ?? []).filter((variant: any) => variant.status === 'active').map((variant: any) => ({
     _id: variant._id,
     name: variant.name,
     sku: variant.sku,
@@ -159,18 +173,8 @@ export async function getPublicProductConfig(id: string) {
     dpi: variant.dpi,
     previewImageUrl: variant.previewImageUrl,
     thumbnailImageUrl: variant.thumbnailImageUrl,
-    roomPreviews: (variant.roomPreviews ?? []).slice().sort((a: any, b: any) => a.sortOrder - b.sortOrder).map((room: any) => ({
-      id: room._id,
-      name: room.name,
-      roomImageUrl: room.roomImageUrl,
-      roomWidthMeters: room.roomWidthMeters,
-      roomHeightMeters: room.roomHeightMeters,
-      centerLeftPercent: room.centerLeftPercent,
-      centerTopPercent: room.centerTopPercent,
-      zoom: room.zoom,
-      isDefault: room.isDefault,
-      sortOrder: room.sortOrder,
-    })),
+    roomOrientation: getVariantRoomOrientation(variant),
+
   }));
   return {
     _id: product._id,
@@ -182,6 +186,7 @@ export async function getPublicProductConfig(id: string) {
     thumbnailUrl: product.thumbnailUrl,
     surface: product.surface,
     variantOptionDefinitions: product.variantOptionDefinitions,
+    roomPreviews: sharedRoomData.roomPreviews.slice().sort((a: any, b: any) => a.sortOrder - b.sortOrder),
     editorRules: product.editorRules,
     exportRules: product.exportRules,
     variants: activeVariants,
