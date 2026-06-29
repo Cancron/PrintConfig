@@ -137,8 +137,26 @@ export async function duplicateProduct(id: string, payload: { scope?: 'shared' |
   const product = await ProductModel.findById(id).lean();
   if (!product) throw new ApiError(404, 'Product not found.');
   const scope = payload.scope ?? product.scope;
-  const copy = await ProductModel.create({ ...stripIds(product), name: `${product.name} Copy`, slug: `${product.slug}-copy-${Date.now()}`, status: 'draft', scope, merchantId: scope === 'shared' ? null : payload.merchantId ?? product.merchantId });
-  return copy;
+  const sharedRoomData = liftLegacyProductRooms(product);
+  const source = { ...product, roomPreviews: sharedRoomData.roomPreviews, variants: sharedRoomData.variants };
+  const templateVariantIndexes = (product.templates ?? []).map((template: any) =>
+    (product.variants ?? []).findIndex((variant: any) => String(variant._id) === String(template.variantId)),
+  );
+  const copy = new ProductModel({
+    ...stripIds(source),
+    name: `${product.name} Copy`,
+    slug: `${product.slug}-copy-${Date.now()}`,
+    status: 'draft',
+    scope,
+    merchantId: scope === 'shared' ? null : payload.merchantId ?? product.merchantId,
+  });
+  copy.templates.forEach((template: any, index: number) => {
+    const variantIndex = templateVariantIndexes[index];
+    template.productId = copy._id;
+    template.surfaceId = (copy.surface as any)?._id;
+    template.variantId = variantIndex >= 0 ? copy.variants[variantIndex]?._id : undefined;
+  });
+  return copy.save();
 }
 
 export async function exportProduct(id: string) {
@@ -212,10 +230,11 @@ export async function calculatePrice(id: string, variantId: string, selectedOpti
 
 function stripIds<T>(value: T): T {
   if (Array.isArray(value)) return value.map(stripIds) as T;
+  if (value instanceof Types.ObjectId || value instanceof Date || Buffer.isBuffer(value)) return value;
   if (value && typeof value === 'object') {
     const output: Record<string, unknown> = {};
     for (const [key, child] of Object.entries(value)) {
-      if (key === '_id' || key === '__v') continue;
+      if (key === '_id' || key === '__v' || key === 'createdAt' || key === 'updatedAt') continue;
       output[key] = stripIds(child);
     }
     return output as T;

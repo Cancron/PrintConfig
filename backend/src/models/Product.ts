@@ -224,11 +224,18 @@ const productSchema = new Schema(
 );
 
 productSchema.pre('validate', function setNestedProductRefs() {
+  if (this.surface) this.surface.productId = this._id;
+  for (const group of this.optionGroups ?? []) {
+    group.productId = this._id;
+    for (const value of group.values ?? []) value.optionGroupId = group._id;
+  }
   for (const definition of this.variantOptionDefinitions ?? []) definition.productId = this._id;
   for (const roomPreview of this.roomPreviews ?? []) roomPreview.productId = this._id;
   for (const variant of this.variants ?? []) {
+    variant.productId = this._id;
     for (const roomPreview of variant.roomPreviews ?? []) roomPreview.variantId = variant._id;
   }
+  for (const template of this.templates ?? []) template.productId = this._id;
 });
 productSchema.index({ accountId: 1, scope: 1, merchantId: 1, categoryId: 1, slug: 1 }, { unique: true });
 export const ProductModel = model('Product', productSchema);
