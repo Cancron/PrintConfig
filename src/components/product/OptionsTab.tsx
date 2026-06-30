@@ -169,14 +169,14 @@ export function OptionsTab({ product, onSave }: Props) {
                   <Select label="Price Modifier Type" value={value.priceModifierType} onChange={(e) => updateValue(entityKey(value), 'priceModifierType', e.target.value as PriceModifierType)} options={modifierOptions} />
                   <Input label="Price Modifier" type="number" step="0.01" value={value.priceModifier} onChange={(e) => updateValue(entityKey(value), 'priceModifier', Number(e.target.value))} error={errors[`value.${entityKey(value)}.priceModifier`]} />
                   <Input label="Sort Order" type="number" value={value.sortOrder} onChange={(e) => updateValue(entityKey(value), 'sortOrder', Number(e.target.value))} />
-                  <Input label="Color Hex" value={value.metadata.colorHex ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'colorHex', e.target.value)} error={errors[`value.${entityKey(value)}.colorHex`]} />
+                  <Input label="Color Hex" value={value.metadata?.colorHex ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'colorHex', e.target.value)} error={errors[`value.${entityKey(value)}.colorHex`]} />
                   {/* <ImageField label="Preview Image URL" url={value.previewImageUrl} assetId={value.previewImageAssetId} onChange={(url, assetId) => { updateValue(entityKey(value), 'previewImageUrl', url); updateValue(entityKey(value), 'previewImageAssetId', assetId); }} /> */}
                   <ImageField label="Thumbnail Image URL" url={value.thumbnailImageUrl} assetId={value.thumbnailImageAssetId} onChange={(url, assetId) => { updateValue(entityKey(value), 'thumbnailImageUrl', url); updateValue(entityKey(value), 'thumbnailImageAssetId', assetId); }} />
-                  {/* <Input label="Production Code" value={value.metadata.productionCode ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'productionCode', e.target.value)} /> */}
+                  {/* <Input label="Production Code" value={value.metadata?.productionCode ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'productionCode', e.target.value)} /> */}
                 </div>
                 {/* <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Textarea label="Description" value={value.metadata.description ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'description', e.target.value)} rows={2} />
-                  <Textarea label="Export Notes" value={value.metadata.exportNotes ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'exportNotes', e.target.value)} rows={2} />
+                  <Textarea label="Description" value={value.metadata?.description ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'description', e.target.value)} rows={2} />
+                  <Textarea label="Export Notes" value={value.metadata?.exportNotes ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'exportNotes', e.target.value)} rows={2} />
                 </div> */}
                 <div className="mt-3 flex justify-end"><button type="button" onClick={() => deleteValue(entityKey(value))} className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /> Delete Value</button></div>
               </div>
@@ -227,7 +227,7 @@ function OptionValueTable({ group }: { group: ProductOptionGroup }) {
         <tbody className="divide-y divide-gray-200 bg-white">
           {[...group.values].sort((a, b) => a.sortOrder - b.sortOrder).map((value) => (
             <tr key={entityKey(value)}>
-              <td className="px-4 py-3">{(value.thumbnailImageUrl || value.previewImageUrl) ? <img src={value.thumbnailImageUrl || value.previewImageUrl} alt="" className="h-10 w-12 rounded object-cover" /> : value.metadata.colorHex ? <span className="block h-8 w-8 rounded-full ring-1 ring-gray-300" style={{ backgroundColor: value.metadata.colorHex }} /> : <span className="text-xs text-gray-400">None</span>}</td>
+              <td className="px-4 py-3">{(value.thumbnailImageUrl || value.previewImageUrl) ? <img src={value.thumbnailImageUrl || value.previewImageUrl} alt="" className="h-10 w-12 rounded object-cover" /> : value.metadata?.colorHex ? <span className="block h-8 w-8 rounded-full ring-1 ring-gray-300" style={{ backgroundColor: value.metadata?.colorHex }} /> : <span className="text-xs text-gray-400">None</span>}</td>
               <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">{value.label}</p><p className="text-xs text-gray-500">{value.value}</p></td>
               <td className="px-4 py-3 text-sm text-gray-700">{formatModifier(value)}</td>
               <td className="px-4 py-3"><div className="flex flex-wrap gap-1">{value.isDefault && <Pill tone="blue">Default</Pill>}<Pill tone={value.isActive ? 'emerald' : 'gray'}>{value.isActive ? 'Active' : 'Inactive'}</Pill></div></td>
@@ -247,7 +247,7 @@ function OptionCustomerPreview({ group }: { group: ProductOptionGroup }) {
       <div className="mt-3 flex flex-wrap gap-3">
         {group.displayType === 'Dropdown' && <select className="rounded-md border-0 px-3 py-2 text-sm ring-1 ring-gray-300">{values.map((value) => <option key={entityKey(value)}>{value.label} ({formatModifier(value)})</option>)}</select>}
         {group.displayType === 'Image Swatches' && values.map((value) => <div key={entityKey(value)} className="w-32 rounded-lg bg-white p-2 ring-1 ring-gray-200"><div className="h-20 rounded bg-gray-100">{(value.previewImageUrl || value.thumbnailImageUrl) && <img src={value.previewImageUrl || value.thumbnailImageUrl} alt="" className="h-full w-full rounded object-cover" />}</div><p className="mt-2 text-sm font-medium text-gray-900">{value.label}</p><p className="text-xs text-gray-500">{formatModifier(value)}</p></div>)}
-        {group.displayType === 'Color Swatches' && values.map((value) => <div key={entityKey(value)} className="flex items-center gap-2 rounded-md bg-white px-3 py-2 ring-1 ring-gray-200"><span className="h-6 w-6 rounded-full ring-1 ring-gray-300" style={{ backgroundColor: value.metadata.colorHex || '#ffffff' }} /><span className="text-sm">{value.label} - {formatModifier(value)}</span></div>)}
+        {group.displayType === 'Color Swatches' && values.map((value) => <div key={entityKey(value)} className="flex items-center gap-2 rounded-md bg-white px-3 py-2 ring-1 ring-gray-200"><span className="h-6 w-6 rounded-full ring-1 ring-gray-300" style={{ backgroundColor: value.metadata?.colorHex || '#ffffff' }} /><span className="text-sm">{value.label} - {formatModifier(value)}</span></div>)}
         {group.displayType === 'Text Buttons' && values.map((value) => <button key={entityKey(value)} type="button" className="rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300">{value.label} - {formatModifier(value)}</button>)}
         {group.displayType === 'Radio Buttons' && values.map((value) => <label key={entityKey(value)} className="flex items-center gap-2 text-sm text-gray-700"><input type="radio" name={entityKey(group)} defaultChecked={value.isDefault} /> {value.label} - {formatModifier(value)}</label>)}
       </div>
@@ -286,7 +286,7 @@ function validateGroup(group: ProductOptionGroup, groups: ProductOptionGroup[], 
     if (!Number.isFinite(Number(value.priceModifier))) errors[`value.${entityKey(value)}.priceModifier`] = 'Price modifier must be numeric.';
     if (value.priceModifierType === 'none' && Number(value.priceModifier) !== 0) errors[`value.${entityKey(value)}.priceModifier`] = 'No extra charge must use 0.';
     if ((value.priceModifierType === 'fixed' || value.priceModifierType === 'percentage') && Number(value.priceModifier) < 0) errors[`value.${entityKey(value)}.priceModifier`] = 'Price modifier must be zero or greater.';
-    if (value.metadata.colorHex && !/^#[0-9a-f]{6}$/i.test(value.metadata.colorHex)) errors[`value.${entityKey(value)}.colorHex`] = 'Use a valid hex color.';
+    if (value.metadata?.colorHex && !/^#[0-9a-f]{6}$/i.test(value.metadata?.colorHex)) errors[`value.${entityKey(value)}.colorHex`] = 'Use a valid hex color.';
   }
   return errors;
 }

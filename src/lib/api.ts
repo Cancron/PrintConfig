@@ -67,7 +67,7 @@ function normalizeOptionGroups(groups: any[] = []) {
     ...group,
     _id: idOf(group),
     productId: String(group.productId ?? ''),
-    values: (group.values ?? []).map((value: any) => ({ ...value, _id: idOf(value), optionGroupId: String(value.optionGroupId ?? group._id ?? group._id ?? '') })),
+    values: (group.values ?? []).map((value: any) => ({ ...value, _id: idOf(value), optionGroupId: String(value.optionGroupId ?? group._id ?? ''), metadata: value.metadata ?? {} })),
   }));
 }
 

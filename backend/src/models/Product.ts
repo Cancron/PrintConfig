@@ -113,10 +113,16 @@ const optionValueSchema = new Schema(
     thumbnailImageUrl: { type: String, default: '' },
     thumbnailImageAssetId: { type: Schema.Types.ObjectId, ref: 'ImageAsset' },
     metadata: {
-      colorHex: String,
-      description: String,
-      productionCode: String,
-      exportNotes: String,
+      type: new Schema(
+        {
+          colorHex: { type: String, default: '' },
+          description: { type: String, default: '' },
+          productionCode: { type: String, default: '' },
+          exportNotes: { type: String, default: '' },
+        },
+        { _id: false }
+      ),
+      default: () => ({}),
     },
   },
   { timestamps: true }
@@ -208,10 +214,10 @@ const productTrustBadgeSchema = new Schema(
 );
 
 const defaultTrustBadges = () => [
-  { icon: '🚚', text: 'Free shipping Canada-wide', sortOrder: 1, isActive: true },
-  { icon: '⚡', text: '24-hour production', sortOrder: 2, isActive: true },
-  { icon: '🛡️', text: 'Lifetime warranty', sortOrder: 3, isActive: true },
-  { icon: '🇨🇦', text: 'Made in Canada', sortOrder: 4, isActive: true },
+  { icon: 'ðŸšš', text: 'Free shipping Canada-wide', sortOrder: 1, isActive: true },
+  { icon: 'âš¡', text: '24-hour production', sortOrder: 2, isActive: true },
+  { icon: 'ðŸ›¡ï¸', text: 'Lifetime warranty', sortOrder: 3, isActive: true },
+  { icon: 'ðŸ‡¨ðŸ‡¦', text: 'Made in Canada', sortOrder: 4, isActive: true },
 ];
 
 const frontendContentSchema = new Schema(

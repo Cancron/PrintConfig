@@ -170,7 +170,7 @@ export function normalizeProduct(product: Product): Product {
     categoryId: legacy.categoryId ?? '',
     categorySnapshot: product.categorySnapshot,
     surface,
-    optionGroups: product.optionGroups ?? [],
+    optionGroups: (product.optionGroups ?? []).map((group) => ({ ...group, values: (group.values ?? []).map((value) => ({ ...value, metadata: value.metadata ?? {} })) })),
     variantOptionDefinitions: normalizeVariantOptionDefinitions(product.variantOptionDefinitions, product._id),
     frontendContent: normalizeFrontendContent(product.frontendContent),
     editorProductSelection: normalizeEditorProductSelection(product.editorProductSelection),
