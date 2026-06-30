@@ -9,6 +9,7 @@ import { getVariantRoomOrientation, liftLegacyProductRooms, ROOM_ORIENTATIONS } 
 import { normalizeFrontendContentPayload, publicFrontendContent } from '../utils/frontendContent.js';
 import { visibleQuery } from './category.service.js';
 import { resolveAccountId } from './account.service.js';
+import { authenticateApiPrivateKey } from './merchant.service.js';
 
 function normalizeScope(data: Record<string, unknown>) {
   if (data.scope === 'shared') data.merchantId = null;
@@ -302,6 +303,11 @@ export async function getPublicProductConfig(id: string, merchantId?: string) {
     exportRules: product.exportRules,
     variants: activeVariants,
   };
+}
+export async function getEditorProductConfig(id: string, apiPrivateKey: string) {
+  const merchant = await authenticateApiPrivateKey(apiPrivateKey);
+  if (!merchant) throw new ApiError(401, 'A valid merchant API private key is required.');
+  return getPublicProductConfig(id, String(merchant._id));
 }
 export async function calculatePrice(id: string, variantId: string, selectedOptions: Record<string, string>) {
   const product = await ProductModel.findById(id).lean();

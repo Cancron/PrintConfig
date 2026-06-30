@@ -93,6 +93,8 @@ export interface Merchant {
   editorAccentColor: string;
   customCss: string;
   customJavascript: string;
+  apiPrivateKeyLastFour?: string;
+  apiPrivateKeyCreatedAt?: string;
 }
 
 export interface ProductCategory {

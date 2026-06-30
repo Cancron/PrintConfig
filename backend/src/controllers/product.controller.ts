@@ -12,3 +12,4 @@ export async function importConfig(req: Request, res: Response, next: NextFuncti
 export async function calculatePrice(req: Request, res: Response, next: NextFunction) { try { res.json(await service.calculatePrice(String(req.params.id), req.body.variantId, req.body.selectedOptions ?? {})); } catch (e) { next(e); } }
 
 export async function publicConfig(req: Request, res: Response, next: NextFunction) { try { res.json(await service.getPublicProductConfig(String(req.params.id), typeof req.query.merchantId === 'string' ? req.query.merchantId : undefined)); } catch (e) { next(e); } }
+export async function editorConfig(req: Request, res: Response, next: NextFunction) { try { res.json(await service.getEditorProductConfig(String(req.params.id), String(req.header('x-api-key') ?? ''))); } catch (e) { next(e); } }

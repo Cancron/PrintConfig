@@ -6,4 +6,5 @@ merchantRoutes.get('/', controller.list);
 merchantRoutes.get('/:id', controller.get);
 merchantRoutes.post('/', controller.create);
 merchantRoutes.put('/:id', controller.update);
+merchantRoutes.post('/:id/api-key', controller.rotateApiKey);
 merchantRoutes.delete('/:id', controller.remove);

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Save } from 'lucide-react';
+import { Copy, KeyRound, RefreshCw, Save } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { ImageField } from '../components/gallery/ImageField';
 import { useWorkspace } from '../hooks/useWorkspace';
+import { api } from '../lib/api';
 import type { Merchant, MerchantStatus } from '../types';
 
 const statusOptions = [
@@ -17,9 +18,14 @@ export function MerchantSettings() {
   const { selectedMerchant, updateMerchant } = useWorkspace();
   const [form, setForm] = useState<Merchant | undefined>(() => selectedMerchant);
   const [saved, setSaved] = useState(false);
+  const [revealedApiKey, setRevealedApiKey] = useState('');
+  const [apiKeyError, setApiKeyError] = useState('');
+  const [rotatingApiKey, setRotatingApiKey] = useState(false);
 
   useEffect(() => {
     setForm(selectedMerchant);
+    setRevealedApiKey('');
+    setApiKeyError('');
     // setSaved(false);
   }, [selectedMerchant]);
 
@@ -40,6 +46,22 @@ export function MerchantSettings() {
     setTimeout(() => setSaved(false), 2000);
   }
 
+  async function rotateApiKey() {
+    if (!form) return;
+    if (form.apiPrivateKeyLastFour && !confirm('Replace the existing API private key? The current key will stop working immediately.')) return;
+    setRotatingApiKey(true);
+    setApiKeyError('');
+    try {
+      const result = await api.rotateMerchantApiKey(form._id);
+      setForm(result.merchant);
+      setRevealedApiKey(result.apiPrivateKey);
+    } catch (error) {
+      setApiKeyError(error instanceof Error ? error.message : 'Could not generate API private key.');
+    } finally {
+      setRotatingApiKey(false);
+    }
+  }
+
   return (
     <div>
       <PageHeader title="Merchant Settings" description="Edit the selected merchant site and customer editor branding." />
@@ -55,6 +77,31 @@ export function MerchantSettings() {
             <ColorField label="Editor Accent Color" value={form.editorAccentColor} error={errors.editorAccentColor} onChange={(value) => update('editorAccentColor', value)} />
           </div>
 
+          <section className="space-y-3 border-t border-gray-200 pt-5">
+            <div>
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900"><KeyRound className="h-4 w-4" /> Editor API Private Key</h2>
+              <p className="mt-1 text-sm text-gray-500">Authenticate product configuration requests made by this merchant's editor admin panel.</p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <Input
+                label="Private key"
+                value={revealedApiKey || (form.apiPrivateKeyLastFour ? `****************${form.apiPrivateKeyLastFour}` : 'Not configured')}
+                readOnly
+                className="font-mono"
+              />
+              <button type="button" onClick={rotateApiKey} disabled={rotatingApiKey} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50">
+                <RefreshCw className={`h-4 w-4 ${rotatingApiKey ? 'animate-spin' : ''}`} /> {form.apiPrivateKeyLastFour ? 'Rotate Key' : 'Generate Key'}
+              </button>
+              {revealedApiKey && (
+                <button type="button" onClick={() => navigator.clipboard.writeText(revealedApiKey)} title="Copy private key" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-gray-600 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                  <Copy className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            {revealedApiKey && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800 ring-1 ring-inset ring-amber-200">Copy this key now. It will not be shown again after leaving this page.</p>}
+            {apiKeyError && <p className="text-sm text-red-600">{apiKeyError}</p>}
+            <p className="text-xs text-gray-500">Send the key in the <code className="rounded bg-gray-100 px-1 py-0.5">X-API-Key</code> header to <code className="rounded bg-gray-100 px-1 py-0.5">/api/products/editor/:productId/config</code>. Never expose it in customer-facing browser code.</p>
+          </section>
           <Textarea label="Custom CSS" value={form.customCss} onChange={(e) => update('customCss', e.target.value)} rows={6} placeholder="/* Optional CSS for the future embedded editor */" />
           {/* <div>
             <Textarea label="Custom JavaScript" value={form.customJavascript} onChange={(e) => update('customJavascript', e.target.value)} rows={6} placeholder="// Stored only. Not executed in admin." />
