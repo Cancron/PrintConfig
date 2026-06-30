@@ -265,6 +265,38 @@ async function resolvePublicProductSelection(product: any, merchantId?: string) 
   const byId = new Map(products.map((item: any) => [String(item._id), item]));
   return { mode: 'specific', products: ids.map((selectedId: string) => byId.get(selectedId)).filter(Boolean).map(publicProductSummary) };
 }
+function publicOptionGroups(optionGroups: any[] = []) {
+  return optionGroups
+    .slice()
+    .sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0))
+    .map((group) => ({
+      _id: group._id,
+      name: group.name,
+      code: group.code,
+      displayType: group.displayType,
+      required: group.required,
+      sortOrder: group.sortOrder,
+      values: (group.values ?? [])
+        .filter((value: any) => value.isActive !== false)
+        .slice()
+        .sort((a: any, b: any) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0))
+        .map((value: any) => ({
+          _id: value._id,
+          label: value.label,
+          value: value.value,
+          priceModifierType: value.priceModifierType,
+          priceModifier: value.priceModifier,
+          isDefault: value.isDefault,
+          sortOrder: value.sortOrder,
+          previewImageUrl: value.previewImageUrl,
+          thumbnailImageUrl: value.thumbnailImageUrl,
+          metadata: {
+            colorHex: value.metadata?.colorHex ?? '',
+            description: value.metadata?.description ?? '',
+          },
+        })),
+    }));
+}
 export async function getPublicProductConfig(id: string, merchantId?: string) {
   const product = await ProductModel.findById(id).lean();
   if (!product) throw new ApiError(404, 'Product not found.');
@@ -296,6 +328,7 @@ export async function getPublicProductConfig(id: string, merchantId?: string) {
     thumbnailUrl: product.thumbnailUrl,
     surface: product.surface,
     variantOptionDefinitions: product.variantOptionDefinitions,
+    optionGroups: publicOptionGroups(product.optionGroups),
     roomPreviews: sharedRoomData.roomPreviews.slice().sort((a: any, b: any) => a.sortOrder - b.sortOrder),
     frontendContent: publicFrontendContent(product.frontendContent),
     productSelection,
@@ -318,7 +351,7 @@ export async function calculatePrice(id: string, variantId: string, selectedOpti
   for (const group of product.optionGroups ?? []) {
     const selected = selectedOptions[group.code];
     if (!selected) continue;
-    const optionValue = group.values.find((value: any) => value.value === selected);
+    const optionValue = group.values.find((value: any) => value.isActive !== false && value.value === selected);
     if (!optionValue) continue;
     const amount = applyModifier(variant.price, optionValue as any);
     modifiers.push({ groupCode: group.code, value: optionValue.value, amount });
