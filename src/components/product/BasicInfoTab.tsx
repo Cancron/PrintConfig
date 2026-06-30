@@ -20,6 +20,7 @@ interface Props {
 const productTypeOptions: { value: ProductType; label: ProductType }[] = [
   { value: 'Canvas Print', label: 'Canvas Print' },
   { value: 'Metal Print', label: 'Metal Print' },
+  { value: 'Art Print', label: 'Art Print' },
   // { value: 'Fine Art Paper', label: 'Fine Art Paper' },
   // { value: 'Matte Photo Paper', label: 'Matte Photo Paper' },
   // { value: 'Acrylic Face Mount Prints', label: 'Acrylic Face Mount Prints' },

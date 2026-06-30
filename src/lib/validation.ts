@@ -7,6 +7,7 @@ export type ValidationErrors = Record<string, string>;
 const PRODUCT_TYPES: ProductType[] = [
   'Canvas Print',
   'Metal Print',
+  'Art Print',
   'Poster Print',
   'Framed Poster',
   'T-Shirt',

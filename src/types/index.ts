@@ -7,6 +7,7 @@ export type ProductType =
   | 'Luster Photo Paper'
   | 'Canvas Print'
   | 'Metal Print'
+  | 'Art Print'
   | 'Poster Print'
   | 'Framed Poster'
   | 'T-Shirt'

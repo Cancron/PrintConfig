@@ -142,7 +142,7 @@ export async function listProducts(filters: Record<string, string | undefined>) 
   if (filters.status) query.status = filters.status;
   if (filters.scope) query.scope = filters.scope;
   if (filters.search) query.name = { $regex: filters.search, $options: 'i' };
-  return ProductModel.find(query).sort({ updatedAt: -1 });
+  return ProductModel.find(query).sort({ categoryId: 1, name: 1 });
 }
 
 export async function getProduct(id: string) {
