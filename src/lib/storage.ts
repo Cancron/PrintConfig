@@ -2,6 +2,7 @@ import { normalizeUnit } from './validation';
 import { normalizeVariantOptionDefinitions } from './variantOptions';
 import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
 import { normalizeFrontendContent } from './frontendContent';
+import { normalizeEditorProductSelection } from './productSelection';
 import type {
   Account,
   BleedSettings,
@@ -172,6 +173,7 @@ export function normalizeProduct(product: Product): Product {
     optionGroups: product.optionGroups ?? [],
     variantOptionDefinitions: normalizeVariantOptionDefinitions(product.variantOptionDefinitions, product._id),
     frontendContent: normalizeFrontendContent(product.frontendContent),
+    editorProductSelection: normalizeEditorProductSelection(product.editorProductSelection),
     editorRules: { ...defaultEditorRules, ...(product.editorRules ?? {}) },
     exportRules: { ...defaultExportRules, ...(product.exportRules ?? {}) },
     templates: (product.templates ?? []).map((template) => ({ ...template, surfaceId: surface?._id ?? template.surfaceId ?? '' })),

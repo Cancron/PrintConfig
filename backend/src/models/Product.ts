@@ -256,6 +256,13 @@ const frontendContentSchema = new Schema(
   },
   { _id: false }
 );
+const editorProductSelectionSchema = new Schema(
+  {
+    mode: { type: String, enum: ['single', 'same-category', 'specific'], default: 'single' },
+    specificProductIds: { type: [{ type: Schema.Types.ObjectId, ref: 'Product' }], default: [] },
+  },
+  { _id: false }
+);
 const productSchema = new Schema(
   {
     accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
@@ -275,6 +282,7 @@ const productSchema = new Schema(
     variantOptionDefinitions: { type: [variantOptionDefinitionSchema], default: defaultVariantOptionDefinitions },
     roomPreviews: { type: [productRoomPreviewSchema], default: [] },
     frontendContent: { type: frontendContentSchema, default: () => ({}) },
+    editorProductSelection: { type: editorProductSelectionSchema, default: () => ({}) },
     variants: { type: [variantSchema], default: [] },
     editorRules: { type: editorRulesSchema, default: () => ({}) },
     exportRules: { type: exportRulesSchema, default: () => ({}) },

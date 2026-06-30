@@ -22,6 +22,32 @@ async function normalizeRefs(data: Record<string, unknown>) {
   if (!data.categoryId || !Types.ObjectId.isValid(String(data.categoryId))) throw new ApiError(400, 'Product must have a valid categoryId.');
 }
 
+function normalizeEditorProductSelection(data: Record<string, any>) {
+  const selection = data.editorProductSelection ?? {};
+  data.editorProductSelection = {
+    mode: selection.mode === 'same-category' || selection.mode === 'specific' ? selection.mode : 'single',
+    specificProductIds: Array.isArray(selection.specificProductIds) ? selection.specificProductIds : [],
+  };
+}
+
+async function validateEditorProductSelection(data: Record<string, any>, productId?: string) {
+  const ids = data.editorProductSelection.specificProductIds.map(String);
+  if (new Set(ids).size !== ids.length) throw new ApiError(400, 'Specific product selections must be unique.');
+  if (ids.some((id: string) => !Types.ObjectId.isValid(id))) throw new ApiError(400, 'Specific product selections must contain valid Product ObjectIds.');
+  if (productId && ids.includes(productId)) throw new ApiError(400, 'A product cannot select itself.');
+  let existingIds = new Set<string>();
+  if (productId) {
+    const current = await ProductModel.findById(productId).select('editorProductSelection.specificProductIds').lean();
+    existingIds = new Set((current?.editorProductSelection?.specificProductIds ?? []).map(String));
+  }
+  const addedIds = ids.filter((id: string) => !existingIds.has(id));
+  if (addedIds.length === 0) return;
+  const visibility: Record<string, unknown>[] = [{ scope: 'shared' }];
+  if (data.scope === 'merchant' && data.merchantId) visibility.push({ scope: 'merchant', merchantId: data.merchantId });
+  else visibility.push({ scope: 'merchant' });
+  const count = await ProductModel.countDocuments({ _id: { $in: addedIds }, accountId: data.accountId, status: 'active', $or: visibility });
+  if (count !== addedIds.length) throw new ApiError(400, 'New specific product selections must be active and visible within this account.');
+}
 function normalizeFrontendContent(data: Record<string, any>) {
   data.frontendContent = normalizeFrontendContentPayload(data.frontendContent);
 }
@@ -128,8 +154,10 @@ export async function createProduct(payload: Record<string, any>) {
   await normalizeRefs(payload);
   payload.slug = payload.slug || slugify(String(payload.name ?? 'product'));
   normalizeFrontendContent(payload);
+  normalizeEditorProductSelection(payload);
   normalizeRoomOwnership(payload);
   validateProductShape(payload);
+  await validateEditorProductSelection(payload);
   await assertUniqueSlug(payload);
   return ProductModel.create(payload);
 }
@@ -139,8 +167,10 @@ export async function updateProduct(id: string, payload: Record<string, any>) {
   await normalizeRefs(payload);
   payload.slug = payload.slug || slugify(String(payload.name ?? 'product'));
   normalizeFrontendContent(payload);
+  normalizeEditorProductSelection(payload);
   normalizeRoomOwnership(payload);
   validateProductShape(payload);
+  await validateEditorProductSelection(payload, id);
   await assertUniqueSlug(payload, id);
   return ProductModel.findByIdAndUpdate(id, payload, { new: true, runValidators: true });
 }
@@ -190,11 +220,56 @@ export async function importProduct(payload: Record<string, any>) {
   return createProduct({ ...stripIds(payload), status: 'draft', slug: `${payload.slug || slugify(payload.name)}-import-${Date.now()}` });
 }
 
-export async function getPublicProductConfig(id: string) {
+function publicProductSummary(product: any) {
+  return {
+    _id: String(product._id),
+    name: product.name,
+    slug: product.slug,
+    productType: product.productType,
+    thumbnailUrl: product.thumbnailUrl,
+    basePrice: product.basePrice,
+    scope: product.scope,
+  };
+}
+
+async function resolvePublicProductSelection(product: any, merchantId?: string) {
+  const selection = product.editorProductSelection ?? { mode: 'single', specificProductIds: [] };
+  if (merchantId && !Types.ObjectId.isValid(merchantId)) throw new ApiError(400, 'merchantId must be a valid MongoDB ObjectId.');
+  let effectiveMerchantId: string | null = merchantId ?? null;
+  if (product.scope === 'merchant') {
+    const sourceMerchantId = String(product.merchantId ?? '');
+    if (merchantId && merchantId !== sourceMerchantId) throw new ApiError(404, 'Product not found.');
+    effectiveMerchantId = sourceMerchantId;
+  }
+  if (selection.mode === 'single') return { mode: 'single', products: [] };
+  const visibility: Record<string, unknown>[] = [{ scope: 'shared' }];
+  if (effectiveMerchantId) visibility.push({ scope: 'merchant', merchantId: effectiveMerchantId });
+  const baseQuery: Record<string, any> = {
+    _id: { $ne: product._id },
+    accountId: product.accountId,
+    status: 'active',
+    $or: visibility,
+  };
+  if (selection.mode === 'same-category') {
+    const products = await ProductModel.find({ ...baseQuery, categoryId: product.categoryId })
+      .select('name slug productType thumbnailUrl basePrice scope')
+      .lean();
+    products.sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)));
+    return { mode: 'same-category', products: products.map(publicProductSummary) };
+  }
+  const ids = (selection.specificProductIds ?? []).map(String);
+  const products = await ProductModel.find({ ...baseQuery, _id: { $in: ids, $ne: product._id } })
+    .select('name slug productType thumbnailUrl basePrice scope')
+    .lean();
+  const byId = new Map(products.map((item: any) => [String(item._id), item]));
+  return { mode: 'specific', products: ids.map((selectedId: string) => byId.get(selectedId)).filter(Boolean).map(publicProductSummary) };
+}
+export async function getPublicProductConfig(id: string, merchantId?: string) {
   const product = await ProductModel.findById(id).lean();
   if (!product) throw new ApiError(404, 'Product not found.');
   if (product.status !== 'active') throw new ApiError(404, 'Product not found.');
   const sharedRoomData = liftLegacyProductRooms(product);
+  const productSelection = await resolvePublicProductSelection(product, merchantId);
   const activeVariants = (sharedRoomData.variants ?? []).filter((variant: any) => variant.status === 'active').map((variant: any) => ({
     _id: variant._id,
     name: variant.name,
@@ -222,6 +297,7 @@ export async function getPublicProductConfig(id: string) {
     variantOptionDefinitions: product.variantOptionDefinitions,
     roomPreviews: sharedRoomData.roomPreviews.slice().sort((a: any, b: any) => a.sortOrder - b.sortOrder),
     frontendContent: publicFrontendContent(product.frontendContent),
+    productSelection,
     editorRules: product.editorRules,
     exportRules: product.exportRules,
     variants: activeVariants,

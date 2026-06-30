@@ -94,7 +94,7 @@ export function ProductDetail() {
   }
 
   const tabs = [
-    { _id: 'basic', label: 'Basic Info', content: <BasicInfoTab product={product} onSave={updateProduct} /> },
+    { _id: 'basic', label: 'Basic Info', content: <BasicInfoTab product={product} products={products} onSave={updateProduct} /> },
     { _id: 'options', label: 'Options', content: <OptionsTab product={product} onSave={updateProduct} /> },
     { _id: 'variants', label: 'Variants', content: <VariantsTab product={product} onSave={updateProduct} /> },
     { _id: 'surfaces', label: 'Surfaces', content: <SurfacesTab product={product} onSave={updateProduct} /> },
@@ -210,8 +210,3 @@ function JsonPreviewTab({ product }: { product: Product }) {
   const json = JSON.stringify(product, null, 2);
   return <div className="relative"><pre className="bg-slate-900 text-slate-50 rounded-lg p-4 overflow-x-auto text-sm font-mono leading-relaxed"><code>{json}</code></pre></div>;
 }
-
-
-
-
-

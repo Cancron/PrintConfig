@@ -11,4 +11,4 @@ export async function exportConfig(req: Request, res: Response, next: NextFuncti
 export async function importConfig(req: Request, res: Response, next: NextFunction) { try { res.status(201).json(await service.importProduct(req.body)); } catch (e) { next(e); } }
 export async function calculatePrice(req: Request, res: Response, next: NextFunction) { try { res.json(await service.calculatePrice(String(req.params.id), req.body.variantId, req.body.selectedOptions ?? {})); } catch (e) { next(e); } }
 
-export async function publicConfig(req: Request, res: Response, next: NextFunction) { try { res.json(await service.getPublicProductConfig(String(req.params.id))); } catch (e) { next(e); } }
+export async function publicConfig(req: Request, res: Response, next: NextFunction) { try { res.json(await service.getPublicProductConfig(String(req.params.id), typeof req.query.merchantId === 'string' ? req.query.merchantId : undefined)); } catch (e) { next(e); } }

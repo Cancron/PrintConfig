@@ -13,6 +13,7 @@ import { createDefaultEditorRules, createDefaultExportRules } from '../lib/stora
 import { validateProductBasicInfo } from '../lib/validation';
 import { createDefaultVariantOptionDefinitions } from '../lib/variantOptions';
 import { createDefaultFrontendContent } from '../lib/frontendContent';
+import { createDefaultEditorProductSelection } from '../lib/productSelection';
 import type { Product, ProductScope, ProductType, ProductStatus } from '../types';
 
 const productTypeOptions: { value: ProductType; label: ProductType }[] = [
@@ -99,6 +100,7 @@ export function CreateProduct() {
       variantOptionDefinitions: createDefaultVariantOptionDefinitions(),
       roomPreviews: [],
       frontendContent: createDefaultFrontendContent(),
+      editorProductSelection: createDefaultEditorProductSelection(),
       templates: [],
       variants: [],
       createdAt: now,

@@ -14,6 +14,12 @@ export type ProductType =
   | 'Business Card'
   | 'Sticker';
 
+export type EditorProductSelectionMode = 'single' | 'same-category' | 'specific';
+
+export interface EditorProductSelection {
+  mode: EditorProductSelectionMode;
+  specificProductIds: string[];
+}
 export type ProductStatus = 'Draft' | 'Active';
 export type MerchantStatus = 'Draft' | 'Active';
 export type ProductScope = 'shared' | 'merchant';
@@ -381,6 +387,7 @@ export interface Product {
   variantOptionDefinitions: VariantOptionDefinition[];
   roomPreviews: ProductRoomPreview[];
   frontendContent: ProductFrontendContent;
+  editorProductSelection: EditorProductSelection;
   editorRules: EditorRules;
   exportRules: ExportRules;
   templates: ProductTemplate[];

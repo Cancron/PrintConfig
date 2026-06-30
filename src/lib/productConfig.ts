@@ -2,6 +2,7 @@ import { createDefaultEditorRules, createDefaultExportRules } from './storage';
 import { createDefaultVariantOptionDefinitions } from './variantOptions';
 import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
 import { normalizeFrontendContent } from './frontendContent';
+import { normalizeEditorProductSelection } from './productSelection';
 import { normalizeUnit } from './validation';
 import type {
   Product,
@@ -115,6 +116,7 @@ function buildImportCandidate(input: Record<string, unknown>): Product {
     variantOptionDefinitions: Array.isArray(input.variantOptionDefinitions) ? input.variantOptionDefinitions.filter(isRecord).map((definition, index) => normalizeVariantOptionDefinition(definition, id, now, index)) : createDefaultVariantOptionDefinitions(id),
     roomPreviews: Array.isArray(input.roomPreviews) ? input.roomPreviews.filter(isRecord).map((room, index) => normalizeSharedRoomPreview(room, id, index)) : [],
     frontendContent: normalizeFrontendContent(isRecord(input.frontendContent) ? input.frontendContent : undefined),
+    editorProductSelection: normalizeEditorProductSelection(isRecord(input.editorProductSelection) ? input.editorProductSelection : undefined),
     templates: Array.isArray(input.templates) ? input.templates.filter(isRecord).map((template, index) => normalizeTemplate(template, id, surface?._id ?? '', now, index)) : [],
     variants: variants.map((variant, index) => normalizeVariant(variant, id, now, index)),
     createdAt: now,
