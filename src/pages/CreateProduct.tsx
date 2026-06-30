@@ -12,6 +12,7 @@ import { useWorkspace } from '../hooks/useWorkspace';
 import { createDefaultEditorRules, createDefaultExportRules } from '../lib/storage';
 import { validateProductBasicInfo } from '../lib/validation';
 import { createDefaultVariantOptionDefinitions } from '../lib/variantOptions';
+import { createDefaultFrontendContent } from '../lib/frontendContent';
 import type { Product, ProductScope, ProductType, ProductStatus } from '../types';
 
 const productTypeOptions: { value: ProductType; label: ProductType }[] = [
@@ -97,6 +98,7 @@ export function CreateProduct() {
       optionGroups: [],
       variantOptionDefinitions: createDefaultVariantOptionDefinitions(),
       roomPreviews: [],
+      frontendContent: createDefaultFrontendContent(),
       templates: [],
       variants: [],
       createdAt: now,

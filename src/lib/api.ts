@@ -2,6 +2,7 @@
 import type { ImageAsset, ImageFolder, Merchant, Product, ProductCategory } from '../types';
 import { normalizeVariantOptionDefinitions } from './variantOptions';
 import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
+import { normalizeFrontendContent } from './frontendContent';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api';
 
@@ -117,6 +118,7 @@ function normalizeProduct(raw: any): Product {
     surface: normalizeSurface(raw.surface),
     optionGroups: normalizeOptionGroups(raw.optionGroups),
     variantOptionDefinitions: normalizeVariantOptionDefinitions(raw.variantOptionDefinitions, productId),
+    frontendContent: normalizeFrontendContent(raw.frontendContent),
     roomPreviews: (raw.roomPreviews ?? []).map((room: any, index: number) => normalizeSharedRoomPreview(room, productId, index)),
     variants,
     editorRules: raw.editorRules ?? {},

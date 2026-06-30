@@ -1,6 +1,7 @@
 import { createDefaultEditorRules, createDefaultExportRules } from './storage';
 import { createDefaultVariantOptionDefinitions } from './variantOptions';
 import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
+import { normalizeFrontendContent } from './frontendContent';
 import { normalizeUnit } from './validation';
 import type {
   Product,
@@ -65,6 +66,7 @@ function clearImportedIds(product: Product): Product {
     surface: product.surface ? { ...product.surface, _id: '', clientId: crypto.randomUUID(), productId: '' } : null,
     variantOptionDefinitions: product.variantOptionDefinitions.map((definition) => ({ ...definition, _id: '', clientId: crypto.randomUUID(), productId: '' })),
     roomPreviews: product.roomPreviews.map((room) => ({ ...room, _id: '', clientId: crypto.randomUUID(), productId: '' })),
+    frontendContent: { ...product.frontendContent, trustBadges: product.frontendContent.trustBadges.map((badge) => ({ ...badge, _id: '', clientId: crypto.randomUUID() })) },
     optionGroups: product.optionGroups.map((group) => ({
       ...group,
       _id: '',
@@ -112,6 +114,7 @@ function buildImportCandidate(input: Record<string, unknown>): Product {
     optionGroups: Array.isArray(input.optionGroups) ? input.optionGroups.filter(isRecord).map((group, index) => normalizeOptionGroup(group, id, now, index)) : [],
     variantOptionDefinitions: Array.isArray(input.variantOptionDefinitions) ? input.variantOptionDefinitions.filter(isRecord).map((definition, index) => normalizeVariantOptionDefinition(definition, id, now, index)) : createDefaultVariantOptionDefinitions(id),
     roomPreviews: Array.isArray(input.roomPreviews) ? input.roomPreviews.filter(isRecord).map((room, index) => normalizeSharedRoomPreview(room, id, index)) : [],
+    frontendContent: normalizeFrontendContent(isRecord(input.frontendContent) ? input.frontendContent : undefined),
     templates: Array.isArray(input.templates) ? input.templates.filter(isRecord).map((template, index) => normalizeTemplate(template, id, surface?._id ?? '', now, index)) : [],
     variants: variants.map((variant, index) => normalizeVariant(variant, id, now, index)),
     createdAt: now,

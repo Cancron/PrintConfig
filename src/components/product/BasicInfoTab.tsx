@@ -23,7 +23,7 @@ const productTypeOptions: { value: ProductType; label: ProductType }[] = [
   // { value: 'Acrylic Face Mount Prints', label: 'Acrylic Face Mount Prints' },
   // { value: 'Poster Printing and Framing', label: 'Poster Printing and Framing' },
   // { value: 'Luster Photo Paper', label: 'Luster Photo Paper' },
-  { value: 'Canvas Print', label: 'Canvas Print' },
+  // { value: 'Canvas Print', label: 'Canvas Print' },
   // { value: 'Poster Print', label: 'Poster Print' },
   // { value: 'Framed Poster', label: 'Framed Poster' },
   { value: 'T-Shirt', label: 'T-Shirt' },

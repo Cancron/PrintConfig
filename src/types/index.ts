@@ -104,6 +104,59 @@ export interface ProductCategory {
   updatedAt: string;
 }
 
+export type PrecheckStatus = 'success' | 'warning' | 'info' | 'error';
+export type FrontendLayoutStyle = 'standard' | 'compact' | 'premium';
+
+export interface ProductTrustBadge {
+  _id: string;
+  clientId?: string;
+  icon: string;
+  text: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductFrontendContent {
+  topCtaLabel: string;
+  productTitleOverride: string;
+  showReviews: boolean;
+  reviewRating: number;
+  reviewCount: number;
+  reviewLabel: string;
+  showPrecheckMessage: boolean;
+  precheckStatus: PrecheckStatus;
+  precheckTitle: string;
+  precheckMessage: string;
+  resizeLabel: string;
+  rotateLabel: string;
+  resetLabel: string;
+  cropLabel: string;
+  changePhotoLabel: string;
+  previewLabel: string;
+  sizeSectionLabel: string;
+  showAllSizesLabel: string;
+  quantityLabel: string;
+  priceLabel: string;
+  salePriceLabel: string;
+  savingsLabel: string;
+  orderButtonText: string;
+  addAnotherImageText: string;
+  showSupportBox: boolean;
+  supportLabel: string;
+  supportPhone: string;
+  supportEmail: string;
+  supportIcon: string;
+  supportMessage: string;
+  productDetailHtml: string;
+  showTopCta: boolean;
+  showReviewBlock: boolean;
+  showTrustBadges: boolean;
+  showProductDetailDescription: boolean;
+  frontendLayoutStyle: FrontendLayoutStyle;
+  trustBadges: ProductTrustBadge[];
+}
 export interface VariantOptionDefinition {
   _id: string;
   clientId?: string;
@@ -327,6 +380,7 @@ export interface Product {
   optionGroups: ProductOptionGroup[];
   variantOptionDefinitions: VariantOptionDefinition[];
   roomPreviews: ProductRoomPreview[];
+  frontendContent: ProductFrontendContent;
   editorRules: EditorRules;
   exportRules: ExportRules;
   templates: ProductTemplate[];

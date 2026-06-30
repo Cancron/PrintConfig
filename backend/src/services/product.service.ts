@@ -6,6 +6,7 @@ import { ApiError } from '../middleware/errorHandler.js';
 import { applyModifier } from '../utils/pricing.js';
 import { slugify } from '../utils/slug.js';
 import { getVariantRoomOrientation, liftLegacyProductRooms, ROOM_ORIENTATIONS } from '../utils/roomPreview.js';
+import { normalizeFrontendContentPayload, publicFrontendContent } from '../utils/frontendContent.js';
 import { visibleQuery } from './category.service.js';
 import { resolveAccountId } from './account.service.js';
 
@@ -21,6 +22,9 @@ async function normalizeRefs(data: Record<string, unknown>) {
   if (!data.categoryId || !Types.ObjectId.isValid(String(data.categoryId))) throw new ApiError(400, 'Product must have a valid categoryId.');
 }
 
+function normalizeFrontendContent(data: Record<string, any>) {
+  data.frontendContent = normalizeFrontendContentPayload(data.frontendContent);
+}
 function normalizeRoomOwnership(data: Record<string, any>) {
   const lifted = liftLegacyProductRooms(data);
   data.roomPreviews = lifted.roomPreviews;
@@ -28,6 +32,16 @@ function normalizeRoomOwnership(data: Record<string, any>) {
 }
 function validateProductShape(data: Record<string, any>) {
   if (data.surface && !data.surface.code) throw new ApiError(400, 'Surface code is required.');
+  const frontendContent = data.frontendContent ?? {};
+  const rating = Number(frontendContent.reviewRating);
+  const reviewCount = Number(frontendContent.reviewCount);
+  if (!Number.isFinite(rating) || rating < 0 || rating > 5) throw new ApiError(400, 'Review rating must be between 0 and 5.');
+  if (!Number.isFinite(reviewCount) || reviewCount < 0) throw new ApiError(400, 'Review count must be zero or greater.');
+  if (frontendContent.supportEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(frontendContent.supportEmail))) throw new ApiError(400, 'Support email must be valid.');
+  for (const badge of frontendContent.trustBadges ?? []) {
+    if (!String(badge.text ?? '').trim()) throw new ApiError(400, 'Trust badge text is required.');
+    if (!Number.isFinite(Number(badge.sortOrder))) throw new ApiError(400, 'Trust badge sort order must be numeric.');
+  }
   const definitionKeys = new Set<string>();
   let groupByCount = 0;
   for (const definition of data.variantOptionDefinitions ?? []) {
@@ -113,6 +127,7 @@ export async function createProduct(payload: Record<string, any>) {
   normalizeScope(payload);
   await normalizeRefs(payload);
   payload.slug = payload.slug || slugify(String(payload.name ?? 'product'));
+  normalizeFrontendContent(payload);
   normalizeRoomOwnership(payload);
   validateProductShape(payload);
   await assertUniqueSlug(payload);
@@ -123,6 +138,7 @@ export async function updateProduct(id: string, payload: Record<string, any>) {
   normalizeScope(payload);
   await normalizeRefs(payload);
   payload.slug = payload.slug || slugify(String(payload.name ?? 'product'));
+  normalizeFrontendContent(payload);
   normalizeRoomOwnership(payload);
   validateProductShape(payload);
   await assertUniqueSlug(payload, id);
@@ -205,6 +221,7 @@ export async function getPublicProductConfig(id: string) {
     surface: product.surface,
     variantOptionDefinitions: product.variantOptionDefinitions,
     roomPreviews: sharedRoomData.roomPreviews.slice().sort((a: any, b: any) => a.sortOrder - b.sortOrder),
+    frontendContent: publicFrontendContent(product.frontendContent),
     editorRules: product.editorRules,
     exportRules: product.exportRules,
     variants: activeVariants,

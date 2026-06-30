@@ -197,6 +197,65 @@ const templateSchema = new Schema(
   { timestamps: true }
 );
 
+const productTrustBadgeSchema = new Schema(
+  {
+    icon: { type: String, default: '' },
+    text: { type: String, required: true, trim: true },
+    sortOrder: { type: Number, default: 0 },
+    isActive: { type: Boolean, default: true },
+  },
+  { timestamps: true }
+);
+
+const defaultTrustBadges = () => [
+  { icon: '🚚', text: 'Free shipping Canada-wide', sortOrder: 1, isActive: true },
+  { icon: '⚡', text: '24-hour production', sortOrder: 2, isActive: true },
+  { icon: '🛡️', text: 'Lifetime warranty', sortOrder: 3, isActive: true },
+  { icon: '🇨🇦', text: 'Made in Canada', sortOrder: 4, isActive: true },
+];
+
+const frontendContentSchema = new Schema(
+  {
+    topCtaLabel: { type: String, default: 'DESIGN YOUR PRODUCT' },
+    productTitleOverride: { type: String, default: '' },
+    showReviews: { type: Boolean, default: true },
+    reviewRating: { type: Number, default: 4.9, min: 0, max: 5 },
+    reviewCount: { type: Number, default: 4777, min: 0 },
+    reviewLabel: { type: String, default: 'reviews' },
+    showPrecheckMessage: { type: Boolean, default: true },
+    precheckStatus: { type: String, enum: ['success', 'warning', 'info', 'error'], default: 'success' },
+    precheckTitle: { type: String, default: 'Pre-Check looks great!' },
+    precheckMessage: { type: String, default: "We'll contact you if your image quality doesn't fit. Your satisfaction is the key to our success!" },
+    resizeLabel: { type: String, default: 'Resize' },
+    rotateLabel: { type: String, default: 'Rotate' },
+    resetLabel: { type: String, default: 'Reset' },
+    cropLabel: { type: String, default: 'Crop' },
+    changePhotoLabel: { type: String, default: 'Change photo' },
+    previewLabel: { type: String, default: 'Preview' },
+    sizeSectionLabel: { type: String, default: 'Size' },
+    showAllSizesLabel: { type: String, default: 'SHOW ALL SIZES & RATIOS' },
+    quantityLabel: { type: String, default: 'Quantity' },
+    priceLabel: { type: String, default: 'Price' },
+    salePriceLabel: { type: String, default: 'Price' },
+    savingsLabel: { type: String, default: 'Save' },
+    orderButtonText: { type: String, default: 'Order Now' },
+    addAnotherImageText: { type: String, default: 'Add Another Image' },
+    showSupportBox: { type: Boolean, default: true },
+    supportLabel: { type: String, default: 'Need help?' },
+    supportPhone: { type: String, default: '+1-825-977-3451' },
+    supportEmail: { type: String, default: '' },
+    supportIcon: { type: String, default: 'phone' },
+    supportMessage: { type: String, default: '' },
+    productDetailHtml: { type: String, default: '' },
+    showTopCta: { type: Boolean, default: true },
+    showReviewBlock: { type: Boolean, default: true },
+    showTrustBadges: { type: Boolean, default: true },
+    showProductDetailDescription: { type: Boolean, default: true },
+    frontendLayoutStyle: { type: String, enum: ['standard', 'compact', 'premium'], default: 'standard' },
+    trustBadges: { type: [productTrustBadgeSchema], default: defaultTrustBadges },
+  },
+  { _id: false }
+);
 const productSchema = new Schema(
   {
     accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
@@ -215,6 +274,7 @@ const productSchema = new Schema(
     optionGroups: { type: [optionGroupSchema], default: [] },
     variantOptionDefinitions: { type: [variantOptionDefinitionSchema], default: defaultVariantOptionDefinitions },
     roomPreviews: { type: [productRoomPreviewSchema], default: [] },
+    frontendContent: { type: frontendContentSchema, default: () => ({}) },
     variants: { type: [variantSchema], default: [] },
     editorRules: { type: editorRulesSchema, default: () => ({}) },
     exportRules: { type: exportRulesSchema, default: () => ({}) },
