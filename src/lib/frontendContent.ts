@@ -23,6 +23,11 @@ export function createDefaultFrontendContent(): ProductFrontendContent {
     ['🇨🇦', 'Made in Canada'],
   ];
   return {
+    promoText: '',
+    uploadHeading: 'Start with a photo you love',
+    uploadDescription: "Upload from your phone, laptop, or camera roll. We'll show you exactly how it will look before you pay.",
+    uploadButtonText: 'Upload Your Photo',
+    uploadRequirementsText: 'JPG - PNG - WEBP | MAX 12MB | RECOMMENDED 300 DPI',
     topCtaLabel: 'DESIGN YOUR PRODUCT',
     productTitleOverride: '',
     showReviews: true,

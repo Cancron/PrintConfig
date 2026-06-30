@@ -128,6 +128,11 @@ export interface ProductTrustBadge {
 }
 
 export interface ProductFrontendContent {
+  promoText: string;
+  uploadHeading: string;
+  uploadDescription: string;
+  uploadButtonText: string;
+  uploadRequirementsText: string;
   topCtaLabel: string;
   productTitleOverride: string;
   showReviews: boolean;

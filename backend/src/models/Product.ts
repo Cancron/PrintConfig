@@ -214,14 +214,19 @@ const productTrustBadgeSchema = new Schema(
 );
 
 const defaultTrustBadges = () => [
-  { icon: 'ðŸšš', text: 'Free shipping Canada-wide', sortOrder: 1, isActive: true },
-  { icon: 'âš¡', text: '24-hour production', sortOrder: 2, isActive: true },
-  { icon: 'ðŸ›¡ï¸', text: 'Lifetime warranty', sortOrder: 3, isActive: true },
-  { icon: 'ðŸ‡¨ðŸ‡¦', text: 'Made in Canada', sortOrder: 4, isActive: true },
+  { icon: '🚚', text: 'Free shipping Canada-wide', sortOrder: 1, isActive: true },
+  { icon: '⚡', text: '24-hour production', sortOrder: 2, isActive: true },
+  { icon: '🛡️', text: 'Lifetime warranty', sortOrder: 3, isActive: true },
+  { icon: '🇨🇦', text: 'Made in Canada', sortOrder: 4, isActive: true },
 ];
 
 const frontendContentSchema = new Schema(
   {
+    promoText: { type: String, default: '', maxlength: 500 },
+    uploadHeading: { type: String, default: 'Start with a photo you love', maxlength: 200 },
+    uploadDescription: { type: String, default: "Upload from your phone, laptop, or camera roll. We'll show you exactly how it will look before you pay.", maxlength: 500 },
+    uploadButtonText: { type: String, default: 'Upload Your Photo', maxlength: 100 },
+    uploadRequirementsText: { type: String, default: 'JPG - PNG - WEBP | MAX 12MB | RECOMMENDED 300 DPI', maxlength: 300 },
     topCtaLabel: { type: String, default: 'DESIGN YOUR PRODUCT' },
     productTitleOverride: { type: String, default: '' },
     showReviews: { type: Boolean, default: true },

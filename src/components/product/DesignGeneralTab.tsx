@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Check, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, Image as ImageIcon, Plus, Trash2, Upload } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Textarea } from '../ui/Textarea';
@@ -84,6 +84,7 @@ export function DesignGeneralTab({ product, onSave }: Props) {
 
         <Section title="Header / CTA Content">
           <Grid>
+            <div className="sm:col-span-2"><Input label="Promo Text" value={content.promoText} onChange={(event) => update('promoText', event.target.value)} error={errors.promoText} placeholder="Free Shipping | Save up to 25% - code CPV25" maxLength={500} /></div>
             <Input label="Top CTA Label" value={content.topCtaLabel} onChange={(event) => update('topCtaLabel', event.target.value)} />
             <Input label="Product Title Override" value={content.productTitleOverride} onChange={(event) => update('productTitleOverride', event.target.value)} placeholder={product.name} />
             <Input label="Review Rating" type="number" min="0" max="5" step="0.1" value={content.reviewRating} onChange={(event) => update('reviewRating', Number(event.target.value))} error={errors.reviewRating} />
@@ -93,6 +94,14 @@ export function DesignGeneralTab({ product, onSave }: Props) {
           </Grid>
         </Section>
 
+        <Section title="Photo Upload Intro">
+          <Grid>
+            <Input label="Heading" value={content.uploadHeading} onChange={(event) => update('uploadHeading', event.target.value)} error={errors.uploadHeading} maxLength={200} />
+            <Input label="Upload Button Text" value={content.uploadButtonText} onChange={(event) => update('uploadButtonText', event.target.value)} error={errors.uploadButtonText} maxLength={100} />
+            <div className="sm:col-span-2"><Textarea label="Description" rows={2} value={content.uploadDescription} onChange={(event) => update('uploadDescription', event.target.value)} error={errors.uploadDescription} maxLength={500} /></div>
+            <div className="sm:col-span-2"><Input label="File Requirements Text" value={content.uploadRequirementsText} onChange={(event) => update('uploadRequirementsText', event.target.value)} error={errors.uploadRequirementsText} maxLength={300} /></div>
+          </Grid>
+        </Section>
         <Section title="Editor Messages and Labels">
           <Grid>
             <BooleanSelect label="Show Pre-check Message" value={content.showPrecheckMessage} onChange={(value) => update('showPrecheckMessage', value)} />
@@ -192,7 +201,14 @@ function LivePreview({ product, content, html }: { product: Product; content: Pr
   return (
     <aside className="h-fit space-y-5 rounded-lg bg-white p-5 ring-1 ring-gray-200 xl:sticky xl:top-6">
       <div><p className="text-sm font-semibold text-gray-900">Live Preview</p><p className="mt-1 text-xs text-gray-500">{content.frontendLayoutStyle} layout</p></div>
-      <div className="space-y-4">
+      {content.promoText.trim() && <div className="overflow-hidden rounded bg-zinc-950 px-3 py-3 text-center text-xs font-semibold leading-5 text-white">{content.promoText}</div>}
+      <div className="rounded-md bg-gray-50 px-4 py-6 text-center ring-1 ring-gray-200">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-cyan-700 text-white"><ImageIcon className="h-6 w-6" /></div>
+        <p className="mt-4 text-lg font-bold text-gray-950">{content.uploadHeading}</p>
+        <p className="mt-2 text-xs leading-5 text-gray-600">{content.uploadDescription}</p>
+        <button type="button" className="mx-auto mt-4 inline-flex items-center gap-2 rounded-md bg-cyan-700 px-4 py-2 text-xs font-semibold text-white"><Upload className="h-4 w-4" /> {content.uploadButtonText}</button>
+        <p className="mt-4 text-[10px] font-medium uppercase text-gray-500">{content.uploadRequirementsText}</p>
+      </div>      <div className="space-y-4">
         {content.showTopCta && <span className="inline-flex rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">{content.topCtaLabel}</span>}
         <div><h3 className="text-xl font-semibold text-gray-900">{content.productTitleOverride || product.name}</h3>{content.showReviews && content.showReviewBlock && <p className="mt-1 text-sm text-amber-600">★★★★★ <span className="text-gray-700">{content.reviewRating.toFixed(1)} · {content.reviewCount.toLocaleString()} {content.reviewLabel}</span></p>}</div>
         {content.showPrecheckMessage && <div className={`rounded-md p-3 text-sm ${statusTone}`}><p className="font-semibold">{content.precheckTitle}</p><p className="mt-1">{content.precheckMessage}</p></div>}
@@ -208,6 +224,11 @@ function LivePreview({ product, content, html }: { product: Product; content: Pr
 
 function validateContent(content: ProductFrontendContent) {
   const errors: Record<string, string> = {};
+  if (content.promoText.length > 500) errors.promoText = 'Promo text must be 500 characters or fewer.';
+  if (!content.uploadHeading.trim()) errors.uploadHeading = 'Upload heading is required.';
+  if (!content.uploadButtonText.trim()) errors.uploadButtonText = 'Upload button text is required.';
+  if (content.uploadDescription.length > 500) errors.uploadDescription = 'Description must be 500 characters or fewer.';
+  if (content.uploadRequirementsText.length > 300) errors.uploadRequirementsText = 'Requirements text must be 300 characters or fewer.';
   if (!Number.isFinite(content.reviewRating) || content.reviewRating < 0 || content.reviewRating > 5) errors.reviewRating = 'Use a rating between 0 and 5.';
   if (!Number.isFinite(content.reviewCount) || content.reviewCount < 0) errors.reviewCount = 'Review count must be zero or greater.';
   if (content.supportEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(content.supportEmail)) errors.supportEmail = 'Enter a valid email address.';

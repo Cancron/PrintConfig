@@ -8,6 +8,11 @@ const allowedTags = [
 
 export function defaultFrontendContent() {
   return {
+    promoText: '',
+    uploadHeading: 'Start with a photo you love',
+    uploadDescription: "Upload from your phone, laptop, or camera roll. We'll show you exactly how it will look before you pay.",
+    uploadButtonText: 'Upload Your Photo',
+    uploadRequirementsText: 'JPG - PNG - WEBP | MAX 12MB | RECOMMENDED 300 DPI',
     topCtaLabel: 'DESIGN YOUR PRODUCT', productTitleOverride: '', showReviews: true, reviewRating: 4.9, reviewCount: 4777, reviewLabel: 'reviews',
     showPrecheckMessage: true, precheckStatus: 'success', precheckTitle: 'Pre-Check looks great!', precheckMessage: "We'll contact you if your image quality doesn't fit. Your satisfaction is the key to our success!",
     resizeLabel: 'Resize', rotateLabel: 'Rotate', resetLabel: 'Reset', cropLabel: 'Crop', changePhotoLabel: 'Change photo', previewLabel: 'Preview',
@@ -47,6 +52,11 @@ export function sanitizeProductDetailHtml(html: unknown) {
 export function publicFrontendContent(content: any = {}) {
   content = normalizeFrontendContentPayload(content);
   return {
+    promoText: content.promoText ?? '',
+    uploadHeading: content.uploadHeading ?? '',
+    uploadDescription: content.uploadDescription ?? '',
+    uploadButtonText: content.uploadButtonText ?? '',
+    uploadRequirementsText: content.uploadRequirementsText ?? '',
     topCtaLabel: content.topCtaLabel ?? '',
     productTitleOverride: content.productTitleOverride ?? '',
     showReviews: content.showReviews !== false,
