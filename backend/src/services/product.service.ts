@@ -121,7 +121,7 @@ function validateProductShape(data: Record<string, any>) {
     const values = new Set<string>();
     let defaultCount = 0;
     for (const value of group.values ?? []) {
-      if (!/^(?=.*[a-z0-9])[a-z0-9_-]+$/.test(String(value.value ?? ''))) throw new ApiError(400, 'Option value may use lowercase letters, numbers, hyphens, and underscores only.');
+      if (!/^(?=.*[a-z0-9])[a-z0-9_.-]+$/.test(String(value.value ?? ''))) throw new ApiError(400, 'Option value may use lowercase letters, numbers, periods, hyphens, and underscores only.');
       if (values.has(value.value)) throw new ApiError(400, 'Option value must be unique within option group.');
       values.add(value.value);
       if (value.isDefault) defaultCount += 1;
@@ -355,7 +355,10 @@ export async function calculatePrice(id: string, variantId: string, selectedOpti
     if (!selected) continue;
     const optionValue = group.values.find((value: any) => value.isActive !== false && value.value === selected);
     if (!optionValue) continue;
-    const amount = applyModifier(variant.price, optionValue as any);
+    const amount = applyModifier(variant.price, optionValue as any, variant.options ?? {}, group.code);
+    if (!Number.isFinite(amount)) {
+      throw new ApiError(400, `Variant ${variant.sku} must have a numeric _${optionValue.value} or _${group.code} option for variant-dependent pricing.`);
+    }
     modifiers.push({ groupCode: group.code, value: optionValue.value, amount });
   }
   const modifierTotal = modifiers.reduce((sum, item) => sum + item.amount, 0);

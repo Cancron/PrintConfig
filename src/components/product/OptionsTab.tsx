@@ -21,7 +21,8 @@ const displayTypeOptions: { value: ProductOptionDisplayType; label: string }[] =
 const modifierOptions: { value: PriceModifierType; label: string }[] = [
   { value: 'none', label: 'No extra charge' },
   { value: 'fixed', label: 'Fixed amount' },
-  { value: 'percentage', label: 'Percentage of base price' },
+  { value: 'variant-fixed', label: 'Fixed amount depending variant' },
+  { value: 'percentage', label: 'Percentage of variant price' },
 ];
 
 const yesNoOptions = [
@@ -61,7 +62,7 @@ export function OptionsTab({ product, onSave }: Props) {
         label: value.label.trim(),
         value: value.value.trim(),
         skuCode: value.skuCode.trim(),
-        priceModifier: value.priceModifierType === 'none' ? 0 : Number(value.priceModifier),
+        priceModifier: value.priceModifierType === 'none' || value.priceModifierType === 'variant-fixed' ? 0 : Number(value.priceModifier),
         updatedAt: now,
       })),
     };
@@ -162,12 +163,17 @@ export function OptionsTab({ product, onSave }: Props) {
               <div key={entityKey(value)} className="rounded-lg bg-white p-4 ring-1 ring-gray-200">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <Input label="Label" value={value.label} onChange={(e) => updateValue(entityKey(value), 'label', e.target.value)} error={errors[`value.${entityKey(value)}.label`]} />
-                  <Input label="Value" value={value.value} onChange={(e) => updateValue(entityKey(value), 'value', slugify(e.target.value))} error={errors[`value.${entityKey(value)}.value`]} />
+                  <Input label="Value" value={value.value} onChange={(e) => updateValue(entityKey(value), 'value', slugify(e.target.value, true))} error={errors[`value.${entityKey(value)}.value`]} />
                   {/* <Input label="SKU Code" value={value.skuCode} onChange={(e) => updateValue(entityKey(value), 'skuCode', e.target.value)} /> */}
                   <Select label="Default" value={value.isDefault ? 'yes' : 'no'} onChange={(e) => updateValue(entityKey(value), 'isDefault', e.target.value === 'yes')} options={yesNoOptions} />
                   <Select label="Active" value={value.isActive ? 'yes' : 'no'} onChange={(e) => updateValue(entityKey(value), 'isActive', e.target.value === 'yes')} options={yesNoOptions} />
-                  <Select label="Price Modifier Type" value={value.priceModifierType} onChange={(e) => updateValue(entityKey(value), 'priceModifierType', e.target.value as PriceModifierType)} options={modifierOptions} />
-                  <Input label="Price Modifier" type="number" step="0.01" value={value.priceModifier} onChange={(e) => updateValue(entityKey(value), 'priceModifier', Number(e.target.value))} error={errors[`value.${entityKey(value)}.priceModifier`]} />
+                  <div>
+                    <Select label="Price Modifier Type" value={value.priceModifierType} onChange={(e) => updateValue(entityKey(value), 'priceModifierType', e.target.value as PriceModifierType)} options={modifierOptions} />
+                    {value.priceModifierType === 'variant-fixed' && (
+                      <p className="mt-2 text-xs leading-5 text-blue-700">For a different price per option, add <code className="rounded bg-blue-50 px-1">_{value.value || 'optionvalue'}</code> to each variant. For one shared price across this group, add <code className="rounded bg-blue-50 px-1">_{form.code || 'groupcode'}</code>. The option-specific price takes priority.</p>
+                    )}
+                  </div>
+                  <Input label="Price Modifier" type="number" step="0.01" value={value.priceModifier} disabled={value.priceModifierType === 'none' || value.priceModifierType === 'variant-fixed'} onChange={(e) => updateValue(entityKey(value), 'priceModifier', Number(e.target.value))} error={errors[`value.${entityKey(value)}.priceModifier`]} />
                   <Input label="Sort Order" type="number" value={value.sortOrder} onChange={(e) => updateValue(entityKey(value), 'sortOrder', Number(e.target.value))} />
                   <Input label="Color Hex" value={value.metadata?.colorHex ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'colorHex', e.target.value)} error={errors[`value.${entityKey(value)}.colorHex`]} />
                   {/* <ImageField label="Preview Image URL" url={value.previewImageUrl} assetId={value.previewImageAssetId} onChange={(url, assetId) => { updateValue(entityKey(value), 'previewImageUrl', url); updateValue(entityKey(value), 'previewImageAssetId', assetId); }} /> */}
@@ -280,7 +286,7 @@ function validateGroup(group: ProductOptionGroup, groups: ProductOptionGroup[], 
   for (const value of group.values) {
     if (!value.label.trim()) errors[`value.${entityKey(value)}.label`] = 'Label is required.';
     if (!value.value.trim()) errors[`value.${entityKey(value)}.value`] = 'Value is required.';
-    if (value.value.trim() && !/^(?=.*[a-z0-9])[a-z0-9_-]+$/.test(value.value.trim())) errors[`value.${entityKey(value)}.value`] = 'Use lowercase letters, numbers, hyphens, and underscores only.';
+    if (value.value.trim() && !/^(?=.*[a-z0-9])[a-z0-9_.-]+$/.test(value.value.trim())) errors[`value.${entityKey(value)}.value`] = 'Use lowercase letters, numbers, periods, hyphens, and underscores only.';
     if (seen.has(value.value.trim().toLowerCase())) errors[`value.${entityKey(value)}.value`] = 'Value must be unique in this group.';
     seen.add(value.value.trim().toLowerCase());
     if (!Number.isFinite(Number(value.priceModifier))) errors[`value.${entityKey(value)}.priceModifier`] = 'Price modifier must be numeric.';
@@ -303,12 +309,14 @@ function createValue(optionGroupId: string, sortOrder: number): ProductOptionVal
 
 function getModifierAmount(basePrice: number, value: ProductOptionValue) {
   if (value.priceModifierType === 'fixed') return value.priceModifier;
+  if (value.priceModifierType === 'variant-fixed') return 0;
   if (value.priceModifierType === 'percentage') return (basePrice * value.priceModifier) / 100;
   return 0;
 }
 
 function formatModifier(value: ProductOptionValue) {
   if (value.priceModifierType === 'fixed') return `+$${value.priceModifier.toFixed(2).replace(/\.00$/, '')}`;
+  if (value.priceModifierType === 'variant-fixed') return `Variant option _${value.value}`;
   if (value.priceModifierType === 'percentage') return `+${value.priceModifier}%`;
   return 'No extra charge';
 }
@@ -318,8 +326,9 @@ function Pill({ children, tone = 'gray' }: { children: React.ReactNode; tone?: '
   return <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 ring-inset ${styles}`}>{children}</span>;
 }
 
-function slugify(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-|-$/g, '');
+function slugify(value: string, allowPeriod = false) {
+  const disallowed = allowPeriod ? /[^a-z0-9_.-]+/g : /[^a-z0-9_-]+/g;
+  return value.toLowerCase().replace(disallowed, '-').replace(/^-|-$/g, '');
 }
 
 function entityKey(entity: { _id: string; clientId?: string }) {

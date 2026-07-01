@@ -20,7 +20,7 @@ export type ProductScope = 'shared' | 'merchant';
 export type ProductCategoryStatus = 'active' | 'draft' | 'archived';
 export type ProductUnit = 'inch' | 'mm' | 'px';
 export type ProductOptionDisplayType = 'Dropdown' | 'Radio Buttons' | 'Color Swatches' | 'Image Swatches' | 'Text Buttons';
-export type PriceModifierType = 'none' | 'fixed' | 'percentage';
+export type PriceModifierType = 'none' | 'fixed' | 'variant-fixed' | 'percentage';
 
 export interface ImageFolder {
   _id: string;
