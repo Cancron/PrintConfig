@@ -22,16 +22,10 @@ import type {
 } from '../types';
 
 const PRODUCT_TYPES: ProductType[] = [
-  'Canvas',
-  'Fine Art Paper',
-  'Matte Photo Paper',
-  'Acrylic Face Mount Prints',
-  'Poster Printing and Framing',
-  'Luster Photo Paper',
-  'Canvas Print',
+  'Canvas Print',  
+  'Framed Print',  
+  'Art Print',
   'Metal Print',
-  'Poster Print',
-  'Framed Poster',
   'T-Shirt',
   'Mug',
   'Business Card',

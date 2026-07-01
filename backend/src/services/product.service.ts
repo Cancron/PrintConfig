@@ -115,11 +115,13 @@ function validateProductShape(data: Record<string, any>) {
     if (room.centerLeftPercent - room.maxWidthPercent / 2 < 0 || room.centerLeftPercent + room.maxWidthPercent / 2 > 100 || room.centerTopPercent - room.maxHeightPercent / 2 < 0 || room.centerTopPercent + room.maxHeightPercent / 2 > 100) throw new ApiError(400, 'Room preview rectangle must stay inside the image.');
   }  const groupCodes = new Set<string>();
   for (const group of data.optionGroups ?? []) {
+    if (!/^(?=.*[a-z0-9])[a-z0-9_-]+$/.test(String(group.code ?? ''))) throw new ApiError(400, 'Option group code may use lowercase letters, numbers, hyphens, and underscores only.');
     if (groupCodes.has(group.code)) throw new ApiError(400, 'Option group code must be unique within product.');
     groupCodes.add(group.code);
     const values = new Set<string>();
     let defaultCount = 0;
     for (const value of group.values ?? []) {
+      if (!/^(?=.*[a-z0-9])[a-z0-9_-]+$/.test(String(value.value ?? ''))) throw new ApiError(400, 'Option value may use lowercase letters, numbers, hyphens, and underscores only.');
       if (values.has(value.value)) throw new ApiError(400, 'Option value must be unique within option group.');
       values.add(value.value);
       if (value.isDefault) defaultCount += 1;

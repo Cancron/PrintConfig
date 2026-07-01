@@ -272,7 +272,7 @@ function validateGroup(group: ProductOptionGroup, groups: ProductOptionGroup[], 
   const errors: Record<string, string> = {};
   if (!group.name.trim()) errors.name = 'Option group name is required.';
   if (!group.code.trim()) errors.code = 'Option group code is required.';
-  if (group.code.trim() && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(group.code.trim())) errors.code = 'Use lowercase letters, numbers, and hyphens only.';
+  if (group.code.trim() && !/^(?=.*[a-z0-9])[a-z0-9_-]+$/.test(group.code.trim())) errors.code = 'Use lowercase letters, numbers, hyphens, and underscores only.';
   if (groups.some((item) => entityKey(item) !== editingId && item.code.trim().toLowerCase() === group.code.trim().toLowerCase())) errors.code = 'Code must be unique within this product.';
   if (group.required && !group.values.some((value) => value.isActive)) errors.activeValues = 'Required groups need at least one active value.';
   if (group.values.filter((value) => value.isDefault).length > 1) errors.activeValues = 'Only one value can be default.';
@@ -280,7 +280,7 @@ function validateGroup(group: ProductOptionGroup, groups: ProductOptionGroup[], 
   for (const value of group.values) {
     if (!value.label.trim()) errors[`value.${entityKey(value)}.label`] = 'Label is required.';
     if (!value.value.trim()) errors[`value.${entityKey(value)}.value`] = 'Value is required.';
-    if (value.value.trim() && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value.value.trim())) errors[`value.${entityKey(value)}.value`] = 'Use slug-safe lowercase text.';
+    if (value.value.trim() && !/^(?=.*[a-z0-9])[a-z0-9_-]+$/.test(value.value.trim())) errors[`value.${entityKey(value)}.value`] = 'Use lowercase letters, numbers, hyphens, and underscores only.';
     if (seen.has(value.value.trim().toLowerCase())) errors[`value.${entityKey(value)}.value`] = 'Value must be unique in this group.';
     seen.add(value.value.trim().toLowerCase());
     if (!Number.isFinite(Number(value.priceModifier))) errors[`value.${entityKey(value)}.priceModifier`] = 'Price modifier must be numeric.';
@@ -319,7 +319,7 @@ function Pill({ children, tone = 'gray' }: { children: React.ReactNode; tone?: '
 }
 
 function slugify(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return value.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-|-$/g, '');
 }
 
 function entityKey(entity: { _id: string; clientId?: string }) {
