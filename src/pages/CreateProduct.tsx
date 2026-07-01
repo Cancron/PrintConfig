@@ -12,19 +12,22 @@ import { useWorkspace } from '../hooks/useWorkspace';
 import { createDefaultEditorRules, createDefaultExportRules } from '../lib/storage';
 import { validateProductBasicInfo } from '../lib/validation';
 import { createDefaultVariantOptionDefinitions } from '../lib/variantOptions';
+import { createDefaultFrontendContent } from '../lib/frontendContent';
+import { createDefaultEditorProductSelection } from '../lib/productSelection';
 import type { Product, ProductScope, ProductType, ProductStatus } from '../types';
 
 const productTypeOptions: { value: ProductType; label: ProductType }[] = [
-  { value: 'Canvas', label: 'Canvas' },
-  { value: 'Fine Art Paper', label: 'Fine Art Paper' },
-  { value: 'Matte Photo Paper', label: 'Matte Photo Paper' },
-  { value: 'Acrylic Face Mount Prints', label: 'Acrylic Face Mount Prints' },
-  { value: 'Poster Printing and Framing', label: 'Poster Printing and Framing' },
-  { value: 'Luster Photo Paper', label: 'Luster Photo Paper' },
   { value: 'Canvas Print', label: 'Canvas Print' },
-  { value: 'Poster Print', label: 'Poster Print' },
-  { value: 'Framed Poster', label: 'Framed Poster' },
   { value: 'Metal Print', label: 'Metal Print' },
+  { value: 'Art Print', label: 'Art Print' },
+  // { value: 'Fine Art Paper', label: 'Fine Art Paper' },
+  // { value: 'Matte Photo Paper', label: 'Matte Photo Paper' },
+  // { value: 'Acrylic Face Mount Prints', label: 'Acrylic Face Mount Prints' },
+  // { value: 'Poster Printing and Framing', label: 'Poster Printing and Framing' },
+  // { value: 'Luster Photo Paper', label: 'Luster Photo Paper' },
+  // { value: 'Canvas Print', label: 'Canvas Print' },
+  // { value: 'Poster Print', label: 'Poster Print' },
+  // { value: 'Framed Poster', label: 'Framed Poster' },
   { value: 'T-Shirt', label: 'T-Shirt' },
   { value: 'Mug', label: 'Mug' },
   { value: 'Business Card', label: 'Business Card' },
@@ -96,6 +99,9 @@ export function CreateProduct() {
       surface: null,
       optionGroups: [],
       variantOptionDefinitions: createDefaultVariantOptionDefinitions(),
+      roomPreviews: [],
+      frontendContent: createDefaultFrontendContent(),
+      editorProductSelection: createDefaultEditorProductSelection(),
       templates: [],
       variants: [],
       createdAt: now,

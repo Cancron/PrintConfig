@@ -1,11 +1,13 @@
 import type { Product, ProductCategory, ProductSurface, ProductType, ProductUnit, ProductVariant, VariantOptionDefinition } from '../types';
 import { missingRequiredVariantOptions } from './variantOptions';
+import { compatibleRooms, getVariantRoomOrientation } from './roomPreview';
 
 export type ValidationErrors = Record<string, string>;
 
 const PRODUCT_TYPES: ProductType[] = [
   'Canvas Print',
   'Metal Print',
+  'Art Print',
   'Poster Print',
   'Framed Poster',
   'T-Shirt',
@@ -146,9 +148,12 @@ export function getProductReadiness(product: Product) {
   const hasExportRules = !!product.exportRules;
   const hasEditorRules = !!product.editorRules;
   const variantsHaveRequiredOptions = product.variants.every((variant) => missingRequiredVariantOptions(variant, product.variantOptionDefinitions).length === 0);
-  const hasAnyRoomPreviews = product.variants.some((variant) => variant.roomPreviews.length > 0);
-  const activeVariantsHaveRoomPreviews = activeVariants.length > 0 && activeVariants.every((variant) => variant.roomPreviews.length > 0);
-  const activeVariantsHaveDefaultRoomPreview = activeVariants.length > 0 && activeVariants.every((variant) => variant.roomPreviews.some((room) => room.isDefault));
+  const hasAnyRoomPreviews = product.roomPreviews.length > 0;
+  const activeVariantsHaveRoomPreviews = activeVariants.length > 0 && activeVariants.every((variant) => compatibleRooms(product.roomPreviews, variant).length > 0);
+  const activeVariantsHaveDefaultRoomPreview = activeVariants.length > 0 && activeVariants.every((variant) => {
+    const orientation = getVariantRoomOrientation(variant);
+    return compatibleRooms(product.roomPreviews, variant).some((room) => room.defaultOrientations.includes(orientation));
+  });
 
   if (Object.keys(basicErrors).length > 0) missing.push('Complete valid product name, slug, type, and base price.');
   if (activeVariants.length === 0) missing.push('Add at least one active variant.');
@@ -158,6 +163,8 @@ export function getProductReadiness(product: Product) {
   if (!hasExportRules) missing.push('Configure export rules.');
   if (!hasEditorRules) missing.push('Configure editor rules.');
   if (!variantsHaveRequiredOptions) missing.push('Fill every required option value on all variants.');
+  if (activeVariants.length > 0 && !activeVariantsHaveRoomPreviews) missing.push('Add a compatible shared room for every active variant orientation.');
+  if (activeVariants.length > 0 && !activeVariantsHaveDefaultRoomPreview) missing.push('Choose a default shared room for every active variant orientation.');
 
   return {
     hasBasicInfo: Object.keys(basicErrors).length === 0,

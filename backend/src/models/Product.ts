@@ -40,6 +40,23 @@ const variantRoomPreviewSchema = new Schema(
   },
   { timestamps: true }
 );
+const roomOrientations = ['square', 'vertical', 'horizontal', 'pano-vertical', 'pano-horizontal'] as const;
+const productRoomPreviewSchema = new Schema(
+  {
+    productId: { type: Schema.Types.ObjectId, ref: 'Product' },
+    name: { type: String, required: true, trim: true },
+    roomImageUrl: { type: String, required: true, trim: true },
+    roomImageAssetId: { type: Schema.Types.ObjectId, ref: 'ImageAsset' },
+    orientations: { type: [{ type: String, enum: roomOrientations }], default: [] },
+    defaultOrientations: { type: [{ type: String, enum: roomOrientations }], default: [] },
+    centerLeftPercent: { type: Number, default: 50, min: 0, max: 100 },
+    centerTopPercent: { type: Number, default: 45, min: 0, max: 100 },
+    maxWidthPercent: { type: Number, default: 30, min: 0.01, max: 100 },
+    maxHeightPercent: { type: Number, default: 30, min: 0.01, max: 100 },
+    sortOrder: { type: Number, default: 0 },
+  },
+  { timestamps: true }
+);
 const variantSchema = new Schema(
   {
     productId: { type: Schema.Types.ObjectId, ref: 'Product' },
@@ -96,10 +113,16 @@ const optionValueSchema = new Schema(
     thumbnailImageUrl: { type: String, default: '' },
     thumbnailImageAssetId: { type: Schema.Types.ObjectId, ref: 'ImageAsset' },
     metadata: {
-      colorHex: String,
-      description: String,
-      productionCode: String,
-      exportNotes: String,
+      type: new Schema(
+        {
+          colorHex: { type: String, default: '' },
+          description: { type: String, default: '' },
+          productionCode: { type: String, default: '' },
+          exportNotes: { type: String, default: '' },
+        },
+        { _id: false }
+      ),
+      default: () => ({}),
     },
   },
   { timestamps: true }
@@ -180,6 +203,77 @@ const templateSchema = new Schema(
   { timestamps: true }
 );
 
+const productTrustBadgeSchema = new Schema(
+  {
+    icon: { type: String, default: '' },
+    text: { type: String, required: true, trim: true },
+    sortOrder: { type: Number, default: 0 },
+    isActive: { type: Boolean, default: true },
+  },
+  { timestamps: true }
+);
+
+const defaultTrustBadges = () => [
+  { icon: '🚚', text: 'Free shipping Canada-wide', sortOrder: 1, isActive: true },
+  { icon: '⚡', text: '24-hour production', sortOrder: 2, isActive: true },
+  { icon: '🛡️', text: 'Lifetime warranty', sortOrder: 3, isActive: true },
+  { icon: '🇨🇦', text: 'Made in Canada', sortOrder: 4, isActive: true },
+];
+
+const frontendContentSchema = new Schema(
+  {
+    promoText: { type: String, default: '', maxlength: 500 },
+    uploadHeading: { type: String, default: 'Start with a photo you love', maxlength: 200 },
+    uploadDescription: { type: String, default: "Upload from your phone, laptop, or camera roll. We'll show you exactly how it will look before you pay.", maxlength: 500 },
+    uploadButtonText: { type: String, default: 'Upload Your Photo', maxlength: 100 },
+    uploadRequirementsText: { type: String, default: 'JPG - PNG - WEBP | MAX 12MB | RECOMMENDED 300 DPI', maxlength: 300 },
+    topCtaLabel: { type: String, default: 'DESIGN YOUR PRODUCT' },
+    productTitleOverride: { type: String, default: '' },
+    showReviews: { type: Boolean, default: true },
+    reviewRating: { type: Number, default: 4.9, min: 0, max: 5 },
+    reviewCount: { type: Number, default: 4777, min: 0 },
+    reviewLabel: { type: String, default: 'reviews' },
+    showPrecheckMessage: { type: Boolean, default: true },
+    precheckStatus: { type: String, enum: ['success', 'warning', 'info', 'error'], default: 'success' },
+    precheckTitle: { type: String, default: 'Pre-Check looks great!' },
+    precheckMessage: { type: String, default: "We'll contact you if your image quality doesn't fit. Your satisfaction is the key to our success!" },
+    resizeLabel: { type: String, default: 'Resize' },
+    rotateLabel: { type: String, default: 'Rotate' },
+    resetLabel: { type: String, default: 'Reset' },
+    cropLabel: { type: String, default: 'Crop' },
+    changePhotoLabel: { type: String, default: 'Change photo' },
+    previewLabel: { type: String, default: 'Preview' },
+    sizeSectionLabel: { type: String, default: 'Size' },
+    showAllSizesLabel: { type: String, default: 'SHOW ALL SIZES & RATIOS' },
+    quantityLabel: { type: String, default: 'Quantity' },
+    priceLabel: { type: String, default: 'Price' },
+    salePriceLabel: { type: String, default: 'Price' },
+    savingsLabel: { type: String, default: 'Save' },
+    orderButtonText: { type: String, default: 'Order Now' },
+    addAnotherImageText: { type: String, default: 'Add Another Image' },
+    showSupportBox: { type: Boolean, default: true },
+    supportLabel: { type: String, default: 'Need help?' },
+    supportPhone: { type: String, default: '+1-825-977-3451' },
+    supportEmail: { type: String, default: '' },
+    supportIcon: { type: String, default: 'phone' },
+    supportMessage: { type: String, default: '' },
+    productDetailHtml: { type: String, default: '' },
+    showTopCta: { type: Boolean, default: true },
+    showReviewBlock: { type: Boolean, default: true },
+    showTrustBadges: { type: Boolean, default: true },
+    showProductDetailDescription: { type: Boolean, default: true },
+    frontendLayoutStyle: { type: String, enum: ['standard', 'compact', 'premium'], default: 'standard' },
+    trustBadges: { type: [productTrustBadgeSchema], default: defaultTrustBadges },
+  },
+  { _id: false }
+);
+const editorProductSelectionSchema = new Schema(
+  {
+    mode: { type: String, enum: ['single', 'same-category', 'specific'], default: 'single' },
+    specificProductIds: { type: [{ type: Schema.Types.ObjectId, ref: 'Product' }], default: [] },
+  },
+  { _id: false }
+);
 const productSchema = new Schema(
   {
     accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
@@ -197,6 +291,9 @@ const productSchema = new Schema(
     surface: { type: surfaceSchema, default: null },
     optionGroups: { type: [optionGroupSchema], default: [] },
     variantOptionDefinitions: { type: [variantOptionDefinitionSchema], default: defaultVariantOptionDefinitions },
+    roomPreviews: { type: [productRoomPreviewSchema], default: [] },
+    frontendContent: { type: frontendContentSchema, default: () => ({}) },
+    editorProductSelection: { type: editorProductSelectionSchema, default: () => ({}) },
     variants: { type: [variantSchema], default: [] },
     editorRules: { type: editorRulesSchema, default: () => ({}) },
     exportRules: { type: exportRulesSchema, default: () => ({}) },
@@ -206,10 +303,18 @@ const productSchema = new Schema(
 );
 
 productSchema.pre('validate', function setNestedProductRefs() {
+  if (this.surface) this.surface.productId = this._id;
+  for (const group of this.optionGroups ?? []) {
+    group.productId = this._id;
+    for (const value of group.values ?? []) value.optionGroupId = group._id;
+  }
   for (const definition of this.variantOptionDefinitions ?? []) definition.productId = this._id;
+  for (const roomPreview of this.roomPreviews ?? []) roomPreview.productId = this._id;
   for (const variant of this.variants ?? []) {
+    variant.productId = this._id;
     for (const roomPreview of variant.roomPreviews ?? []) roomPreview.variantId = variant._id;
   }
+  for (const template of this.templates ?? []) template.productId = this._id;
 });
 productSchema.index({ accountId: 1, scope: 1, merchantId: 1, categoryId: 1, slug: 1 }, { unique: true });
 export const ProductModel = model('Product', productSchema);

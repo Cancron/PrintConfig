@@ -7,6 +7,7 @@ export type ProductType =
   | 'Luster Photo Paper'
   | 'Canvas Print'
   | 'Metal Print'
+  | 'Art Print'
   | 'Poster Print'
   | 'Framed Poster'
   | 'T-Shirt'
@@ -14,6 +15,12 @@ export type ProductType =
   | 'Business Card'
   | 'Sticker';
 
+export type EditorProductSelectionMode = 'single' | 'same-category' | 'specific';
+
+export interface EditorProductSelection {
+  mode: EditorProductSelectionMode;
+  specificProductIds: string[];
+}
 export type ProductStatus = 'Draft' | 'Active';
 export type MerchantStatus = 'Draft' | 'Active';
 export type ProductScope = 'shared' | 'merchant';
@@ -86,6 +93,8 @@ export interface Merchant {
   editorAccentColor: string;
   customCss: string;
   customJavascript: string;
+  apiPrivateKeyLastFour?: string;
+  apiPrivateKeyCreatedAt?: string;
 }
 
 export interface ProductCategory {
@@ -104,6 +113,64 @@ export interface ProductCategory {
   updatedAt: string;
 }
 
+export type PrecheckStatus = 'success' | 'warning' | 'info' | 'error';
+export type FrontendLayoutStyle = 'standard' | 'compact' | 'premium';
+
+export interface ProductTrustBadge {
+  _id: string;
+  clientId?: string;
+  icon: string;
+  text: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductFrontendContent {
+  promoText: string;
+  uploadHeading: string;
+  uploadDescription: string;
+  uploadButtonText: string;
+  uploadRequirementsText: string;
+  topCtaLabel: string;
+  productTitleOverride: string;
+  showReviews: boolean;
+  reviewRating: number;
+  reviewCount: number;
+  reviewLabel: string;
+  showPrecheckMessage: boolean;
+  precheckStatus: PrecheckStatus;
+  precheckTitle: string;
+  precheckMessage: string;
+  resizeLabel: string;
+  rotateLabel: string;
+  resetLabel: string;
+  cropLabel: string;
+  changePhotoLabel: string;
+  previewLabel: string;
+  sizeSectionLabel: string;
+  showAllSizesLabel: string;
+  quantityLabel: string;
+  priceLabel: string;
+  salePriceLabel: string;
+  savingsLabel: string;
+  orderButtonText: string;
+  addAnotherImageText: string;
+  showSupportBox: boolean;
+  supportLabel: string;
+  supportPhone: string;
+  supportEmail: string;
+  supportIcon: string;
+  supportMessage: string;
+  productDetailHtml: string;
+  showTopCta: boolean;
+  showReviewBlock: boolean;
+  showTrustBadges: boolean;
+  showProductDetailDescription: boolean;
+  frontendLayoutStyle: FrontendLayoutStyle;
+  trustBadges: ProductTrustBadge[];
+}
 export interface VariantOptionDefinition {
   _id: string;
   clientId?: string;
@@ -249,7 +316,27 @@ export interface ProductTemplate {
   updatedAt: string;
 }
 
-export interface VariantRoomPreview {
+export type RoomOrientation = 'square' | 'vertical' | 'horizontal' | 'pano-vertical' | 'pano-horizontal';
+
+export interface ProductRoomPreview {
+  _id: string;
+  clientId?: string;
+  productId: string;
+  name: string;
+  roomImageUrl: string;
+  roomImageAssetId?: string;
+  orientations: RoomOrientation[];
+  defaultOrientations: RoomOrientation[];
+  centerLeftPercent: number;
+  centerTopPercent: number;
+  maxWidthPercent: number;
+  maxHeightPercent: number;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LegacyVariantRoomPreview {
   _id: string;
   clientId?: string;
   variantId: string;
@@ -283,7 +370,7 @@ export interface ProductVariant {
   previewImageAssetId?: string;
   thumbnailImageUrl: string;
   thumbnailImageAssetId?: string;
-  roomPreviews: VariantRoomPreview[];
+  roomPreviews?: LegacyVariantRoomPreview[];
   createdAt: string;
   updatedAt: string;
 }
@@ -306,6 +393,9 @@ export interface Product {
   surface: ProductSurface | null;
   optionGroups: ProductOptionGroup[];
   variantOptionDefinitions: VariantOptionDefinition[];
+  roomPreviews: ProductRoomPreview[];
+  frontendContent: ProductFrontendContent;
+  editorProductSelection: EditorProductSelection;
   editorRules: EditorRules;
   exportRules: ExportRules;
   templates: ProductTemplate[];

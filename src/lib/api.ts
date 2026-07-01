@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { ImageAsset, ImageFolder, Merchant, Product, ProductCategory } from '../types';
 import { normalizeVariantOptionDefinitions } from './variantOptions';
+import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
+import { normalizeFrontendContent } from './frontendContent';
+import { normalizeEditorProductSelection } from './productSelection';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api';
 
@@ -34,6 +37,8 @@ function normalizeMerchant(raw: any): Merchant {
     editorAccentColor: raw.editorAccentColor ?? '#2563eb',
     customCss: raw.customCss ?? '',
     customJavascript: raw.customJavascript ?? '',
+    apiPrivateKeyLastFour: raw.apiPrivateKeyLastFour ?? '',
+    apiPrivateKeyCreatedAt: raw.apiPrivateKeyCreatedAt ?? undefined,
   };
 }
 
@@ -64,7 +69,7 @@ function normalizeOptionGroups(groups: any[] = []) {
     ...group,
     _id: idOf(group),
     productId: String(group.productId ?? ''),
-    values: (group.values ?? []).map((value: any) => ({ ...value, _id: idOf(value), optionGroupId: String(value.optionGroupId ?? group._id ?? group._id ?? '') })),
+    values: (group.values ?? []).map((value: any) => ({ ...value, _id: idOf(value), optionGroupId: String(value.optionGroupId ?? group._id ?? ''), metadata: value.metadata ?? {} })),
   }));
 }
 
@@ -96,9 +101,18 @@ function galleryQuery(input: { accountId: string; merchantId?: string; folderId?
   return params.toString();
 }
 function normalizeProduct(raw: any): Product {
-  return {
+  const productId = idOf(raw);
+  const variants = (raw.variants ?? []).map((variant: any) => ({
+    ...variant,
+    _id: idOf(variant),
+    productId: String(variant.productId ?? productId),
+    status: variant.status === 'active' || variant.status === 'Active' ? 'Active' : 'Draft',
+    options: variant.options ?? {},
+    roomPreviews: (variant.roomPreviews ?? []).map((room: any) => ({ ...room, _id: idOf(room), variantId: String(room.variantId ?? variant._id ?? '') })),
+  }));
+  const product: Product = {
     ...raw,
-    _id: idOf(raw),
+    _id: productId,
     accountId: String(raw.accountId ?? 'acct-1'),
     merchantId: raw.merchantId ? String(raw.merchantId) : null,
     categoryId: String(raw.categoryId ?? ''),
@@ -106,14 +120,20 @@ function normalizeProduct(raw: any): Product {
     status: raw.status === 'active' || raw.status === 'Active' ? 'Active' : 'Draft',
     surface: normalizeSurface(raw.surface),
     optionGroups: normalizeOptionGroups(raw.optionGroups),
-    variantOptionDefinitions: normalizeVariantOptionDefinitions(raw.variantOptionDefinitions, idOf(raw)),
-    variants: (raw.variants ?? []).map((variant: any) => ({ ...variant, _id: idOf(variant), productId: String(variant.productId ?? ''), status: variant.status === 'active' || variant.status === 'Active' ? 'Active' : 'Draft', options: variant.options ?? {}, roomPreviews: (variant.roomPreviews ?? []).map((room: any) => ({ ...room, _id: idOf(room), variantId: String(room.variantId ?? variant._id ?? '') })) })),
+    variantOptionDefinitions: normalizeVariantOptionDefinitions(raw.variantOptionDefinitions, productId),
+    frontendContent: normalizeFrontendContent(raw.frontendContent),
+    editorProductSelection: normalizeEditorProductSelection(raw.editorProductSelection),
+    roomPreviews: (raw.roomPreviews ?? []).map((room: any, index: number) => normalizeSharedRoomPreview(room, productId, index)),
+    variants,
     editorRules: raw.editorRules ?? {},
     exportRules: raw.exportRules ?? {},
     templates: normalizeTemplates(raw.templates),
     createdAt: raw.createdAt ?? new Date().toISOString(),
     updatedAt: raw.updatedAt ?? new Date().toISOString(),
   };
+  product.roomPreviews = liftLegacyRoomPreviews(product);
+  product.variants = product.variants.map((variant) => ({ ...variant, roomPreviews: undefined }));
+  return product;
 }
 
 function apiPayload<T>(value: T): T {
@@ -158,6 +178,7 @@ export const api = {
   moveImageAsset: (id: string, folderId?: string | null) => request<any>(`/image-assets/${id}/move`, { method: 'POST', body: JSON.stringify({ folderId: folderId || null }) }).then(normalizeAsset),
   listMerchants: (accountId: string) => request<any[]>(`/merchants?accountId=${encodeURIComponent(accountId)}`).then((items) => items.map(normalizeMerchant)),
   updateMerchant: (merchant: Merchant) => request<any>(`/merchants/${merchant._id}`, { method: 'PUT', body: JSON.stringify(merchantPayload(merchant)) }).then(normalizeMerchant),
+  rotateMerchantApiKey: (merchantId: string) => request<any>(`/merchants/${merchantId}/api-key`, { method: 'POST' }).then((result) => ({ merchant: normalizeMerchant(result.merchant), apiPrivateKey: String(result.apiPrivateKey) })),
   listCategories: (accountId: string, merchantId: string) => request<any[]>(`/categories?accountId=${encodeURIComponent(accountId)}&merchantId=${encodeURIComponent(merchantId)}`).then((items) => items.map(normalizeCategory)),
   createCategory: (category: ProductCategory) => request<any>('/categories', { method: 'POST', body: JSON.stringify(apiPayload(withoutRootId(category))) }).then(normalizeCategory),
   updateCategory: (category: ProductCategory) => request<any>(`/categories/${category._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(category))) }).then(normalizeCategory),

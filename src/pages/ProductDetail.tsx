@@ -17,6 +17,7 @@ import { EditorRulesTab } from '../components/product/EditorRulesTab';
 import { ExportRulesTab } from '../components/product/ExportRulesTab';
 import { PreviewTab } from '../components/product/PreviewTab';
 import { TemplatesTab } from '../components/product/TemplatesTab';
+import { DesignGeneralTab } from '../components/product/DesignGeneralTab';
 
 export function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -93,7 +94,7 @@ export function ProductDetail() {
   }
 
   const tabs = [
-    { _id: 'basic', label: 'Basic Info', content: <BasicInfoTab product={product} onSave={updateProduct} /> },
+    { _id: 'basic', label: 'Basic Info', content: <BasicInfoTab product={product} products={products} onSave={updateProduct} /> },
     { _id: 'options', label: 'Options', content: <OptionsTab product={product} onSave={updateProduct} /> },
     { _id: 'variants', label: 'Variants', content: <VariantsTab product={product} onSave={updateProduct} /> },
     { _id: 'surfaces', label: 'Surfaces', content: <SurfacesTab product={product} onSave={updateProduct} /> },
@@ -102,6 +103,7 @@ export function ProductDetail() {
     { _id: 'templates', label: 'Templates', content: <TemplatesTab product={product} onSave={updateProduct} /> },
     { _id: 'preview', label: 'Preview', content: <PreviewTab product={product} onSave={updateProduct} /> },
     { _id: 'json', label: 'JSON', content: <JsonPreviewTab product={product} /> },
+    { _id: 'design', label: 'Design', content: <DesignGeneralTab product={product} onSave={updateProduct} /> },
   ];
 
   return (
@@ -180,6 +182,8 @@ function ProductReadinessPanel({ product }: { product: Product }) {
     { label: 'Surface settings are valid', value: readiness.surfaceValid },
     { label: 'Export rules exist', value: readiness.hasExportRules },
     { label: 'Editor rules exist', value: readiness.hasEditorRules },
+    { label: 'Active variants have compatible shared rooms', value: readiness.activeVariantsHaveRoomPreviews },
+    { label: 'Active variant orientations have defaults', value: readiness.activeVariantsHaveDefaultRoomPreview },
   ];
 
   return (
@@ -206,8 +210,3 @@ function JsonPreviewTab({ product }: { product: Product }) {
   const json = JSON.stringify(product, null, 2);
   return <div className="relative"><pre className="bg-slate-900 text-slate-50 rounded-lg p-4 overflow-x-auto text-sm font-mono leading-relaxed"><code>{json}</code></pre></div>;
 }
-
-
-
-
-

@@ -5,26 +5,30 @@ import { Select } from '../ui/Select';
 import { Textarea } from '../ui/Textarea';
 // import { ThumbnailUpload } from './ThumbnailUpload';
 import { ImageField } from '../gallery/ImageField';
+import { EditorProductSelection } from './EditorProductSelection';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { useCategories } from '../../hooks/useCategories';
 import { validateProductBasicInfo } from '../../lib/validation';
-import type { Product, ProductScope, ProductType, ProductStatus } from '../../types';
+import type { EditorProductSelectionMode, Product, ProductScope, ProductType, ProductStatus } from '../../types';
 
 interface Props {
   product: Product;
+  products: Product[];
   onSave: (product: Product) => void;
 }
 
 const productTypeOptions: { value: ProductType; label: ProductType }[] = [
-  { value: 'Canvas', label: 'Canvas' },
-  { value: 'Fine Art Paper', label: 'Fine Art Paper' },
-  { value: 'Matte Photo Paper', label: 'Matte Photo Paper' },
-  { value: 'Acrylic Face Mount Prints', label: 'Acrylic Face Mount Prints' },
-  { value: 'Poster Printing and Framing', label: 'Poster Printing and Framing' },
-  { value: 'Luster Photo Paper', label: 'Luster Photo Paper' },
   { value: 'Canvas Print', label: 'Canvas Print' },
-  { value: 'Poster Print', label: 'Poster Print' },
-  { value: 'Framed Poster', label: 'Framed Poster' },
+  { value: 'Metal Print', label: 'Metal Print' },
+  { value: 'Art Print', label: 'Art Print' },
+  // { value: 'Fine Art Paper', label: 'Fine Art Paper' },
+  // { value: 'Matte Photo Paper', label: 'Matte Photo Paper' },
+  // { value: 'Acrylic Face Mount Prints', label: 'Acrylic Face Mount Prints' },
+  // { value: 'Poster Printing and Framing', label: 'Poster Printing and Framing' },
+  // { value: 'Luster Photo Paper', label: 'Luster Photo Paper' },
+  // { value: 'Canvas Print', label: 'Canvas Print' },
+  // { value: 'Poster Print', label: 'Poster Print' },
+  // { value: 'Framed Poster', label: 'Framed Poster' },
   { value: 'T-Shirt', label: 'T-Shirt' },
   { value: 'Mug', label: 'Mug' },
   { value: 'Business Card', label: 'Business Card' },
@@ -41,7 +45,7 @@ const scopeOptions = [
   { value: 'merchant', label: 'Only for selected merchant' },
 ];
 
-export function BasicInfoTab({ product, onSave }: Props) {
+export function BasicInfoTab({ product, products, onSave }: Props) {
   const { selectedMerchant } = useWorkspace();
   const { categories } = useCategories();
   const [name, setName] = useState(product.name);
@@ -55,6 +59,8 @@ export function BasicInfoTab({ product, onSave }: Props) {
   const [thumbnailAssetId, setThumbnailAssetId] = useState(product.thumbnailAssetId);
   const [categoryId, setCategoryId] = useState(product.categoryId);
   const [saved, setSaved] = useState(false);
+  const [selectionMode, setSelectionMode] = useState<EditorProductSelectionMode>(product.editorProductSelection.mode);
+  const [specificProductIds, setSpecificProductIds] = useState([...product.editorProductSelection.specificProductIds]);
 
   const errors = useMemo(
     () => validateProductBasicInfo({ name, slug, productType, basePrice, categoryId }),
@@ -79,13 +85,17 @@ export function BasicInfoTab({ product, onSave }: Props) {
       thumbnailAssetId,
       categoryId,
       categorySnapshot: categories.find((category) => category._id === categoryId),
+      editorProductSelection: {
+        mode: selectionMode,
+        specificProductIds: specificProductIds.filter((id) => id !== product._id),
+      },
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl space-y-6 pb-6">
+    <form onSubmit={handleSubmit} className="max-w-4xl space-y-6 pb-6">
       <Input label="Product Name" value={name} onChange={(e) => setName(e.target.value)} error={errors.name} placeholder="e.g. Canvas Print" />
       <Input label="Slug" value={slug} onChange={(e) => setSlug(e.target.value)} error={errors.slug} placeholder="e.g. canvas-print" />
       <Select label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} options={categories.map((category) => ({ value: category._id, label: category.name }))} error={errors.categoryId} />
@@ -98,6 +108,15 @@ export function BasicInfoTab({ product, onSave }: Props) {
       {/* <ThumbnailUpload value={thumbnailUrl} onChange={(url) => { setThumbnailUrl(url); setThumbnailAssetId(undefined); }} productId={product._id} /> */}
       <ImageField label="Thumbnail Image URL" url={thumbnailUrl} assetId={thumbnailAssetId} onChange={(url, assetId) => { setThumbnailUrl(url); setThumbnailAssetId(assetId); }} />
 
+      <EditorProductSelection
+        currentProductId={product._id}
+        categoryId={categoryId}
+        products={products}
+        mode={selectionMode}
+        specificProductIds={specificProductIds}
+        onModeChange={setSelectionMode}
+        onSpecificProductIdsChange={setSpecificProductIds}
+      />
       <div className="flex items-center gap-3 pt-2">
         <button type="submit" disabled={!isValid} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors disabled:cursor-not-allowed disabled:bg-slate-300">
           <Save className="h-4 w-4" /> Save Changes
@@ -107,5 +126,3 @@ export function BasicInfoTab({ product, onSave }: Props) {
     </form>
   );
 }
-
-

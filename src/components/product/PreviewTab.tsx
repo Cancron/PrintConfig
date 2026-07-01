@@ -5,7 +5,8 @@ import { SurfacePreview } from './SurfacePreview';
 import { RoomPreviewsPanel } from './RoomPreviewsPanel';
 import { Select } from '../ui/Select';
 import { toPixels } from '../../lib/validation';
-import type { Product, ProductSurface, ProductVariant } from '../../types';
+import { ROOM_ORIENTATIONS, compatibleRooms, getVariantRoomOrientation } from '../../lib/roomPreview';
+import type { Product, ProductSurface, ProductVariant, RoomOrientation } from '../../types';
 
 interface Props {
   product: Product;
@@ -15,23 +16,23 @@ interface Props {
 export function PreviewTab({ product, onSave }: Props) {
   const [searchParams] = useSearchParams();
   const activeVariants = product.variants.filter((variant) => variant.status === 'Active');
-  const variantsForSelection = product.variants;
   const requestedVariantId = searchParams.get('variantId');
-  const [selectedVariantId, setSelectedVariantId] = useState(requestedVariantId ?? variantsForSelection[0]?._id ?? '');
-  const selectedVariant = variantsForSelection.find((variant) => variant._id === selectedVariantId) ?? variantsForSelection[0];
+  const requestedVariant = product.variants.find((variant) => variant._id === requestedVariantId);
+  const initialOrientation = requestedVariant ? getVariantRoomOrientation(requestedVariant) : product.variants[0] ? getVariantRoomOrientation(product.variants[0]) : 'square';
+  const [selectedOrientation, setSelectedOrientation] = useState<RoomOrientation>(initialOrientation);
+  const selectedVariant = product.variants.find((variant) => getVariantRoomOrientation(variant) === selectedOrientation);
   const [testConfig, setTestConfig] = useState<object | null>(null);
   const dimensions = useMemo(() => (selectedVariant ? calculateDimensions(product.surface, selectedVariant) : null), [product.surface, selectedVariant]);
   const warnings = useMemo(() => getWarnings(product, activeVariants, selectedVariant), [activeVariants, product, selectedVariant]);
 
   useEffect(() => {
-    if (requestedVariantId && product.variants.some((variant) => variant._id === requestedVariantId)) setSelectedVariantId(requestedVariantId);
-  }, [product.variants, requestedVariantId]);
+    if (requestedVariant) setSelectedOrientation(getVariantRoomOrientation(requestedVariant));
+  }, [requestedVariant]);
 
-  function handleVariantChange(variantId: string) {
-    setSelectedVariantId(variantId);
+  function handleOrientationChange(orientation: RoomOrientation) {
+    setSelectedOrientation(orientation);
     setTestConfig(null);
   }
-
   function generateTestConfiguration() {
     setTestConfig({
       note: 'This is a configuration test only. It is not a real print export.',
@@ -52,11 +53,13 @@ export function PreviewTab({ product, onSave }: Props) {
       </div>
 
       <Select
-        label="Variant"
-        value={selectedVariant?._id ?? ''}
-        onChange={(event) => handleVariantChange(event.target.value)}
-        options={variantsForSelection.length > 0 ? variantsForSelection.map((variant) => ({ value: variant._id, label: `${variant.name} (${variant.sku})` })) : [{ value: '', label: 'No variants available' }]}
-        disabled={variantsForSelection.length === 0}
+        label="Orientation"
+        value={selectedOrientation}
+        onChange={(event) => handleOrientationChange(event.target.value as RoomOrientation)}
+        options={ROOM_ORIENTATIONS.map((orientation) => ({
+          value: orientation,
+          label: `${orientationLabel(orientation)} (${product.variants.filter((variant) => getVariantRoomOrientation(variant) === orientation).length})`,
+        }))}
       />
 
       {warnings.length > 0 && (
@@ -65,13 +68,13 @@ export function PreviewTab({ product, onSave }: Props) {
         </div>
       )}
 
-      <RoomPreviewsPanel product={product} variant={selectedVariant} onSave={onSave} />
+      <RoomPreviewsPanel product={product} orientation={selectedOrientation} variant={selectedVariant} onSave={onSave} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200 xl:col-span-2">
           <h3 className="text-sm font-semibold text-gray-900">Surface Preview</h3>
           <p className="mt-1 text-sm text-gray-500">Bleed, trim, and safe area use the product surface and selected variant size.</p>
           <div className="mt-6 flex min-h-80 items-center justify-center overflow-auto rounded-lg bg-white p-4 ring-1 ring-gray-200">
-            {selectedVariant ? <SurfacePreview surface={product.surface} variant={selectedVariant} size={420} /> : <p className="text-sm text-gray-500">No variant selected.</p>}
+            {selectedVariant ? <SurfacePreview surface={product.surface} variant={selectedVariant} size={420} /> : <p className="text-sm text-gray-500">No variant exists for this orientation.</p>}
           </div>
         </div>
 
@@ -146,6 +149,7 @@ function getWarnings(product: Product, activeVariants: ProductVariant[], selecte
   if (!selectedVariant) warnings.push('No variant exists. Add a variant before previewing.');
   if (!product.exportRules) warnings.push('Export rules are missing. Configure export rules before publishing.');
   if (selectedVariant && selectedVariant.dpi < 150) warnings.push('DPI is below 150. Production quality may be too low.');
+  if (selectedVariant && compatibleRooms(product.roomPreviews, selectedVariant).length === 0) warnings.push('No shared room preview supports this variant orientation.');
   if (product.surface && selectedVariant && hasTightSafeArea(product.surface, selectedVariant)) warnings.push('Image/text may go outside safe area. Review the safe area margins for this surface.');
   return warnings;
 }
@@ -157,13 +161,16 @@ function hasTightSafeArea(surface: ProductSurface, variant: ProductVariant) {
 }
 
 function summarizeProduct(product: Product) {
-  return { _id: product._id, name: product.name, slug: product.slug, productType: product.productType, status: product.status, basePrice: product.basePrice };
+  return { _id: product._id, name: product.name, slug: product.slug, productType: product.productType, status: product.status, basePrice: product.basePrice, roomPreviews: product.roomPreviews };
 }
 
 function summarizeVariant(variant: ProductVariant) {
-  return { _id: variant._id, name: variant.name, sku: variant.sku, status: variant.status, price: variant.price, width: variant.width, height: variant.height, unit: variant.unit, dpi: variant.dpi, previewImageUrl: variant.previewImageUrl, thumbnailImageUrl: variant.thumbnailImageUrl, options: variant.options, roomPreviews: variant.roomPreviews };
+  return { _id: variant._id, name: variant.name, sku: variant.sku, status: variant.status, price: variant.price, width: variant.width, height: variant.height, unit: variant.unit, dpi: variant.dpi, previewImageUrl: variant.previewImageUrl, thumbnailImageUrl: variant.thumbnailImageUrl, options: variant.options, roomOrientation: getVariantRoomOrientation(variant) };
 }
 
+function orientationLabel(orientation: RoomOrientation) {
+  return orientation === 'pano-vertical' ? 'Pano Vertical' : orientation === 'pano-horizontal' ? 'Pano Horizontal' : orientation.charAt(0).toUpperCase() + orientation.slice(1);
+}
 function yesNo(value: boolean) {
   return value ? 'Yes' : 'No';
 }

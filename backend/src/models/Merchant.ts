@@ -13,9 +13,13 @@ const merchantSchema = new Schema(
     editorAccentColor: { type: String, default: '#2563eb' },
     customCss: { type: String, default: '' },
     customJavascript: { type: String, default: '' },
+    apiPrivateKeyHash: { type: String, select: false },
+    apiPrivateKeyLastFour: { type: String, default: '' },
+    apiPrivateKeyCreatedAt: { type: Date },
   },
   { timestamps: true }
 );
 
 merchantSchema.index({ accountId: 1, slug: 1 }, { unique: true });
+merchantSchema.index({ apiPrivateKeyHash: 1 }, { unique: true, sparse: true });
 export const MerchantModel = model('Merchant', merchantSchema);

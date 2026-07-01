@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Check, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import type { Product, VariantOptionDefinition } from '../../types';
@@ -25,6 +25,7 @@ export function VariantOptionDefinitions({ product, onSave }: Props) {
   );
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [form, setForm] = useState<VariantOptionDefinition | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const errors = useMemo(() => {
     if (!form) return {};
@@ -141,17 +142,22 @@ export function VariantOptionDefinitions({ product, onSave }: Props) {
 
   return (
     <section className="overflow-hidden rounded-lg bg-white ring-1 ring-gray-200">
-      <div className="flex flex-col gap-3 border-b border-gray-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900">Option Definitions</h3>
-          <p className="mt-1 text-sm text-gray-500">Define the named values stored on every variant and optionally choose one frontend grouping field.</p>
-        </div>
-        <button type="button" onClick={startAdd} className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
-          <Plus className="h-4 w-4" /> Add Definition
+      <div className={`flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between ${isExpanded ? 'border-b border-gray-200' : ''}`}>
+        <button type="button" onClick={() => setIsExpanded((current) => !current)} aria-expanded={isExpanded} className="flex min-w-0 items-start gap-2 text-left">
+          {isExpanded ? <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" /> : <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" />}
+          <span>
+            <span className="block text-sm font-semibold text-gray-900">Option Definitions ({definitions.length})</span>
+            <span className="mt-1 block text-sm text-gray-500">Define the named values stored on every variant and optionally choose one frontend grouping field.</span>
+          </span>
         </button>
+        {isExpanded && (
+          <button type="button" onClick={startAdd} className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+            <Plus className="h-4 w-4" /> Add Definition
+          </button>
+        )}
       </div>
 
-      {definitions.length === 0 ? (
+      {isExpanded && (definitions.length === 0 ? (
         <p className="px-5 py-6 text-sm text-gray-500">No option definitions. Variants may still use additional options.</p>
       ) : (
         <div className="overflow-x-auto">
@@ -185,7 +191,7 @@ export function VariantOptionDefinitions({ product, onSave }: Props) {
             </tbody>
           </table>
         </div>
-      )}
+      ))}
 
       {form && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">

@@ -1,5 +1,8 @@
 import { normalizeUnit } from './validation';
 import { normalizeVariantOptionDefinitions } from './variantOptions';
+import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
+import { normalizeFrontendContent } from './frontendContent';
+import { normalizeEditorProductSelection } from './productSelection';
 import type {
   Account,
   BleedSettings,
@@ -156,6 +159,8 @@ export function normalizeProduct(product: Product): Product {
   const scope: ProductScope = product.scope === 'shared' ? 'shared' : 'merchant';
   const firstLegacySurface = legacy.surface ?? legacy.variants?.flatMap((variant) => variant.surfaces ?? [])[0] ?? null;
   const surface = firstLegacySurface ? normalizeSurface(firstLegacySurface, product._id) : null;
+  const variants = (legacy.variants ?? []).map((variant) => normalizeVariant(variant, product._id));
+  const sharedRooms = (product.roomPreviews ?? []).map((room, index) => normalizeSharedRoomPreview(room, product._id, index));
 
   return {
     ...product,
@@ -165,12 +170,15 @@ export function normalizeProduct(product: Product): Product {
     categoryId: legacy.categoryId ?? '',
     categorySnapshot: product.categorySnapshot,
     surface,
-    optionGroups: product.optionGroups ?? [],
+    optionGroups: (product.optionGroups ?? []).map((group) => ({ ...group, values: (group.values ?? []).map((value) => ({ ...value, metadata: value.metadata ?? {} })) })),
     variantOptionDefinitions: normalizeVariantOptionDefinitions(product.variantOptionDefinitions, product._id),
+    frontendContent: normalizeFrontendContent(product.frontendContent),
+    editorProductSelection: normalizeEditorProductSelection(product.editorProductSelection),
     editorRules: { ...defaultEditorRules, ...(product.editorRules ?? {}) },
     exportRules: { ...defaultExportRules, ...(product.exportRules ?? {}) },
     templates: (product.templates ?? []).map((template) => ({ ...template, surfaceId: surface?._id ?? template.surfaceId ?? '' })),
-    variants: (legacy.variants ?? []).map((variant) => normalizeVariant(variant, product._id)),
+    roomPreviews: liftLegacyRoomPreviews({ ...product, variants, roomPreviews: sharedRooms }),
+    variants: variants.map((variant) => ({ ...variant, roomPreviews: undefined })),
   };
 }
 
