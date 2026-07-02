@@ -5,6 +5,8 @@ export interface PricingOptionValue {
   value: string;
   priceModifierType: PriceModifierType;
   priceModifier: number;
+  priceModifierMin?: number;
+  priceModifierMax?: number;
 }
 
 export function getVariantConfiguredPrice(option: PricingOptionValue, variantOptions: Record<string, string> = {}, groupCode = '') {
@@ -17,6 +19,11 @@ export function getVariantConfiguredPrice(option: PricingOptionValue, variantOpt
 export function applyModifier(variantPrice: number, option: PricingOptionValue, variantOptions: Record<string, string> = {}, groupCode = '') {
   if (option.priceModifierType === 'fixed') return option.priceModifier;
   if (option.priceModifierType === 'variant-fixed') return getVariantConfiguredPrice(option, variantOptions, groupCode);
-  if (option.priceModifierType === 'percentage') return (variantPrice * option.priceModifier) / 100;
+  if (option.priceModifierType === 'percentage') {
+    const calculated = (variantPrice * option.priceModifier) / 100;
+    const minimum = Number.isFinite(option.priceModifierMin) ? Number(option.priceModifierMin) : Number.NEGATIVE_INFINITY;
+    const maximum = Number.isFinite(option.priceModifierMax) ? Number(option.priceModifierMax) : Number.POSITIVE_INFINITY;
+    return Math.min(maximum, Math.max(minimum, calculated));
+  }
   return 0;
 }

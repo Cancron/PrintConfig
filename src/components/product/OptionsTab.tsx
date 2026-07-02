@@ -178,6 +178,12 @@ export function OptionsTab({ product, onSave }: Props) {
                     )}
                   </div>
                   <Input label="Price Modifier" type="number" step="0.01" value={value.priceModifier} disabled={value.priceModifierType === 'none' || value.priceModifierType === 'variant-fixed' || value.priceModifierType === 'variant-override'} onChange={(e) => updateValue(entityKey(value), 'priceModifier', Number(e.target.value))} error={errors[`value.${entityKey(value)}.priceModifier`]} />
+                  {value.priceModifierType === 'percentage' && (
+                    <>
+                      <Input label="Minimum Price" type="number" min="0" step="0.01" value={value.priceModifierMin ?? ''} onChange={(e) => updateValue(entityKey(value), 'priceModifierMin', e.target.value === '' ? undefined : Number(e.target.value))} error={errors[`value.${entityKey(value)}.priceModifierMin`]} placeholder="No minimum" />
+                      <Input label="Maximum Price" type="number" min="0" step="0.01" value={value.priceModifierMax ?? ''} onChange={(e) => updateValue(entityKey(value), 'priceModifierMax', e.target.value === '' ? undefined : Number(e.target.value))} error={errors[`value.${entityKey(value)}.priceModifierMax`]} placeholder="No maximum" />
+                    </>
+                  )}
                   <Input label="Sort Order" type="number" value={value.sortOrder} onChange={(e) => updateValue(entityKey(value), 'sortOrder', Number(e.target.value))} />
                   <Input label="Color Hex" value={value.metadata?.colorHex ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'colorHex', e.target.value)} error={errors[`value.${entityKey(value)}.colorHex`]} />
                   {/* <ImageField label="Preview Image URL" url={value.previewImageUrl} assetId={value.previewImageAssetId} onChange={(url, assetId) => { updateValue(entityKey(value), 'previewImageUrl', url); updateValue(entityKey(value), 'previewImageAssetId', assetId); }} /> */}
@@ -296,6 +302,11 @@ function validateGroup(group: ProductOptionGroup, groups: ProductOptionGroup[], 
     if (!Number.isFinite(Number(value.priceModifier))) errors[`value.${entityKey(value)}.priceModifier`] = 'Price modifier must be numeric.';
     if (value.priceModifierType === 'none' && Number(value.priceModifier) !== 0) errors[`value.${entityKey(value)}.priceModifier`] = 'No extra charge must use 0.';
     if ((value.priceModifierType === 'fixed' || value.priceModifierType === 'percentage') && Number(value.priceModifier) < 0) errors[`value.${entityKey(value)}.priceModifier`] = 'Price modifier must be zero or greater.';
+    if (value.priceModifierType === 'percentage') {
+      if (value.priceModifierMin !== undefined && (!Number.isFinite(value.priceModifierMin) || value.priceModifierMin < 0)) errors[`value.${entityKey(value)}.priceModifierMin`] = 'Minimum must be zero or greater.';
+      if (value.priceModifierMax !== undefined && (!Number.isFinite(value.priceModifierMax) || value.priceModifierMax < 0)) errors[`value.${entityKey(value)}.priceModifierMax`] = 'Maximum must be zero or greater.';
+      if (value.priceModifierMin !== undefined && value.priceModifierMax !== undefined && value.priceModifierMax < value.priceModifierMin) errors[`value.${entityKey(value)}.priceModifierMax`] = 'Maximum must be greater than or equal to minimum.';
+    }
     if (value.metadata?.colorHex && !/^#[0-9a-f]{6}$/i.test(value.metadata?.colorHex)) errors[`value.${entityKey(value)}.colorHex`] = 'Use a valid hex color.';
   }
   return errors;
@@ -315,7 +326,10 @@ function getModifierAmount(basePrice: number, value: ProductOptionValue) {
   if (value.priceModifierType === 'fixed') return value.priceModifier;
   if (value.priceModifierType === 'variant-fixed') return 0;
   if (value.priceModifierType === 'variant-override') return 0;
-  if (value.priceModifierType === 'percentage') return (basePrice * value.priceModifier) / 100;
+  if (value.priceModifierType === 'percentage') {
+    const calculated = (basePrice * value.priceModifier) / 100;
+    return Math.min(value.priceModifierMax ?? Number.POSITIVE_INFINITY, Math.max(value.priceModifierMin ?? Number.NEGATIVE_INFINITY, calculated));
+  }
   return 0;
 }
 
@@ -323,7 +337,11 @@ function formatModifier(value: ProductOptionValue) {
   if (value.priceModifierType === 'fixed') return `+$${value.priceModifier.toFixed(2).replace(/\.00$/, '')}`;
   if (value.priceModifierType === 'variant-fixed') return `Variant option _${value.value}`;
   if (value.priceModifierType === 'variant-override') return `Variant price _${value.value}`;
-  if (value.priceModifierType === 'percentage') return `+${value.priceModifier}%`;
+  if (value.priceModifierType === 'percentage') {
+    const minimum = value.priceModifierMin !== undefined ? ` min $${value.priceModifierMin}` : '';
+    const maximum = value.priceModifierMax !== undefined ? ` max $${value.priceModifierMax}` : '';
+    return `+${value.priceModifier}%${minimum}${maximum}`;
+  }
   return 'No extra charge';
 }
 

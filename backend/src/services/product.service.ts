@@ -126,6 +126,13 @@ function validateProductShape(data: Record<string, any>) {
       values.add(value.value);
       if (value.isDefault) defaultCount += 1;
       if (Number.isNaN(Number(value.priceModifier))) throw new ApiError(400, 'Price modifier must be numeric.');
+      if (value.priceModifierType === 'percentage') {
+        const minimum = value.priceModifierMin;
+        const maximum = value.priceModifierMax;
+        if (minimum !== undefined && (!Number.isFinite(Number(minimum)) || Number(minimum) < 0)) throw new ApiError(400, 'Percentage minimum price must be zero or greater.');
+        if (maximum !== undefined && (!Number.isFinite(Number(maximum)) || Number(maximum) < 0)) throw new ApiError(400, 'Percentage maximum price must be zero or greater.');
+        if (minimum !== undefined && maximum !== undefined && Number(maximum) < Number(minimum)) throw new ApiError(400, 'Percentage maximum price must be greater than or equal to the minimum price.');
+      }
     }
     if (defaultCount > 1) throw new ApiError(400, 'Only one option value can be default inside an option group.');
   }
@@ -288,6 +295,8 @@ function publicOptionGroups(optionGroups: any[] = []) {
           value: value.value,
           priceModifierType: value.priceModifierType,
           priceModifier: value.priceModifier,
+          priceModifierMin: value.priceModifierMin,
+          priceModifierMax: value.priceModifierMax,
           isDefault: value.isDefault,
           sortOrder: value.sortOrder,
           previewImageUrl: value.previewImageUrl,
