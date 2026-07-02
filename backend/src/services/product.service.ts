@@ -3,7 +3,7 @@ import { Types } from 'mongoose';
 import { ProductModel } from '../models/Product.js';
 import { ProductCategoryModel } from '../models/ProductCategory.js';
 import { ApiError } from '../middleware/errorHandler.js';
-import { applyModifier } from '../utils/pricing.js';
+import { applyModifier, getVariantConfiguredPrice } from '../utils/pricing.js';
 import { slugify } from '../utils/slug.js';
 import { getVariantRoomOrientation, liftLegacyProductRooms, ROOM_ORIENTATIONS } from '../utils/roomPreview.js';
 import { normalizeFrontendContentPayload, publicFrontendContent } from '../utils/frontendContent.js';
@@ -349,20 +349,39 @@ export async function calculatePrice(id: string, variantId: string, selectedOpti
   if (!product) throw new ApiError(404, 'Product not found.');
   const variant = product.variants.find((item: any) => String(item._id) === variantId);
   if (!variant) throw new ApiError(404, 'Variant not found.');
-  const modifiers: Array<{ groupCode: string; value: string; amount: number }> = [];
+  const selections: Array<{ group: any; optionValue: any }> = [];
   for (const group of product.optionGroups ?? []) {
     const selected = selectedOptions[group.code];
     if (!selected) continue;
     const optionValue = group.values.find((value: any) => value.isActive !== false && value.value === selected);
-    if (!optionValue) continue;
-    const amount = applyModifier(variant.price, optionValue as any, variant.options ?? {}, group.code);
+    if (optionValue) selections.push({ group, optionValue });
+  }
+
+  const overrides = selections.filter(({ optionValue }) => optionValue.priceModifierType === 'variant-override');
+  if (overrides.length > 1) throw new ApiError(400, 'Only one selected option may override the variant price.');
+
+  let resolvedVariantPrice = variant.price;
+  const modifiers: Array<{ groupCode: string; value: string; type: string; amount: number; price?: number }> = [];
+  if (overrides[0]) {
+    const { group, optionValue } = overrides[0];
+    const overridePrice = getVariantConfiguredPrice(optionValue, variant.options ?? {}, group.code);
+    if (!Number.isFinite(overridePrice) || overridePrice < 0) {
+      throw new ApiError(400, `Variant ${variant.sku} must have a nonnegative numeric _${optionValue.value} or _${group.code} price override.`);
+    }
+    resolvedVariantPrice = overridePrice;
+    modifiers.push({ groupCode: group.code, value: optionValue.value, type: 'variant-override', amount: overridePrice - variant.price, price: overridePrice });
+  }
+
+  for (const { group, optionValue } of selections) {
+    if (optionValue.priceModifierType === 'variant-override') continue;
+    const amount = applyModifier(resolvedVariantPrice, optionValue, variant.options ?? {}, group.code);
     if (!Number.isFinite(amount)) {
       throw new ApiError(400, `Variant ${variant.sku} must have a numeric _${optionValue.value} or _${group.code} option for variant-dependent pricing.`);
     }
-    modifiers.push({ groupCode: group.code, value: optionValue.value, amount });
+    modifiers.push({ groupCode: group.code, value: optionValue.value, type: optionValue.priceModifierType, amount });
   }
   const modifierTotal = modifiers.reduce((sum, item) => sum + item.amount, 0);
-  return { basePrice: variant.price, modifiers, finalPrice: Math.round((variant.price + modifierTotal) * 100) / 100 };
+  return { basePrice: variant.price, resolvedVariantPrice, modifiers, finalPrice: Math.round((variant.price + modifierTotal) * 100) / 100 };
 }
 
 function stripIds<T>(value: T): T {

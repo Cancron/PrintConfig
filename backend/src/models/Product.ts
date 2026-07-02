@@ -103,8 +103,10 @@ const optionValueSchema = new Schema(
     label: { type: String, required: true },
     value: { type: String, required: true },
     skuCode: { type: String, default: '' },
-    priceModifierType: { type: String, enum: ['none', 'fixed', 'variant-fixed', 'percentage'], default: 'none' },
+    priceModifierType: { type: String, enum: ['none', 'fixed', 'variant-fixed', 'variant-override', 'percentage'], default: 'none' },
     priceModifier: { type: Number, default: 0 },
+    priceModifierMin: { type: Number, min: 0 },
+    priceModifierMax: { type: Number, min: 0 },
     isDefault: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0 },
@@ -214,10 +216,10 @@ const productTrustBadgeSchema = new Schema(
 );
 
 const defaultTrustBadges = () => [
-  { icon: 'ðŸšš', text: 'Free shipping Canada-wide', sortOrder: 1, isActive: true },
-  { icon: 'âš¡', text: '24-hour production', sortOrder: 2, isActive: true },
-  { icon: 'ðŸ›¡ï¸', text: 'Lifetime warranty', sortOrder: 3, isActive: true },
-  { icon: 'ðŸ‡¨ðŸ‡¦', text: 'Made in Canada', sortOrder: 4, isActive: true },
+  { icon: 'ÃƒÂ°Ã…Â¸Ã…Â¡Ã…Â¡', text: 'Free shipping Canada-wide', sortOrder: 1, isActive: true },
+  { icon: 'ÃƒÂ¢Ã…Â¡Ã‚Â¡', text: '24-hour production', sortOrder: 2, isActive: true },
+  { icon: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂºÃ‚Â¡ÃƒÂ¯Ã‚Â¸Ã‚Â', text: 'Lifetime warranty', sortOrder: 3, isActive: true },
+  { icon: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Â¡Ã‚Â¨ÃƒÂ°Ã…Â¸Ã¢â‚¬Â¡Ã‚Â¦', text: 'Made in Canada', sortOrder: 4, isActive: true },
 ];
 
 const frontendContentSchema = new Schema(

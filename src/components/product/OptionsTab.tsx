@@ -22,6 +22,7 @@ const modifierOptions: { value: PriceModifierType; label: string }[] = [
   { value: 'none', label: 'No extra charge' },
   { value: 'fixed', label: 'Fixed amount' },
   { value: 'variant-fixed', label: 'Fixed amount depending variant' },
+  { value: 'variant-override', label: 'Variant price override' },
   { value: 'percentage', label: 'Percentage of variant price' },
 ];
 
@@ -62,7 +63,7 @@ export function OptionsTab({ product, onSave }: Props) {
         label: value.label.trim(),
         value: value.value.trim(),
         skuCode: value.skuCode.trim(),
-        priceModifier: value.priceModifierType === 'none' || value.priceModifierType === 'variant-fixed' ? 0 : Number(value.priceModifier),
+        priceModifier: value.priceModifierType === 'none' || value.priceModifierType === 'variant-fixed' || value.priceModifierType === 'variant-override' ? 0 : Number(value.priceModifier),
         updatedAt: now,
       })),
     };
@@ -170,10 +171,13 @@ export function OptionsTab({ product, onSave }: Props) {
                   <div>
                     <Select label="Price Modifier Type" value={value.priceModifierType} onChange={(e) => updateValue(entityKey(value), 'priceModifierType', e.target.value as PriceModifierType)} options={modifierOptions} />
                     {value.priceModifierType === 'variant-fixed' && (
-                      <p className="mt-2 text-xs leading-5 text-blue-700">For a different price per option, add <code className="rounded bg-blue-50 px-1">_{value.value || 'optionvalue'}</code> to each variant. For one shared price across this group, add <code className="rounded bg-blue-50 px-1">_{form.code || 'groupcode'}</code>. The option-specific price takes priority.</p>
+                      <p className="mt-2 text-xs leading-5 text-blue-700">Adds a surcharge to the resolved variant price. Use <code className="rounded bg-blue-50 px-1">_{value.value || 'optionvalue'}</code> for an option-specific amount or <code className="rounded bg-blue-50 px-1">_{form.code || 'groupcode'}</code> for one shared group amount. The option-specific amount takes priority.</p>
+                    )}
+                    {value.priceModifierType === 'variant-override' && (
+                      <p className="mt-2 text-xs leading-5 text-amber-700">Replaces the variant base price before other modifiers. Use <code className="rounded bg-amber-50 px-1">_{value.value || 'optionvalue'}</code> for an option-specific price or <code className="rounded bg-amber-50 px-1">_{form.code || 'groupcode'}</code> for one shared group price. Only one selected option may override the price.</p>
                     )}
                   </div>
-                  <Input label="Price Modifier" type="number" step="0.01" value={value.priceModifier} disabled={value.priceModifierType === 'none' || value.priceModifierType === 'variant-fixed'} onChange={(e) => updateValue(entityKey(value), 'priceModifier', Number(e.target.value))} error={errors[`value.${entityKey(value)}.priceModifier`]} />
+                  <Input label="Price Modifier" type="number" step="0.01" value={value.priceModifier} disabled={value.priceModifierType === 'none' || value.priceModifierType === 'variant-fixed' || value.priceModifierType === 'variant-override'} onChange={(e) => updateValue(entityKey(value), 'priceModifier', Number(e.target.value))} error={errors[`value.${entityKey(value)}.priceModifier`]} />
                   <Input label="Sort Order" type="number" value={value.sortOrder} onChange={(e) => updateValue(entityKey(value), 'sortOrder', Number(e.target.value))} />
                   <Input label="Color Hex" value={value.metadata?.colorHex ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'colorHex', e.target.value)} error={errors[`value.${entityKey(value)}.colorHex`]} />
                   {/* <ImageField label="Preview Image URL" url={value.previewImageUrl} assetId={value.previewImageAssetId} onChange={(url, assetId) => { updateValue(entityKey(value), 'previewImageUrl', url); updateValue(entityKey(value), 'previewImageAssetId', assetId); }} /> */}
@@ -310,6 +314,7 @@ function createValue(optionGroupId: string, sortOrder: number): ProductOptionVal
 function getModifierAmount(basePrice: number, value: ProductOptionValue) {
   if (value.priceModifierType === 'fixed') return value.priceModifier;
   if (value.priceModifierType === 'variant-fixed') return 0;
+  if (value.priceModifierType === 'variant-override') return 0;
   if (value.priceModifierType === 'percentage') return (basePrice * value.priceModifier) / 100;
   return 0;
 }
@@ -317,6 +322,7 @@ function getModifierAmount(basePrice: number, value: ProductOptionValue) {
 function formatModifier(value: ProductOptionValue) {
   if (value.priceModifierType === 'fixed') return `+$${value.priceModifier.toFixed(2).replace(/\.00$/, '')}`;
   if (value.priceModifierType === 'variant-fixed') return `Variant option _${value.value}`;
+  if (value.priceModifierType === 'variant-override') return `Variant price _${value.value}`;
   if (value.priceModifierType === 'percentage') return `+${value.priceModifier}%`;
   return 'No extra charge';
 }

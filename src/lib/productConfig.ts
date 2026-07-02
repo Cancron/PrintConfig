@@ -196,7 +196,7 @@ function normalizeOptionGroup(input: Record<string, unknown>, productId: string,
 }
 
 function normalizeOptionValue(input: Record<string, unknown>, optionGroupId: string, now: string, index: number): ProductOptionValue {
-  const priceModifierType = input.priceModifierType === 'fixed' || input.priceModifierType === 'variant-fixed' || input.priceModifierType === 'percentage' ? input.priceModifierType : 'none';
+  const priceModifierType = input.priceModifierType === 'fixed' || input.priceModifierType === 'variant-fixed' || input.priceModifierType === 'variant-override' || input.priceModifierType === 'percentage' ? input.priceModifierType : 'none';
   return {
     _id: typeof input._id === 'string' ? input._id : '',
     optionGroupId,
@@ -204,7 +204,9 @@ function normalizeOptionValue(input: Record<string, unknown>, optionGroupId: str
     value: typeof input.value === 'string' ? input.value : `option-${index + 1}`,
     skuCode: typeof input.skuCode === 'string' ? input.skuCode : '',
     priceModifierType,
-    priceModifier: priceModifierType === 'none' || priceModifierType === 'variant-fixed' ? 0 : numberOr(input.priceModifier, 0),
+    priceModifier: priceModifierType === 'none' || priceModifierType === 'variant-fixed' || priceModifierType === 'variant-override' ? 0 : numberOr(input.priceModifier, 0),
+    priceModifierMin: typeof input.priceModifierMin === 'number' && Number.isFinite(input.priceModifierMin) ? input.priceModifierMin : undefined,
+    priceModifierMax: typeof input.priceModifierMax === 'number' && Number.isFinite(input.priceModifierMax) ? input.priceModifierMax : undefined,
     isDefault: input.isDefault === true,
     isActive: input.isActive !== false,
     sortOrder: numberOr(input.sortOrder, index + 1),

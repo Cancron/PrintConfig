@@ -20,7 +20,7 @@ export type ProductScope = 'shared' | 'merchant';
 export type ProductCategoryStatus = 'active' | 'draft' | 'archived';
 export type ProductUnit = 'inch' | 'mm' | 'px';
 export type ProductOptionDisplayType = 'Dropdown' | 'Radio Buttons' | 'Color Swatches' | 'Image Swatches' | 'Text Buttons';
-export type PriceModifierType = 'none' | 'fixed' | 'variant-fixed' | 'percentage';
+export type PriceModifierType = 'none' | 'fixed' | 'variant-fixed' | 'variant-override' | 'percentage';
 
 export interface ImageFolder {
   _id: string;
@@ -192,6 +192,8 @@ export interface ProductOptionValue {
   skuCode: string;
   priceModifierType: PriceModifierType;
   priceModifier: number;
+  priceModifierMin?: number;
+  priceModifierMax?: number;
   isDefault: boolean;
   isActive: boolean;
   sortOrder: number;
