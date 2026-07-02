@@ -3,7 +3,7 @@ import { Types } from 'mongoose';
 import { ProductModel } from '../models/Product.js';
 import { ProductCategoryModel } from '../models/ProductCategory.js';
 import { ApiError } from '../middleware/errorHandler.js';
-import { applyModifier } from '../utils/pricing.js';
+import { applyModifier, getVariantConfiguredPrice } from '../utils/pricing.js';
 import { slugify } from '../utils/slug.js';
 import { getVariantRoomOrientation, liftLegacyProductRooms, ROOM_ORIENTATIONS } from '../utils/roomPreview.js';
 import { normalizeFrontendContentPayload, publicFrontendContent } from '../utils/frontendContent.js';
@@ -115,15 +115,24 @@ function validateProductShape(data: Record<string, any>) {
     if (room.centerLeftPercent - room.maxWidthPercent / 2 < 0 || room.centerLeftPercent + room.maxWidthPercent / 2 > 100 || room.centerTopPercent - room.maxHeightPercent / 2 < 0 || room.centerTopPercent + room.maxHeightPercent / 2 > 100) throw new ApiError(400, 'Room preview rectangle must stay inside the image.');
   }  const groupCodes = new Set<string>();
   for (const group of data.optionGroups ?? []) {
+    if (!/^(?=.*[a-z0-9])[a-z0-9_-]+$/.test(String(group.code ?? ''))) throw new ApiError(400, 'Option group code may use lowercase letters, numbers, hyphens, and underscores only.');
     if (groupCodes.has(group.code)) throw new ApiError(400, 'Option group code must be unique within product.');
     groupCodes.add(group.code);
     const values = new Set<string>();
     let defaultCount = 0;
     for (const value of group.values ?? []) {
+      if (!/^(?=.*[a-z0-9])[a-z0-9_.-]+$/.test(String(value.value ?? ''))) throw new ApiError(400, 'Option value may use lowercase letters, numbers, periods, hyphens, and underscores only.');
       if (values.has(value.value)) throw new ApiError(400, 'Option value must be unique within option group.');
       values.add(value.value);
       if (value.isDefault) defaultCount += 1;
       if (Number.isNaN(Number(value.priceModifier))) throw new ApiError(400, 'Price modifier must be numeric.');
+      if (value.priceModifierType === 'percentage') {
+        const minimum = value.priceModifierMin;
+        const maximum = value.priceModifierMax;
+        if (minimum !== undefined && (!Number.isFinite(Number(minimum)) || Number(minimum) < 0)) throw new ApiError(400, 'Percentage minimum price must be zero or greater.');
+        if (maximum !== undefined && (!Number.isFinite(Number(maximum)) || Number(maximum) < 0)) throw new ApiError(400, 'Percentage maximum price must be zero or greater.');
+        if (minimum !== undefined && maximum !== undefined && Number(maximum) < Number(minimum)) throw new ApiError(400, 'Percentage maximum price must be greater than or equal to the minimum price.');
+      }
     }
     if (defaultCount > 1) throw new ApiError(400, 'Only one option value can be default inside an option group.');
   }
@@ -286,6 +295,8 @@ function publicOptionGroups(optionGroups: any[] = []) {
           value: value.value,
           priceModifierType: value.priceModifierType,
           priceModifier: value.priceModifier,
+          priceModifierMin: value.priceModifierMin,
+          priceModifierMax: value.priceModifierMax,
           isDefault: value.isDefault,
           sortOrder: value.sortOrder,
           previewImageUrl: value.previewImageUrl,
@@ -332,10 +343,40 @@ export async function getPublicProductConfig(id: string, merchantId?: string) {
     roomPreviews: sharedRoomData.roomPreviews.slice().sort((a: any, b: any) => a.sortOrder - b.sortOrder),
     frontendContent: publicFrontendContent(product.frontendContent),
     productSelection,
-    editorRules: product.editorRules,
+    editorRules: { ...(product.editorRules ?? {}), allowCustomSize: product.editorRules?.allowCustomSize ?? false },
     exportRules: product.exportRules,
     variants: activeVariants,
   };
+}
+export async function listEditorProducts(apiPrivateKey: string) {
+  const merchant = await authenticateApiPrivateKey(apiPrivateKey);
+  if (!merchant) throw new ApiError(401, 'A valid merchant API private key is required.');
+
+  const products = await ProductModel.find({
+    ...visibleQuery(String(merchant.accountId), String(merchant._id)),
+    status: 'active',
+  })
+    .select('name productType categoryId status updatedAt')
+    .sort({ name: 1 })
+    .lean();
+
+  const categoryIds = [...new Set(products.map((product: any) => String(product.categoryId ?? '')).filter(Boolean))];
+  const categories = await ProductCategoryModel.find({ _id: { $in: categoryIds } })
+    .select('name slug')
+    .lean();
+  const categoriesById = new Map(categories.map((category: any) => [String(category._id), category]));
+
+  return products.map((product: any) => {
+    const category = categoriesById.get(String(product.categoryId));
+    return {
+      _id: String(product._id),
+      name: product.name,
+      productType: product.productType,
+      category: category ? { _id: String(category._id), name: category.name, slug: category.slug } : null,
+      status: product.status,
+      updatedAt: product.updatedAt,
+    };
+  });
 }
 export async function getEditorProductConfig(id: string, apiPrivateKey: string) {
   const merchant = await authenticateApiPrivateKey(apiPrivateKey);
@@ -347,17 +388,39 @@ export async function calculatePrice(id: string, variantId: string, selectedOpti
   if (!product) throw new ApiError(404, 'Product not found.');
   const variant = product.variants.find((item: any) => String(item._id) === variantId);
   if (!variant) throw new ApiError(404, 'Variant not found.');
-  const modifiers: Array<{ groupCode: string; value: string; amount: number }> = [];
+  const selections: Array<{ group: any; optionValue: any }> = [];
   for (const group of product.optionGroups ?? []) {
     const selected = selectedOptions[group.code];
     if (!selected) continue;
     const optionValue = group.values.find((value: any) => value.isActive !== false && value.value === selected);
-    if (!optionValue) continue;
-    const amount = applyModifier(variant.price, optionValue as any);
-    modifiers.push({ groupCode: group.code, value: optionValue.value, amount });
+    if (optionValue) selections.push({ group, optionValue });
+  }
+
+  const overrides = selections.filter(({ optionValue }) => optionValue.priceModifierType === 'variant-override');
+  if (overrides.length > 1) throw new ApiError(400, 'Only one selected option may override the variant price.');
+
+  let resolvedVariantPrice = variant.price;
+  const modifiers: Array<{ groupCode: string; value: string; type: string; amount: number; price?: number }> = [];
+  if (overrides[0]) {
+    const { group, optionValue } = overrides[0];
+    const overridePrice = getVariantConfiguredPrice(optionValue, variant.options ?? {}, group.code);
+    if (!Number.isFinite(overridePrice) || overridePrice < 0) {
+      throw new ApiError(400, `Variant ${variant.sku} must have a nonnegative numeric _${optionValue.value} or _${group.code} price override.`);
+    }
+    resolvedVariantPrice = overridePrice;
+    modifiers.push({ groupCode: group.code, value: optionValue.value, type: 'variant-override', amount: overridePrice - variant.price, price: overridePrice });
+  }
+
+  for (const { group, optionValue } of selections) {
+    if (optionValue.priceModifierType === 'variant-override') continue;
+    const amount = applyModifier(resolvedVariantPrice, optionValue, variant.options ?? {}, group.code);
+    if (!Number.isFinite(amount)) {
+      throw new ApiError(400, `Variant ${variant.sku} must have a numeric _${optionValue.value} or _${group.code} option for variant-dependent pricing.`);
+    }
+    modifiers.push({ groupCode: group.code, value: optionValue.value, type: optionValue.priceModifierType, amount });
   }
   const modifierTotal = modifiers.reduce((sum, item) => sum + item.amount, 0);
-  return { basePrice: variant.price, modifiers, finalPrice: Math.round((variant.price + modifierTotal) * 100) / 100 };
+  return { basePrice: variant.price, resolvedVariantPrice, modifiers, finalPrice: Math.round((variant.price + modifierTotal) * 100) / 100 };
 }
 
 function stripIds<T>(value: T): T {

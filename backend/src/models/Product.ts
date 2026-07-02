@@ -103,8 +103,10 @@ const optionValueSchema = new Schema(
     label: { type: String, required: true },
     value: { type: String, required: true },
     skuCode: { type: String, default: '' },
-    priceModifierType: { type: String, enum: ['none', 'fixed', 'percentage'], default: 'none' },
+    priceModifierType: { type: String, enum: ['none', 'fixed', 'variant-fixed', 'variant-override', 'percentage'], default: 'none' },
     priceModifier: { type: Number, default: 0 },
+    priceModifierMin: { type: Number, min: 0 },
+    priceModifierMax: { type: Number, min: 0 },
     isDefault: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0 },
@@ -144,6 +146,7 @@ const optionGroupSchema = new Schema(
 const editorRulesSchema = new Schema(
   {
     allowImageUpload: { type: Boolean, default: true },
+    allowCustomSize: { type: Boolean, default: false },
     allowAddText: { type: Boolean, default: true },
     allowClipart: { type: Boolean, default: false },
     allowBackgroundColor: { type: Boolean, default: true },
@@ -214,10 +217,10 @@ const productTrustBadgeSchema = new Schema(
 );
 
 const defaultTrustBadges = () => [
-  { icon: '🚚', text: 'Free shipping Canada-wide', sortOrder: 1, isActive: true },
-  { icon: '⚡', text: '24-hour production', sortOrder: 2, isActive: true },
-  { icon: '🛡️', text: 'Lifetime warranty', sortOrder: 3, isActive: true },
-  { icon: '🇨🇦', text: 'Made in Canada', sortOrder: 4, isActive: true },
+  { icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â¡Ãƒâ€¦Ã‚Â¡', text: 'Free shipping Canada-wide', sortOrder: 1, isActive: true },
+  { icon: 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â¡', text: '24-hour production', sortOrder: 2, isActive: true },
+  { icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂºÃƒâ€šÃ‚Â¡ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â', text: 'Lifetime warranty', sortOrder: 3, isActive: true },
+  { icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡Ãƒâ€šÃ‚Â¨ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡Ãƒâ€šÃ‚Â¦', text: 'Made in Canada', sortOrder: 4, isActive: true },
 ];
 
 const frontendContentSchema = new Schema(

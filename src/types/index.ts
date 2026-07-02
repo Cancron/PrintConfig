@@ -1,15 +1,8 @@
 export type ProductType =
-  | 'Canvas'
-  | 'Fine Art Paper'
-  | 'Matte Photo Paper'
-  | 'Acrylic Face Mount Prints'
-  | 'Poster Printing and Framing'
-  | 'Luster Photo Paper'
   | 'Canvas Print'
+  | 'Framed Print'
   | 'Metal Print'
   | 'Art Print'
-  | 'Poster Print'
-  | 'Framed Poster'
   | 'T-Shirt'
   | 'Mug'
   | 'Business Card'
@@ -27,7 +20,7 @@ export type ProductScope = 'shared' | 'merchant';
 export type ProductCategoryStatus = 'active' | 'draft' | 'archived';
 export type ProductUnit = 'inch' | 'mm' | 'px';
 export type ProductOptionDisplayType = 'Dropdown' | 'Radio Buttons' | 'Color Swatches' | 'Image Swatches' | 'Text Buttons';
-export type PriceModifierType = 'none' | 'fixed' | 'percentage';
+export type PriceModifierType = 'none' | 'fixed' | 'variant-fixed' | 'variant-override' | 'percentage';
 
 export interface ImageFolder {
   _id: string;
@@ -199,6 +192,8 @@ export interface ProductOptionValue {
   skuCode: string;
   priceModifierType: PriceModifierType;
   priceModifier: number;
+  priceModifierMin?: number;
+  priceModifierMax?: number;
   isDefault: boolean;
   isActive: boolean;
   sortOrder: number;
@@ -257,6 +252,7 @@ export interface ProductSurface {
 
 export interface EditorRules {
   allowImageUpload: boolean;
+  allowCustomSize: boolean;
   allowAddText: boolean;
   allowClipart: boolean;
   allowBackgroundColor: boolean;

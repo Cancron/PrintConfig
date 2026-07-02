@@ -13,6 +13,7 @@ type BooleanRule = {
   key: keyof Pick<
     EditorRules,
     | 'allowImageUpload'
+    | 'allowCustomSize'
     | 'allowAddText'
     | 'allowClipart'
     | 'allowBackgroundColor'
@@ -25,6 +26,7 @@ type BooleanRule = {
   >;
   label: string;
   description: string;
+  comingSoon?: boolean;
 };
 
 type NumberRule = {
@@ -40,22 +42,31 @@ const booleanRules: BooleanRule[] = [
     description: 'Customers can upload their own photos or artwork into the editor.',
   },
   {
+    key: 'allowCustomSize',
+    label: 'Allow custom size',
+    description: 'Customers can use ratio-derived dimensions such as 12 x 16.5 instead of selecting only an exact configured variant size.',
+  },
+  {
     key: 'allowAddText',
+    comingSoon: true,
     label: 'Allow add text',
     description: 'Customers can add new text boxes beyond any text already in the design.',
   },
   {
     key: 'allowClipart',
+    comingSoon: true,
     label: 'Allow clipart',
     description: 'Customers can insert clipart or stock graphic elements from your library.',
   },
   {
     key: 'allowBackgroundColor',
+    comingSoon: true,
     label: 'Allow background color',
     description: 'Customers can change the design background to a solid color.',
   },
   {
     key: 'allowBackgroundImage',
+    comingSoon: true,
     label: 'Allow background image',
     description: 'Customers can place an uploaded or library image behind the design content.',
   },
@@ -71,11 +82,13 @@ const booleanRules: BooleanRule[] = [
   },
   {
     key: 'allowDeleteObjects',
+    comingSoon: true,
     label: 'Allow delete objects',
     description: 'Customers can remove editable items from the design.',
   },
   {
     key: 'allowLayersPanel',
+    comingSoon: true,
     label: 'Allow layers panel',
     description: 'Customers can open a layers panel to reorder and select overlapping objects.',
   },
@@ -150,6 +163,7 @@ export function EditorRulesTab({ product, onSave }: Props) {
             key={rule.key}
             label={rule.label}
             description={rule.description}
+            comingSoon={rule.comingSoon}
             checked={rules[rule.key]}
             onChange={(checked) => updateBoolean(rule.key, checked)}
           />
@@ -192,11 +206,13 @@ function RuleSwitch({
   label,
   description,
   checked,
+  comingSoon,
   onChange,
 }: {
   label: string;
   description: string;
   checked: boolean;
+  comingSoon?: boolean;
   onChange: (checked: boolean) => void;
 }) {
   return (
@@ -208,7 +224,7 @@ function RuleSwitch({
         className="mt-1 h-4 w-4 rounded border-gray-300 text-slate-900 focus:ring-slate-600"
       />
       <span>
-        <span className="block text-sm font-medium text-gray-900">{label}</span>
+        <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-gray-900"><span>{label}</span>{comingSoon && <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">Coming soon</span>}</span>
         <span className="mt-1 block text-sm text-gray-500">{description}</span>
       </span>
     </label>

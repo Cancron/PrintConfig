@@ -7,20 +7,10 @@ import { imageFolderRoutes } from './routes/image-folder.routes.js';
 import { imageAssetRoutes } from './routes/image-asset.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
-const configuredOrigins = (process.env.FRONTEND_URL ?? 'http://localhost:5173,http://127.0.0.1:5173')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-
 const corsOptions: cors.CorsOptions = {
-  origin(origin, callback) {
-    if (!origin) return callback(null, true);
-    if (configuredOrigins.includes(origin)) return callback(null, true);
-    if (/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) return callback(null, true);
-    return callback(new Error(`CORS blocked origin: ${origin}`));
-  },
+  origin: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
 };
 
 export const app = express();

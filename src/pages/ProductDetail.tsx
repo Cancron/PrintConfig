@@ -208,5 +208,28 @@ function ProductReadinessPanel({ product }: { product: Product }) {
 
 function JsonPreviewTab({ product }: { product: Product }) {
   const json = JSON.stringify(product, null, 2);
-  return <div className="relative"><pre className="bg-slate-900 text-slate-50 rounded-lg p-4 overflow-x-auto text-sm font-mono leading-relaxed"><code>{json}</code></pre></div>;
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
+
+  async function copyJson() {
+    try {
+      await navigator.clipboard.writeText(json);
+      setCopyStatus('copied');
+    } catch {
+      setCopyStatus('error');
+    }
+    window.setTimeout(() => setCopyStatus('idle'), 2000);
+  }
+
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-end gap-3">
+        {copyStatus === 'copied' && <span className="text-sm font-medium text-emerald-600">Copied</span>}
+        {copyStatus === 'error' && <span className="text-sm font-medium text-red-600">Copy failed</span>}
+        <button type="button" onClick={copyJson} className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+          <Copy className="h-4 w-4" /> Copy JSON
+        </button>
+      </div>
+      <pre className="overflow-x-auto rounded-lg bg-slate-900 p-4 font-mono text-sm leading-relaxed text-slate-50"><code>{json}</code></pre>
+    </div>
+  );
 }

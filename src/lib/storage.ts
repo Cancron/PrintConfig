@@ -33,6 +33,7 @@ export const defaultMerchants: Merchant[] = [];
 
 export const defaultEditorRules: EditorRules = {
   allowImageUpload: true,
+  allowCustomSize: false,
   allowAddText: true,
   allowClipart: false,
   allowBackgroundColor: true,

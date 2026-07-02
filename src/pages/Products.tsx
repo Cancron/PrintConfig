@@ -10,7 +10,16 @@ import { useProducts } from '../hooks/useProducts';
 import { useWorkspace } from '../hooks/useWorkspace';
 import type { ProductScope, ProductType } from '../types';
 
-const productTypes: ProductType[] = ['Canvas', 'Fine Art Paper', 'Matte Photo Paper', 'Acrylic Face Mount Prints', 'Poster Printing and Framing', 'Luster Photo Paper', 'Canvas Print', 'Metal Print', 'Poster Print', 'Framed Poster', 'T-Shirt', 'Mug', 'Business Card', 'Sticker'];
+const productTypes: ProductType[] = [
+  'Canvas Print',
+  'Metal Print',
+  'Framed Print',
+  'Art Print',
+  'T-Shirt',
+  'Mug',
+  'Business Card', 
+  'Sticker'
+];
 
 export function Products() {
   const { products, deleteProduct, duplicateProduct, loading, error } = useProducts();

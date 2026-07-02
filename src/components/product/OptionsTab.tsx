@@ -21,7 +21,9 @@ const displayTypeOptions: { value: ProductOptionDisplayType; label: string }[] =
 const modifierOptions: { value: PriceModifierType; label: string }[] = [
   { value: 'none', label: 'No extra charge' },
   { value: 'fixed', label: 'Fixed amount' },
-  { value: 'percentage', label: 'Percentage of base price' },
+  { value: 'variant-fixed', label: 'Fixed amount depending variant' },
+  { value: 'variant-override', label: 'Variant price override' },
+  { value: 'percentage', label: 'Percentage of variant price' },
 ];
 
 const yesNoOptions = [
@@ -61,7 +63,7 @@ export function OptionsTab({ product, onSave }: Props) {
         label: value.label.trim(),
         value: value.value.trim(),
         skuCode: value.skuCode.trim(),
-        priceModifier: value.priceModifierType === 'none' ? 0 : Number(value.priceModifier),
+        priceModifier: value.priceModifierType === 'none' || value.priceModifierType === 'variant-fixed' || value.priceModifierType === 'variant-override' ? 0 : Number(value.priceModifier),
         updatedAt: now,
       })),
     };
@@ -162,12 +164,26 @@ export function OptionsTab({ product, onSave }: Props) {
               <div key={entityKey(value)} className="rounded-lg bg-white p-4 ring-1 ring-gray-200">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <Input label="Label" value={value.label} onChange={(e) => updateValue(entityKey(value), 'label', e.target.value)} error={errors[`value.${entityKey(value)}.label`]} />
-                  <Input label="Value" value={value.value} onChange={(e) => updateValue(entityKey(value), 'value', slugify(e.target.value))} error={errors[`value.${entityKey(value)}.value`]} />
+                  <Input label="Value" value={value.value} onChange={(e) => updateValue(entityKey(value), 'value', slugify(e.target.value, true))} error={errors[`value.${entityKey(value)}.value`]} />
                   {/* <Input label="SKU Code" value={value.skuCode} onChange={(e) => updateValue(entityKey(value), 'skuCode', e.target.value)} /> */}
                   <Select label="Default" value={value.isDefault ? 'yes' : 'no'} onChange={(e) => updateValue(entityKey(value), 'isDefault', e.target.value === 'yes')} options={yesNoOptions} />
                   <Select label="Active" value={value.isActive ? 'yes' : 'no'} onChange={(e) => updateValue(entityKey(value), 'isActive', e.target.value === 'yes')} options={yesNoOptions} />
-                  <Select label="Price Modifier Type" value={value.priceModifierType} onChange={(e) => updateValue(entityKey(value), 'priceModifierType', e.target.value as PriceModifierType)} options={modifierOptions} />
-                  <Input label="Price Modifier" type="number" step="0.01" value={value.priceModifier} onChange={(e) => updateValue(entityKey(value), 'priceModifier', Number(e.target.value))} error={errors[`value.${entityKey(value)}.priceModifier`]} />
+                  <div>
+                    <Select label="Price Modifier Type" value={value.priceModifierType} onChange={(e) => updateValue(entityKey(value), 'priceModifierType', e.target.value as PriceModifierType)} options={modifierOptions} />
+                    {value.priceModifierType === 'variant-fixed' && (
+                      <p className="mt-2 text-xs leading-5 text-blue-700">Adds a surcharge to the resolved variant price. Use <code className="rounded bg-blue-50 px-1">_{value.value || 'optionvalue'}</code> for an option-specific amount or <code className="rounded bg-blue-50 px-1">_{form.code || 'groupcode'}</code> for one shared group amount. The option-specific amount takes priority.</p>
+                    )}
+                    {value.priceModifierType === 'variant-override' && (
+                      <p className="mt-2 text-xs leading-5 text-amber-700">Replaces the variant base price before other modifiers. Use <code className="rounded bg-amber-50 px-1">_{value.value || 'optionvalue'}</code> for an option-specific price or <code className="rounded bg-amber-50 px-1">_{form.code || 'groupcode'}</code> for one shared group price. Only one selected option may override the price.</p>
+                    )}
+                  </div>
+                  <Input label="Price Modifier" type="number" step="0.01" value={value.priceModifier} disabled={value.priceModifierType === 'none' || value.priceModifierType === 'variant-fixed' || value.priceModifierType === 'variant-override'} onChange={(e) => updateValue(entityKey(value), 'priceModifier', Number(e.target.value))} error={errors[`value.${entityKey(value)}.priceModifier`]} />
+                  {value.priceModifierType === 'percentage' && (
+                    <>
+                      <Input label="Minimum Price" type="number" min="0" step="0.01" value={value.priceModifierMin ?? ''} onChange={(e) => updateValue(entityKey(value), 'priceModifierMin', e.target.value === '' ? undefined : Number(e.target.value))} error={errors[`value.${entityKey(value)}.priceModifierMin`]} placeholder="No minimum" />
+                      <Input label="Maximum Price" type="number" min="0" step="0.01" value={value.priceModifierMax ?? ''} onChange={(e) => updateValue(entityKey(value), 'priceModifierMax', e.target.value === '' ? undefined : Number(e.target.value))} error={errors[`value.${entityKey(value)}.priceModifierMax`]} placeholder="No maximum" />
+                    </>
+                  )}
                   <Input label="Sort Order" type="number" value={value.sortOrder} onChange={(e) => updateValue(entityKey(value), 'sortOrder', Number(e.target.value))} />
                   <Input label="Color Hex" value={value.metadata?.colorHex ?? ''} onChange={(e) => updateValueMetadata(entityKey(value), 'colorHex', e.target.value)} error={errors[`value.${entityKey(value)}.colorHex`]} />
                   {/* <ImageField label="Preview Image URL" url={value.previewImageUrl} assetId={value.previewImageAssetId} onChange={(url, assetId) => { updateValue(entityKey(value), 'previewImageUrl', url); updateValue(entityKey(value), 'previewImageAssetId', assetId); }} /> */}
@@ -272,7 +288,7 @@ function validateGroup(group: ProductOptionGroup, groups: ProductOptionGroup[], 
   const errors: Record<string, string> = {};
   if (!group.name.trim()) errors.name = 'Option group name is required.';
   if (!group.code.trim()) errors.code = 'Option group code is required.';
-  if (group.code.trim() && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(group.code.trim())) errors.code = 'Use lowercase letters, numbers, and hyphens only.';
+  if (group.code.trim() && !/^(?=.*[a-z0-9])[a-z0-9_-]+$/.test(group.code.trim())) errors.code = 'Use lowercase letters, numbers, hyphens, and underscores only.';
   if (groups.some((item) => entityKey(item) !== editingId && item.code.trim().toLowerCase() === group.code.trim().toLowerCase())) errors.code = 'Code must be unique within this product.';
   if (group.required && !group.values.some((value) => value.isActive)) errors.activeValues = 'Required groups need at least one active value.';
   if (group.values.filter((value) => value.isDefault).length > 1) errors.activeValues = 'Only one value can be default.';
@@ -280,12 +296,17 @@ function validateGroup(group: ProductOptionGroup, groups: ProductOptionGroup[], 
   for (const value of group.values) {
     if (!value.label.trim()) errors[`value.${entityKey(value)}.label`] = 'Label is required.';
     if (!value.value.trim()) errors[`value.${entityKey(value)}.value`] = 'Value is required.';
-    if (value.value.trim() && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value.value.trim())) errors[`value.${entityKey(value)}.value`] = 'Use slug-safe lowercase text.';
+    if (value.value.trim() && !/^(?=.*[a-z0-9])[a-z0-9_.-]+$/.test(value.value.trim())) errors[`value.${entityKey(value)}.value`] = 'Use lowercase letters, numbers, periods, hyphens, and underscores only.';
     if (seen.has(value.value.trim().toLowerCase())) errors[`value.${entityKey(value)}.value`] = 'Value must be unique in this group.';
     seen.add(value.value.trim().toLowerCase());
     if (!Number.isFinite(Number(value.priceModifier))) errors[`value.${entityKey(value)}.priceModifier`] = 'Price modifier must be numeric.';
     if (value.priceModifierType === 'none' && Number(value.priceModifier) !== 0) errors[`value.${entityKey(value)}.priceModifier`] = 'No extra charge must use 0.';
     if ((value.priceModifierType === 'fixed' || value.priceModifierType === 'percentage') && Number(value.priceModifier) < 0) errors[`value.${entityKey(value)}.priceModifier`] = 'Price modifier must be zero or greater.';
+    if (value.priceModifierType === 'percentage') {
+      if (value.priceModifierMin !== undefined && (!Number.isFinite(value.priceModifierMin) || value.priceModifierMin < 0)) errors[`value.${entityKey(value)}.priceModifierMin`] = 'Minimum must be zero or greater.';
+      if (value.priceModifierMax !== undefined && (!Number.isFinite(value.priceModifierMax) || value.priceModifierMax < 0)) errors[`value.${entityKey(value)}.priceModifierMax`] = 'Maximum must be zero or greater.';
+      if (value.priceModifierMin !== undefined && value.priceModifierMax !== undefined && value.priceModifierMax < value.priceModifierMin) errors[`value.${entityKey(value)}.priceModifierMax`] = 'Maximum must be greater than or equal to minimum.';
+    }
     if (value.metadata?.colorHex && !/^#[0-9a-f]{6}$/i.test(value.metadata?.colorHex)) errors[`value.${entityKey(value)}.colorHex`] = 'Use a valid hex color.';
   }
   return errors;
@@ -303,13 +324,24 @@ function createValue(optionGroupId: string, sortOrder: number): ProductOptionVal
 
 function getModifierAmount(basePrice: number, value: ProductOptionValue) {
   if (value.priceModifierType === 'fixed') return value.priceModifier;
-  if (value.priceModifierType === 'percentage') return (basePrice * value.priceModifier) / 100;
+  if (value.priceModifierType === 'variant-fixed') return 0;
+  if (value.priceModifierType === 'variant-override') return 0;
+  if (value.priceModifierType === 'percentage') {
+    const calculated = (basePrice * value.priceModifier) / 100;
+    return Math.min(value.priceModifierMax ?? Number.POSITIVE_INFINITY, Math.max(value.priceModifierMin ?? Number.NEGATIVE_INFINITY, calculated));
+  }
   return 0;
 }
 
 function formatModifier(value: ProductOptionValue) {
   if (value.priceModifierType === 'fixed') return `+$${value.priceModifier.toFixed(2).replace(/\.00$/, '')}`;
-  if (value.priceModifierType === 'percentage') return `+${value.priceModifier}%`;
+  if (value.priceModifierType === 'variant-fixed') return `Variant option _${value.value}`;
+  if (value.priceModifierType === 'variant-override') return `Variant price _${value.value}`;
+  if (value.priceModifierType === 'percentage') {
+    const minimum = value.priceModifierMin !== undefined ? ` min $${value.priceModifierMin}` : '';
+    const maximum = value.priceModifierMax !== undefined ? ` max $${value.priceModifierMax}` : '';
+    return `+${value.priceModifier}%${minimum}${maximum}`;
+  }
   return 'No extra charge';
 }
 
@@ -318,8 +350,9 @@ function Pill({ children, tone = 'gray' }: { children: React.ReactNode; tone?: '
   return <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 ring-inset ${styles}`}>{children}</span>;
 }
 
-function slugify(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+function slugify(value: string, allowPeriod = false) {
+  const disallowed = allowPeriod ? /[^a-z0-9_.-]+/g : /[^a-z0-9_-]+/g;
+  return value.toLowerCase().replace(disallowed, '-').replace(/^-|-$/g, '');
 }
 
 function entityKey(entity: { _id: string; clientId?: string }) {
