@@ -95,7 +95,7 @@ export function PreviewTab({ product, onSave }: Props) {
           </SummaryPanel>
 
           <SummaryPanel title="Editor Rules">
-            {product.editorRules ? <dl className="space-y-2 text-sm"><SummaryRow label="Image upload" value={yesNo(product.editorRules.allowImageUpload)} /><SummaryRow label="Add text" value={yesNo(product.editorRules.allowAddText)} /><SummaryRow label="Clipart" value={yesNo(product.editorRules.allowClipart)} /><SummaryRow label="Crop" value={yesNo(product.editorRules.allowCrop)} /><SummaryRow label="Rotate" value={yesNo(product.editorRules.allowRotate)} /><SummaryRow label="Max images" value={`${product.editorRules.maxImageCount}`} /><SummaryRow label="Max text" value={`${product.editorRules.maxTextCount}`} /></dl> : <p className="text-sm text-gray-500">Editor rules are missing.</p>}
+            {product.editorRules ? <dl className="space-y-2 text-sm"><SummaryRow label="Image upload" value={yesNo(product.editorRules.allowImageUpload)} /><SummaryRow label="Custom size" value={yesNo(product.editorRules.allowCustomSize)} /><SummaryRow label="Add text" value={yesNo(product.editorRules.allowAddText)} /><SummaryRow label="Clipart" value={yesNo(product.editorRules.allowClipart)} /><SummaryRow label="Crop" value={yesNo(product.editorRules.allowCrop)} /><SummaryRow label="Rotate" value={yesNo(product.editorRules.allowRotate)} /><SummaryRow label="Max images" value={`${product.editorRules.maxImageCount}`} /><SummaryRow label="Max text" value={`${product.editorRules.maxTextCount}`} /></dl> : <p className="text-sm text-gray-500">Editor rules are missing.</p>}
           </SummaryPanel>
         </div>
       </div>

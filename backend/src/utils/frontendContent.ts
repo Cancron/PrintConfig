@@ -24,7 +24,7 @@ export function defaultFrontendContent() {
       { icon: '🚚', text: 'Free shipping Canada-wide', sortOrder: 1, isActive: true },
       { icon: '⚡', text: '24-hour production', sortOrder: 2, isActive: true },
       { icon: '🛡️', text: 'Lifetime warranty', sortOrder: 3, isActive: true },
-      { icon: '🇨🇦', text: 'Made in Canada', sortOrder: 4, isActive: true },
+      { icon: '🍁', text: 'Made in Canada', sortOrder: 4, isActive: true },
     ],
   };
 }

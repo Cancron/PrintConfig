@@ -20,7 +20,7 @@ export function createDefaultFrontendContent(): ProductFrontendContent {
     ['🚚', 'Free shipping Canada-wide'],
     ['⚡', '24-hour production'],
     ['🛡️', 'Lifetime warranty'],
-    ['🇨🇦', 'Made in Canada'],
+    ['🍁', 'Made in Canada'],
   ];
   return {
     promoText: '',

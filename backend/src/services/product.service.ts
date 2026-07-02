@@ -343,7 +343,7 @@ export async function getPublicProductConfig(id: string, merchantId?: string) {
     roomPreviews: sharedRoomData.roomPreviews.slice().sort((a: any, b: any) => a.sortOrder - b.sortOrder),
     frontendContent: publicFrontendContent(product.frontendContent),
     productSelection,
-    editorRules: product.editorRules,
+    editorRules: { ...(product.editorRules ?? {}), allowCustomSize: product.editorRules?.allowCustomSize ?? false },
     exportRules: product.exportRules,
     variants: activeVariants,
   };

@@ -13,6 +13,7 @@ type BooleanRule = {
   key: keyof Pick<
     EditorRules,
     | 'allowImageUpload'
+    | 'allowCustomSize'
     | 'allowAddText'
     | 'allowClipart'
     | 'allowBackgroundColor'
@@ -38,6 +39,11 @@ const booleanRules: BooleanRule[] = [
     key: 'allowImageUpload',
     label: 'Allow image upload',
     description: 'Customers can upload their own photos or artwork into the editor.',
+  },
+  {
+    key: 'allowCustomSize',
+    label: 'Allow custom size',
+    description: 'Customers can use ratio-derived dimensions such as 12 x 16.5 instead of selecting only an exact configured variant size.',
   },
   {
     key: 'allowAddText',

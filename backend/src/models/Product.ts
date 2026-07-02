@@ -146,6 +146,7 @@ const optionGroupSchema = new Schema(
 const editorRulesSchema = new Schema(
   {
     allowImageUpload: { type: Boolean, default: true },
+    allowCustomSize: { type: Boolean, default: false },
     allowAddText: { type: Boolean, default: true },
     allowClipart: { type: Boolean, default: false },
     allowBackgroundColor: { type: Boolean, default: true },
@@ -216,10 +217,10 @@ const productTrustBadgeSchema = new Schema(
 );
 
 const defaultTrustBadges = () => [
-  { icon: 'ÃƒÂ°Ã…Â¸Ã…Â¡Ã…Â¡', text: 'Free shipping Canada-wide', sortOrder: 1, isActive: true },
-  { icon: 'ÃƒÂ¢Ã…Â¡Ã‚Â¡', text: '24-hour production', sortOrder: 2, isActive: true },
-  { icon: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂºÃ‚Â¡ÃƒÂ¯Ã‚Â¸Ã‚Â', text: 'Lifetime warranty', sortOrder: 3, isActive: true },
-  { icon: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Â¡Ã‚Â¨ÃƒÂ°Ã…Â¸Ã¢â‚¬Â¡Ã‚Â¦', text: 'Made in Canada', sortOrder: 4, isActive: true },
+  { icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â¡Ãƒâ€¦Ã‚Â¡', text: 'Free shipping Canada-wide', sortOrder: 1, isActive: true },
+  { icon: 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â¡', text: '24-hour production', sortOrder: 2, isActive: true },
+  { icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂºÃƒâ€šÃ‚Â¡ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â', text: 'Lifetime warranty', sortOrder: 3, isActive: true },
+  { icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡Ãƒâ€šÃ‚Â¨ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡Ãƒâ€šÃ‚Â¦', text: 'Made in Canada', sortOrder: 4, isActive: true },
 ];
 
 const frontendContentSchema = new Schema(

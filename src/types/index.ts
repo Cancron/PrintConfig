@@ -252,6 +252,7 @@ export interface ProductSurface {
 
 export interface EditorRules {
   allowImageUpload: boolean;
+  allowCustomSize: boolean;
   allowAddText: boolean;
   allowClipart: boolean;
   allowBackgroundColor: boolean;
