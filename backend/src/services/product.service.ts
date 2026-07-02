@@ -348,6 +348,36 @@ export async function getPublicProductConfig(id: string, merchantId?: string) {
     variants: activeVariants,
   };
 }
+export async function listEditorProducts(apiPrivateKey: string) {
+  const merchant = await authenticateApiPrivateKey(apiPrivateKey);
+  if (!merchant) throw new ApiError(401, 'A valid merchant API private key is required.');
+
+  const products = await ProductModel.find({
+    ...visibleQuery(String(merchant.accountId), String(merchant._id)),
+    status: 'active',
+  })
+    .select('name productType categoryId status updatedAt')
+    .sort({ name: 1 })
+    .lean();
+
+  const categoryIds = [...new Set(products.map((product: any) => String(product.categoryId ?? '')).filter(Boolean))];
+  const categories = await ProductCategoryModel.find({ _id: { $in: categoryIds } })
+    .select('name slug')
+    .lean();
+  const categoriesById = new Map(categories.map((category: any) => [String(category._id), category]));
+
+  return products.map((product: any) => {
+    const category = categoriesById.get(String(product.categoryId));
+    return {
+      _id: String(product._id),
+      name: product.name,
+      productType: product.productType,
+      category: category ? { _id: String(category._id), name: category.name, slug: category.slug } : null,
+      status: product.status,
+      updatedAt: product.updatedAt,
+    };
+  });
+}
 export async function getEditorProductConfig(id: string, apiPrivateKey: string) {
   const merchant = await authenticateApiPrivateKey(apiPrivateKey);
   if (!merchant) throw new ApiError(401, 'A valid merchant API private key is required.');

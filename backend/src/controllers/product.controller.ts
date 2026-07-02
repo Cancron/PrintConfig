@@ -13,3 +13,4 @@ export async function calculatePrice(req: Request, res: Response, next: NextFunc
 
 export async function publicConfig(req: Request, res: Response, next: NextFunction) { try { res.json(await service.getPublicProductConfig(String(req.params.id), typeof req.query.merchantId === 'string' ? req.query.merchantId : undefined)); } catch (e) { next(e); } }
 export async function editorConfig(req: Request, res: Response, next: NextFunction) { try { res.json(await service.getEditorProductConfig(String(req.params.id), String(req.header('x-api-key') ?? ''))); } catch (e) { next(e); } }
+export async function editorList(req: Request, res: Response, next: NextFunction) { try { res.json(await service.listEditorProducts(String(req.header('x-api-key') ?? ''))); } catch (e) { next(e); } }

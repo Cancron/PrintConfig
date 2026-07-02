@@ -4,6 +4,7 @@ import * as controller from '../controllers/product.controller.js';
 export const productRoutes = Router();
 productRoutes.get('/', controller.list);
 productRoutes.get('/public/:id/config', controller.publicConfig);
+productRoutes.get('/editor', controller.editorList);
 productRoutes.get('/editor/:id/config', controller.editorConfig);
 productRoutes.get('/:id', controller.get);
 productRoutes.post('/', controller.create);
