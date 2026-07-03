@@ -7,3 +7,5 @@ export async function create(req: Request, res: Response, next: NextFunction) { 
 export async function update(req: Request, res: Response, next: NextFunction) { try { res.json(await service.updateMerchant(String(req.params.id), req.body)); } catch (e) { next(e); } }
 export async function remove(req: Request, res: Response, next: NextFunction) { try { res.json(await service.deleteMerchant(String(req.params.id))); } catch (e) { next(e); } }
 export async function rotateApiKey(req: Request, res: Response, next: NextFunction) { try { const result = await service.rotateApiPrivateKey(String(req.params.id)); if (!result) return res.status(404).json({ error: 'Merchant not found.' }); res.json(result); } catch (e) { next(e); } }
+export async function getPublicConfig(req: Request, res: Response, next: NextFunction) { try { res.json( await service.getMerchantPublicConfig(String(req.header("x-api-key") ?? ""))); } catch (e) { next(e); }
+}

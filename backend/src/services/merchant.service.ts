@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { MerchantModel } from '../models/Merchant.js';
 import { resolveAccountId } from './account.service.js';
+import { ApiError } from '../middleware/errorHandler.js';
 
 export { resolveAccountId };
 
@@ -56,4 +57,19 @@ export async function authenticateApiPrivateKey(apiPrivateKey: string) {
     apiPrivateKeyHash: hashApiKey(apiPrivateKey),
     status: 'active',
   }).select('+apiPrivateKeyHash');
+}
+export async function getMerchantPublicConfig(apiPrivateKey: string) {
+  const merchant = await authenticateApiPrivateKey(apiPrivateKey);
+  if (!merchant) throw new ApiError(401, 'A valid merchant API private key is required.');
+  
+  return {
+    _id: String(merchant._id),
+    name: merchant.name,
+    slug: merchant.slug,
+    logoUrl: merchant.logoUrl,
+    status: merchant.status,
+    editorPrimaryColor: merchant.editorPrimaryColor,
+    editorSecondaryColor: merchant.editorSecondaryColor,
+    editorAccentColor: merchant.editorAccentColor,
+  };
 }
