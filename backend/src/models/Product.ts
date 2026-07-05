@@ -130,6 +130,15 @@ const optionValueSchema = new Schema(
   { timestamps: true }
 );
 
+const dependencyRuleSchema = new Schema(
+  {
+    dependsOnGroupCode: { type: String, required: true, trim: true },
+    condition: { type: String, enum: ['equals', 'not_equals', 'in', 'not_in'], default: 'in' },
+    allowedValues: { type: [String], default: [] },
+  },
+  { _id: false }
+);
+
 const optionGroupSchema = new Schema(
   {
     productId: { type: Schema.Types.ObjectId, ref: 'Product' },
@@ -139,6 +148,7 @@ const optionGroupSchema = new Schema(
     required: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0 },
     values: { type: [optionValueSchema], default: [] },
+    dependencyRules: { type: [dependencyRuleSchema], default: [] },
   },
   { timestamps: true }
 );

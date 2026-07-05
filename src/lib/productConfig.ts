@@ -19,6 +19,7 @@ import type {
   ProductVariant,
   VariantOptionDefinition,
   TemplateElement,
+  DependencyRule,
 } from '../types';
 
 const PRODUCT_TYPES: ProductType[] = [
@@ -190,8 +191,24 @@ function normalizeOptionGroup(input: Record<string, unknown>, productId: string,
     required: input.required !== false,
     sortOrder: numberOr(input.sortOrder, index + 1),
     values: Array.isArray(input.values) ? input.values.filter(isRecord).map((value, valueIndex) => normalizeOptionValue(value, id, now, valueIndex)) : [],
+    dependencyRules: Array.isArray(input.dependencyRules)
+      ? input.dependencyRules.filter(isRecord).map((rule) => normalizeDependencyRule(rule))
+      : [],
     createdAt: now,
     updatedAt: now,
+  };
+}
+
+function normalizeDependencyRule(input: Record<string, unknown>): DependencyRule {
+  return {
+    dependsOnGroupCode: typeof input.dependsOnGroupCode === 'string' ? input.dependsOnGroupCode : '',
+    condition:
+      input.condition === 'equals' || input.condition === 'not_equals' || input.condition === 'in' || input.condition === 'not_in'
+        ? input.condition
+        : 'in',
+    allowedValues: Array.isArray(input.allowedValues)
+      ? input.allowedValues.filter((v): v is string => typeof v === 'string')
+      : [],
   };
 }
 

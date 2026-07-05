@@ -11,6 +11,118 @@ import { visibleQuery } from './category.service.js';
 import { resolveAccountId } from './account.service.js';
 import { authenticateApiPrivateKey } from './merchant.service.js';
 
+export type DependencyCondition = 'equals' | 'not_equals' | 'in' | 'not_in';
+
+export interface DependencyRule {
+  dependsOnGroupCode: string;
+  condition: DependencyCondition;
+  allowedValues: string[];
+}
+
+function evaluateDependencyRule(
+  rule: DependencyRule,
+  selectedValues: Record<string, string>
+): boolean {
+  const selectedValue = selectedValues[rule.dependsOnGroupCode];
+
+  // If the parent group has no selection, the dependency is not satisfied
+  if (selectedValue === undefined || selectedValue === '') {
+    return false;
+  }
+
+  switch (rule.condition) {
+    case 'equals':
+      return selectedValue === rule.allowedValues[0];
+    case 'not_equals':
+      return selectedValue !== rule.allowedValues[0];
+    case 'in':
+      return rule.allowedValues.includes(selectedValue);
+    case 'not_in':
+      return !rule.allowedValues.includes(selectedValue);
+    default:
+      return false;
+  }
+}
+
+export function evaluateOptionGroupVisibility(
+  groups: Array<{ code: string; dependencyRules?: DependencyRule[] }>,
+  selectedValues: Record<string, string>
+): Record<string, boolean> {
+  const result: Record<string, boolean> = {};
+
+  for (const group of groups) {
+    // If no dependency rules, group is always visible
+    if (!group.dependencyRules || group.dependencyRules.length === 0) {
+      result[group.code] = true;
+      continue;
+    }
+
+    // All rules must pass (AND logic)
+    const isVisible = group.dependencyRules.every((rule) =>
+      evaluateDependencyRule(rule, selectedValues)
+    );
+    result[group.code] = isVisible;
+  }
+
+  return result;
+}
+
+function detectCircularDependencies(
+  groups: Array<{ code: string; dependencyRules?: DependencyRule[] }>
+): string[] {
+  const issues: string[] = [];
+  const groupCodes = new Set(groups.map((g) => g.code));
+
+  for (const group of groups) {
+    if (!group.dependencyRules) continue;
+
+    for (const rule of group.dependencyRules) {
+      // Check if referenced group exists
+      if (!groupCodes.has(rule.dependsOnGroupCode)) {
+        issues.push(
+          `Group "${group.code}" depends on non-existent group "${rule.dependsOnGroupCode}"`
+        );
+        continue;
+      }
+
+      // Check for circular dependency
+      const visited = new Set<string>();
+      const stack = [group.code];
+
+      while (stack.length > 0) {
+        const current = stack.pop()!;
+        if (current === rule.dependsOnGroupCode) {
+          // We've traced back to a group that depends on us - circular!
+          // But we need to find the actual cycle, not just A depends on B
+          // Actually, a single dependency rule means group A depends on group B's value
+          // This is NOT circular - it's a valid dependency chain
+          // Circular would be: A depends on B, B depends on A
+          // Let's check if the target group depends on us
+          const targetGroup = groups.find((g) => g.code === rule.dependsOnGroupCode);
+          if (targetGroup?.dependencyRules?.some((r) => r.dependsOnGroupCode === group.code)) {
+            issues.push(
+              `Circular dependency detected: "${group.code}" and "${rule.dependsOnGroupCode}" depend on each other`
+            );
+          }
+          continue;
+        }
+
+        if (visited.has(current)) continue;
+        visited.add(current);
+
+        const currentGroup = groups.find((g) => g.code === current);
+        if (currentGroup?.dependencyRules) {
+          for (const r of currentGroup.dependencyRules) {
+            stack.push(r.dependsOnGroupCode);
+          }
+        }
+      }
+    }
+  }
+
+  return issues;
+}
+
 function normalizeScope(data: Record<string, unknown>) {
   if (data.scope === 'shared') data.merchantId = null;
   if (data.scope === 'merchant' && !data.merchantId) throw new ApiError(400, 'merchantId is required for merchant scoped products.');
@@ -135,6 +247,25 @@ function validateProductShape(data: Record<string, any>) {
       }
     }
     if (defaultCount > 1) throw new ApiError(400, 'Only one option value can be default inside an option group.');
+    // Validate dependency rules
+    if (Array.isArray(group.dependencyRules)) {
+      for (const rule of group.dependencyRules) {
+        if (!String(rule.dependsOnGroupCode ?? '').trim()) {
+          throw new ApiError(400, 'Dependency rule must specify a target group code.');
+        }
+        if (!['equals', 'not_equals', 'in', 'not_in'].includes(rule.condition)) {
+          throw new ApiError(400, 'Dependency rule condition must be equals, not_equals, in, or not_in.');
+        }
+        if (!Array.isArray(rule.allowedValues) || rule.allowedValues.length === 0) {
+          throw new ApiError(400, 'Dependency rule must have at least one allowed value.');
+        }
+      }
+    }
+  }
+  // Check for circular dependencies and missing group references
+  const dependencyIssues = detectCircularDependencies(data.optionGroups ?? []);
+  if (dependencyIssues.length > 0) {
+    throw new ApiError(400, `Dependency validation failed: ${dependencyIssues.join('; ')}`);
   }
 }
 
@@ -285,6 +416,11 @@ function publicOptionGroups(optionGroups: any[] = []) {
       displayType: group.displayType,
       required: group.required,
       sortOrder: group.sortOrder,
+      dependencyRules: (group.dependencyRules ?? []).map((rule: any) => ({
+        dependsOnGroupCode: rule.dependsOnGroupCode,
+        condition: rule.condition,
+        allowedValues: rule.allowedValues,
+      })),
       values: (group.values ?? [])
         .filter((value: any) => value.isActive !== false)
         .slice()
