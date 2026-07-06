@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Check, Copy, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { AlertCircle, Check, Copy, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { ImageField } from '../gallery/ImageField';
-import type { PriceModifierType, Product, ProductOptionDisplayType, ProductOptionGroup, ProductOptionValue } from '../../types';
+import { getVisibilityPreviewText } from '../../lib/optionDependency';
+import type { DependencyCondition, DependencyRule, PriceModifierType, Product, ProductOptionDisplayType, ProductOptionGroup, ProductOptionValue } from '../../types';
 
 interface Props {
   product: Product;
@@ -131,6 +132,37 @@ export function OptionsTab({ product, onSave }: Props) {
     setForm((prev) => (prev ? { ...prev, values: prev.values.filter((value) => entityKey(value) !== id) } : prev));
   }
 
+  function addDependencyRule() {
+    setForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            dependencyRules: [
+              ...(prev.dependencyRules ?? []),
+              { dependsOnGroupCode: '', condition: 'in', allowedValues: [] },
+            ],
+          }
+        : prev
+    );
+  }
+
+  function updateDependencyRule(index: number, field: keyof DependencyRule, value: string | string[] | DependencyCondition) {
+    setForm((prev) => {
+      if (!prev) return prev;
+      const rules = [...(prev.dependencyRules ?? [])];
+      rules[index] = { ...rules[index], [field]: value };
+      return { ...prev, dependencyRules: rules };
+    });
+  }
+
+  function deleteDependencyRule(index: number) {
+    setForm((prev) =>
+      prev
+        ? { ...prev, dependencyRules: prev.dependencyRules?.filter((_, i) => i !== index) }
+        : prev
+    );
+  }
+
   return (
     <div className="space-y-6 pb-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -199,6 +231,122 @@ export function OptionsTab({ product, onSave }: Props) {
             ))}
           </div>
 
+          {/* Visibility Rules Section */}
+          <div className="mt-6 border-t border-gray-200 pt-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Visibility Rules</h3>
+                <p className="mt-1 text-xs text-gray-500">Show this group only when selected values match these conditions.</p>
+              </div>
+              <button
+                type="button"
+                onClick={addDependencyRule}
+                className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50"
+              >
+                <Plus className="h-4 w-4" /> Add Rule
+              </button>
+            </div>
+
+            {(form.dependencyRules?.length ?? 0) > 0 && (
+              <div className="mt-4 space-y-3">
+                {form.dependencyRules?.map((rule, index) => {
+                  const targetGroup = product.optionGroups.find((g) => g.code === rule.dependsOnGroupCode);
+                  const targetValues = targetGroup?.values.filter((v) => v.isActive) ?? [];
+                  const otherGroups = product.optionGroups.filter((g) => g.code !== form.code);
+
+                  return (
+                    <div key={index} className="rounded-lg bg-white p-4 ring-1 ring-gray-200">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <Select
+                          label="Depends On Group"
+                          value={rule.dependsOnGroupCode}
+                          onChange={(e) => updateDependencyRule(index, 'dependsOnGroupCode', e.target.value)}
+                          options={[
+                            { value: '', label: 'Select a group' },
+                            ...otherGroups.map((g) => ({ value: g.code, label: g.name })),
+                          ]}
+                        />
+                        <Select
+                          label="Condition"
+                          value={rule.condition}
+                          onChange={(e) => updateDependencyRule(index, 'condition', e.target.value as DependencyCondition)}
+                          options={[
+                            { value: 'equals', label: 'equals' },
+                            { value: 'not_equals', label: 'not equals' },
+                            { value: 'in', label: 'in list' },
+                            { value: 'not_in', label: 'not in list' },
+                          ]}
+                        />
+                        <div className="sm:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Allowed Values {rule.condition === 'equals' || rule.condition === 'not_equals' ? '(single)' : '(multiple)'}
+                          </label>
+                          {targetValues.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {targetValues.map((v) => (
+                                <label
+                                  key={v.value}
+                                  className="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-2 py-1 text-sm ring-1 ring-gray-200 cursor-pointer hover:bg-gray-100"
+                                >
+                                  <input
+                                    type={rule.condition === 'equals' || rule.condition === 'not_equals' ? 'radio' : 'checkbox'}
+                                    name={`rule-${index}-value`}
+                                    checked={rule.allowedValues.includes(v.value)}
+                                    onChange={() => {
+                                      if (rule.condition === 'equals' || rule.condition === 'not_equals') {
+                                        updateDependencyRule(index, 'allowedValues', [v.value]);
+                                      } else {
+                                        const newValues = rule.allowedValues.includes(v.value)
+                                          ? rule.allowedValues.filter((val) => val !== v.value)
+                                          : [...rule.allowedValues, v.value];
+                                        updateDependencyRule(index, 'allowedValues', newValues);
+                                      }
+                                    }}
+                                    className="h-4 w-4 rounded border-gray-300"
+                                  />
+                                  {v.label}
+                                </label>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-500 italic">Select a target group to see available values</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => deleteDependencyRule(index)}
+                          className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" /> Remove Rule
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {(form.dependencyRules?.length ?? 0) > 0 && (
+              <div className="mt-4 rounded-lg bg-blue-50 p-3 ring-1 ring-blue-100">
+                <div className="flex items-center gap-2 text-sm text-blue-700">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="font-medium">Visibility Preview:</span>
+                </div>
+                <p className="mt-1 text-sm text-blue-900">
+                  This group will show when: {getVisibilityPreviewText(form, product.optionGroups)}
+                </p>
+              </div>
+            )}
+
+            {(form.dependencyRules?.length ?? 0) === 0 && (
+              <p className="mt-3 text-sm text-gray-500">
+                No visibility rules configured. This group will always be visible.
+              </p>
+            )}
+          </div>
+
           <div className="mt-6 flex items-center gap-3">
             <button type="button" onClick={saveGroup} disabled={!isValid} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"><Check className="h-4 w-4" /> Save Group</button>
             <button type="button" onClick={() => { setForm(null); setEditingGroupId(null); }} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50"><X className="h-4 w-4" /> Cancel</button>
@@ -215,8 +363,14 @@ export function OptionsTab({ product, onSave }: Props) {
                   <h3 className="text-base font-semibold text-gray-900">{group.name}</h3>
                   <Pill>{group.displayType}</Pill>
                   <Pill tone={group.required ? 'amber' : 'gray'}>{group.required ? 'Required' : 'Optional'}</Pill>
+                  {(group.dependencyRules?.length ?? 0) > 0 && <Pill tone="blue">Conditional</Pill>}
                 </div>
                 <p className="mt-1 text-sm text-gray-500">Code: {group.code} - {group.values.length} values</p>
+                {(group.dependencyRules?.length ?? 0) > 0 && (
+                  <p className="mt-1 text-xs text-blue-600">
+                    Shows when: {getVisibilityPreviewText(group, product.optionGroups)}
+                  </p>
+                )}
               </div>
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={() => moveGroup(entityKey(group), -1)} disabled={index === 0} className="rounded-md p-2 text-gray-500 hover:bg-gray-100 disabled:opacity-40"><GripVertical className="h-4 w-4" /></button>
@@ -314,7 +468,7 @@ function validateGroup(group: ProductOptionGroup, groups: ProductOptionGroup[], 
 
 function createGroup(productId: string, sortOrder: number): ProductOptionGroup {
   const now = new Date().toISOString();
-  return { _id: '', clientId: crypto.randomUUID(), productId, name: '', code: '', displayType: 'Dropdown', required: true, sortOrder, values: [], createdAt: now, updatedAt: now };
+  return { _id: '', clientId: crypto.randomUUID(), productId, name: '', code: '', displayType: 'Dropdown', required: true, sortOrder, values: [], dependencyRules: [], createdAt: now, updatedAt: now };
 }
 
 function createValue(optionGroupId: string, sortOrder: number): ProductOptionValue {

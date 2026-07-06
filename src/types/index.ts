@@ -206,6 +206,14 @@ export interface ProductOptionValue {
   updatedAt: string;
 }
 
+export type DependencyCondition = 'equals' | 'not_equals' | 'in' | 'not_in';
+
+export interface DependencyRule {
+  dependsOnGroupCode: string;
+  condition: DependencyCondition;
+  allowedValues: string[];
+}
+
 export interface ProductOptionGroup {
   _id: string;
   clientId?: string;
@@ -216,6 +224,7 @@ export interface ProductOptionGroup {
   required: boolean;
   sortOrder: number;
   values: ProductOptionValue[];
+  dependencyRules: DependencyRule[];
   createdAt: string;
   updatedAt: string;
 }
