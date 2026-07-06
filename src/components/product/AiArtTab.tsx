@@ -27,18 +27,12 @@ export function AiArtTab({ product, onSave }: Props) {
   }, [form, originalAiArt]);
 
   const sortedStyles = useMemo(() => {
-    return [...(form.styles ?? [])].sort((a, b) => {
-      const groupA = a.groupName || '';
-      const groupB = b.groupName || '';
-      if (groupA !== groupB) return groupA.localeCompare(groupB);
-      return a.sortOrder - b.sortOrder;
-    });
+    return [...(form.styles ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
   }, [form.styles]);
 
   const styleErrors = useMemo(() => (styleForm ? validateStyle(styleForm, form.styles, editingStyleId) : {}), [editingStyleId, styleForm, form.styles]);
   const isStyleValid = Object.keys(styleErrors).length === 0;
 
-  // Sync form when product changes (e.g., after save)
   useEffect(() => {
     setForm(JSON.parse(JSON.stringify(originalAiArt)));
   }, [originalAiArt]);
@@ -59,16 +53,13 @@ export function AiArtTab({ product, onSave }: Props) {
       clientId: crypto.randomUUID(),
       name: '',
       slug: '',
-      groupName: '',
-      description: '',
       prompt: '',
-      negativePrompt: '',
+      artTitlePrompt: '',
       additionalPrice: 0,
       previewImageUrl: '',
       thumbnailImageUrl: '',
       sortOrder: (form.styles?.length ?? 0) + 1,
       isActive: true,
-      tags: [],
       metadata: {},
       createdAt: now,
       updatedAt: now,
@@ -209,38 +200,43 @@ export function AiArtTab({ product, onSave }: Props) {
             options={yesNoOptions}
           />
           <Select
-            label="Show Descriptions"
-            value={form.showDescriptions ? 'yes' : 'no'}
-            onChange={(e) => updateConfig('showDescriptions', e.target.value === 'yes')}
-            options={yesNoOptions}
-          />
-          <Select
-            label="Show Group Names"
-            value={form.showGroupNames ? 'yes' : 'no'}
-            onChange={(e) => updateConfig('showGroupNames', e.target.value === 'yes')}
-            options={yesNoOptions}
-          />
-          <Select
             label="Show Additional Price"
             value={form.showAdditionalPrice ? 'yes' : 'no'}
             onChange={(e) => updateConfig('showAdditionalPrice', e.target.value === 'yes')}
             options={yesNoOptions}
           />
+          <Select
+            label="Allow Art Name"
+            value={form.allowArtName ? 'yes' : 'no'}
+            onChange={(e) => updateConfig('allowArtName', e.target.value === 'yes')}
+            options={yesNoOptions}
+          />
         </div>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+        {form.allowArtName && (
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input
+              label="Art Name Field Label"
+              value={form.artNameFieldLabel}
+              onChange={(e) => updateConfig('artNameFieldLabel', e.target.value)}
+              placeholder="Pet name (optional)"
+            />
+            <Input
+              label="Art Name Field Placeholder"
+              value={form.artNameFieldPlaceholder}
+              onChange={(e) => updateConfig('artNameFieldPlaceholder', e.target.value)}
+              placeholder="e.g., Buddy, Luna, Max"
+            />
+          </div>
+        )}
+
+        <div className="mt-4">
           <Textarea
             label="Help Text"
             value={form.helpText}
             onChange={(e) => updateConfig('helpText', e.target.value)}
             rows={2}
             placeholder="Upload your pet photo. We will create the selected artwork style before printing."
-          />
-          <Textarea
-            label="Generation Note"
-            value={form.generationNote}
-            onChange={(e) => updateConfig('generationNote', e.target.value)}
-            rows={2}
-            placeholder="Proof/revision available before production."
           />
         </div>
       </div>
@@ -272,13 +268,18 @@ export function AiArtTab({ product, onSave }: Props) {
                 error={styleErrors.slug}
                 required
               />
-              <Input label="Group Name" value={styleForm.groupName} onChange={(e) => updateStyleField('groupName', e.target.value)} placeholder="Classic Styles" />
               <Input label="Sort Order" type="number" value={styleForm.sortOrder} onChange={(e) => updateStyleField('sortOrder', Number(e.target.value))} />
+              <Input
+                label="Additional Price"
+                type="number"
+                min={0}
+                step={0.01}
+                value={styleForm.additionalPrice}
+                onChange={(e) => updateStyleField('additionalPrice', Math.max(0, Number(e.target.value)))}
+                error={styleErrors.additionalPrice}
+              />
             </div>
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Textarea label="Description" value={styleForm.description} onChange={(e) => updateStyleField('description', e.target.value)} rows={2} />
-              <Textarea label="Negative Prompt" value={styleForm.negativePrompt} onChange={(e) => updateStyleField('negativePrompt', e.target.value)} rows={2} />
-            </div>
+
             <div className="mt-4">
               <Textarea
                 label="Prompt"
@@ -290,34 +291,36 @@ export function AiArtTab({ product, onSave }: Props) {
                 placeholder="Create a watercolor pet portrait from the uploaded pet photo..."
               />
             </div>
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Input
-                label="Additional Price"
-                type="number"
-                min={0}
-                step={0.01}
-                value={styleForm.additionalPrice}
-                onChange={(e) => updateStyleField('additionalPrice', Math.max(0, Number(e.target.value)))}
-                error={styleErrors.additionalPrice}
-              />
-              <Input label="Tags (comma separated)" value={styleForm.tags.join(', ')} onChange={(e) => updateStyleField('tags', e.target.value.split(',').map((t) => t.trim()).filter(Boolean))} />
+
+            {form.allowArtName && (
+              <div className="mt-4">
+                <Textarea
+                  label="Art Title Prompt"
+                  value={styleForm.artTitlePrompt}
+                  onChange={(e) => updateStyleField('artTitlePrompt', e.target.value)}
+                  rows={2}
+                  placeholder="Mention [_name] to use the custom name in the prompt. e.g., 'Create a portrait of [_name] the pet...'"
+                />
+                <p className="mt-1 text-xs text-gray-500">Use [_name] placeholder to include the customer-provided name in the generated art title.</p>
+              </div>
+            )}
+
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Select
                 label="Active"
                 value={styleForm.isActive ? 'yes' : 'no'}
                 onChange={(e) => updateStyleField('isActive', e.target.value === 'yes')}
                 options={yesNoOptions}
               />
-              <div className="sm:col-span-1">
-                <ImageField
-                  label="Preview Image"
-                  url={styleForm.previewImageUrl}
-                  assetId={styleForm.previewImageAssetId}
-                  onChange={(url, assetId) => {
-                    updateStyleField('previewImageUrl', url);
-                    updateStyleField('previewImageAssetId', assetId);
-                  }}
-                />
-              </div>
+              <ImageField
+                label="Preview Image"
+                url={styleForm.previewImageUrl}
+                assetId={styleForm.previewImageAssetId}
+                onChange={(url, assetId) => {
+                  updateStyleField('previewImageUrl', url);
+                  updateStyleField('previewImageAssetId', assetId);
+                }}
+              />
             </div>
 
             <div className="mt-6 flex items-center gap-3">
@@ -364,10 +367,8 @@ export function AiArtTab({ product, onSave }: Props) {
                       <div className="flex flex-wrap items-center gap-2">
                         <h4 className="text-sm font-semibold text-gray-900">{style.name}</h4>
                         <Pill tone={style.isActive ? 'emerald' : 'gray'}>{style.isActive ? 'Active' : 'Inactive'}</Pill>
-                        {style.groupName && <Pill tone="blue">{style.groupName}</Pill>}
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5">Slug: {style.slug}</p>
-                      {style.description && <p className="text-xs text-gray-600 mt-1 line-clamp-1">{style.description}</p>}
                       <p className="text-xs text-gray-500 mt-1">Additional Price: ${style.additionalPrice.toFixed(2)}</p>
                     </div>
                   </div>
@@ -406,6 +407,16 @@ export function AiArtTab({ product, onSave }: Props) {
                 <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">{form.badgeText}</span>
               )}
             </div>
+            {form.allowArtName && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">{form.artNameFieldLabel || 'Pet name (optional)'}</label>
+                <input
+                  type="text"
+                  className="rounded-md border-0 px-3 py-2 text-sm shadow-sm ring-1 ring-gray-300 placeholder:text-gray-400"
+                  placeholder={form.artNameFieldPlaceholder || 'e.g., Buddy, Luna, Max'}
+                />
+              </div>
+            )}
             <div className="flex flex-wrap gap-3">
               {sortedStyles.filter((s) => s.isActive).map((style) => (
                 <div
@@ -423,16 +434,12 @@ export function AiArtTab({ product, onSave }: Props) {
                   {form.showAdditionalPrice && style.additionalPrice > 0 && (
                     <p className="text-xs text-gray-500">+${style.additionalPrice.toFixed(0)}</p>
                   )}
-                  {form.showDescriptions && style.description && (
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{style.description}</p>
-                  )}
                 </div>
               ))}
             </div>
-            {(form.helpText || form.generationNote) && (
-              <div className="mt-4 space-y-1 text-xs text-gray-600">
-                {form.helpText && <p>{form.helpText}</p>}
-                {form.generationNote && <p className="text-gray-500">{form.generationNote}</p>}
+            {form.helpText && (
+              <div className="mt-4 text-xs text-gray-600">
+                <p>{form.helpText}</p>
               </div>
             )}
           </div>

@@ -523,38 +523,31 @@ function publicAiArtConfig(aiArt: any) {
   }
   const activeStyles = (aiArt.styles ?? [])
     .filter((style: any) => style.isActive !== false)
-    .sort((a: any, b: any) => {
-      const groupA = String(a.groupName ?? '');
-      const groupB = String(b.groupName ?? '');
-      if (groupA !== groupB) return groupA.localeCompare(groupB);
-      return Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0);
-    });
+    .sort((a: any, b: any) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0));
   return {
     enabled: true,
     sectionTitle: aiArt.sectionTitle || 'AI Art Styles',
     badgeText: aiArt.badgeText || '',
     helpText: aiArt.helpText || '',
-    generationNote: aiArt.generationNote || '',
     requireUploadBeforeStyleSelection: aiArt.requireUploadBeforeStyleSelection ?? true,
     maxUploadImages: aiArt.maxUploadImages ?? 1,
     defaultGeneratedImageCount: aiArt.defaultGeneratedImageCount ?? 4,
     allowMultipleStyleSelection: aiArt.allowMultipleStyleSelection ?? false,
     showDescriptions: aiArt.showDescriptions ?? true,
-    showGroupNames: aiArt.showGroupNames ?? true,
     showAdditionalPrice: aiArt.showAdditionalPrice ?? true,
+    allowArtName: aiArt.allowArtName ?? false,
+    artNameFieldLabel: aiArt.artNameFieldLabel || 'Pet name (optional)',
+    artNameFieldPlaceholder: aiArt.artNameFieldPlaceholder || 'e.g., Buddy, Luna, Max',
     styles: activeStyles.map((style: any) => ({
       _id: style._id,
       name: style.name,
       slug: style.slug,
-      groupName: style.groupName || '',
-      description: style.description || '',
       prompt: style.prompt,
-      negativePrompt: style.negativePrompt || '',
+      artTitlePrompt: style.artTitlePrompt || '',
       additionalPrice: style.additionalPrice ?? 0,
       previewImageUrl: style.previewImageUrl || '',
       thumbnailImageUrl: style.thumbnailImageUrl || '',
       sortOrder: style.sortOrder ?? 0,
-      tags: style.tags || [],
     })),
   };
 }

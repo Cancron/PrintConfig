@@ -385,10 +385,8 @@ export interface AiArtStyle {
   clientId?: string;
   name: string;
   slug: string;
-  groupName: string;
-  description: string;
   prompt: string;
-  negativePrompt: string;
+  artTitlePrompt: string;
   additionalPrice: number;
   previewImageUrl: string;
   previewImageAssetId?: string;
@@ -396,7 +394,6 @@ export interface AiArtStyle {
   thumbnailImageAssetId?: string;
   sortOrder: number;
   isActive: boolean;
-  tags: string[];
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -407,14 +404,15 @@ export interface AiArtConfig {
   sectionTitle: string;
   badgeText: string;
   helpText: string;
-  generationNote: string;
   requireUploadBeforeStyleSelection: boolean;
   maxUploadImages: number;
   defaultGeneratedImageCount: number;
   allowMultipleStyleSelection: boolean;
   showDescriptions: boolean;
-  showGroupNames: boolean;
   showAdditionalPrice: boolean;
+  allowArtName: boolean;
+  artNameFieldLabel: string;
+  artNameFieldPlaceholder: string;
   styles: AiArtStyle[];
 }
 

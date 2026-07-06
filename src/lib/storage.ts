@@ -74,14 +74,15 @@ export const defaultAiArtConfig: AiArtConfig = {
   sectionTitle: 'AI Art Styles',
   badgeText: '',
   helpText: '',
-  generationNote: '',
   requireUploadBeforeStyleSelection: true,
   maxUploadImages: 1,
   defaultGeneratedImageCount: 4,
   allowMultipleStyleSelection: false,
   showDescriptions: true,
-  showGroupNames: true,
   showAdditionalPrice: true,
+  allowArtName: false,
+  artNameFieldLabel: 'Pet name (optional)',
+  artNameFieldPlaceholder: 'e.g., Buddy, Luna, Max',
   styles: [],
 };
 
