@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Check, Copy, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
@@ -17,24 +17,38 @@ const yesNoOptions = [
 ];
 
 export function AiArtTab({ product, onSave }: Props) {
-  const aiArt = product.aiArt;
+  const originalAiArt = product.aiArt;
+  const [form, setForm] = useState<AiArtConfig>(JSON.parse(JSON.stringify(originalAiArt)));
   const [editingStyleId, setEditingStyleId] = useState<string | null>(null);
   const [styleForm, setStyleForm] = useState<AiArtStyle | null>(null);
-  const sortedStyles = [...(aiArt.styles ?? [])].sort((a, b) => {
-    const groupA = a.groupName || '';
-    const groupB = b.groupName || '';
-    if (groupA !== groupB) return groupA.localeCompare(groupB);
-    return a.sortOrder - b.sortOrder;
-  });
 
-  const styleErrors = useMemo(() => (styleForm ? validateStyle(styleForm, aiArt.styles, editingStyleId) : {}), [editingStyleId, styleForm, aiArt.styles]);
+  const hasChanges = useMemo(() => {
+    return JSON.stringify(form) !== JSON.stringify(originalAiArt);
+  }, [form, originalAiArt]);
+
+  const sortedStyles = useMemo(() => {
+    return [...(form.styles ?? [])].sort((a, b) => {
+      const groupA = a.groupName || '';
+      const groupB = b.groupName || '';
+      if (groupA !== groupB) return groupA.localeCompare(groupB);
+      return a.sortOrder - b.sortOrder;
+    });
+  }, [form.styles]);
+
+  const styleErrors = useMemo(() => (styleForm ? validateStyle(styleForm, form.styles, editingStyleId) : {}), [editingStyleId, styleForm, form.styles]);
   const isStyleValid = Object.keys(styleErrors).length === 0;
 
+  // Sync form when product changes (e.g., after save)
+  useEffect(() => {
+    setForm(JSON.parse(JSON.stringify(originalAiArt)));
+  }, [originalAiArt]);
+
+  function saveAll() {
+    onSave({ ...product, aiArt: form });
+  }
+
   function updateConfig<K extends keyof AiArtConfig>(field: K, value: AiArtConfig[K]) {
-    onSave({
-      ...product,
-      aiArt: { ...aiArt, [field]: value },
-    });
+    setForm((prev) => ({ ...prev, [field]: value }));
   }
 
   function startAddStyle() {
@@ -52,7 +66,7 @@ export function AiArtTab({ product, onSave }: Props) {
       additionalPrice: 0,
       previewImageUrl: '',
       thumbnailImageUrl: '',
-      sortOrder: (aiArt.styles?.length ?? 0) + 1,
+      sortOrder: (form.styles?.length ?? 0) + 1,
       isActive: true,
       tags: [],
       metadata: {},
@@ -78,22 +92,19 @@ export function AiArtTab({ product, onSave }: Props) {
 
     let styles: AiArtStyle[];
     if (editingStyleId) {
-      styles = aiArt.styles.map((s) => (entityKey(s) === editingStyleId ? nextStyle : s));
+      styles = form.styles.map((s) => (entityKey(s) === editingStyleId ? nextStyle : s));
     } else {
-      styles = [...aiArt.styles, nextStyle];
+      styles = [...form.styles, nextStyle];
     }
 
-    onSave({ ...product, aiArt: { ...aiArt, styles } });
+    setForm((prev) => ({ ...prev, styles }));
     setStyleForm(null);
     setEditingStyleId(null);
   }
 
   function deleteStyle(styleId: string) {
     if (!confirm('Delete this AI Art style?')) return;
-    onSave({
-      ...product,
-      aiArt: { ...aiArt, styles: aiArt.styles.filter((s) => entityKey(s) !== styleId) },
-    });
+    setForm((prev) => ({ ...prev, styles: prev.styles.filter((s) => entityKey(s) !== styleId) }));
   }
 
   function duplicateStyle(style: AiArtStyle) {
@@ -104,11 +115,11 @@ export function AiArtTab({ product, onSave }: Props) {
       clientId: crypto.randomUUID(),
       name: `${style.name} Copy`,
       slug: `${style.slug}-copy`,
-      sortOrder: (aiArt.styles?.length ?? 0) + 1,
+      sortOrder: (form.styles?.length ?? 0) + 1,
       createdAt: now,
       updatedAt: now,
     };
-    onSave({ ...product, aiArt: { ...aiArt, styles: [...aiArt.styles, copy] } });
+    setForm((prev) => ({ ...prev, styles: [...prev.styles, copy] }));
   }
 
   function moveStyle(styleId: string, direction: -1 | 1) {
@@ -117,10 +128,7 @@ export function AiArtTab({ product, onSave }: Props) {
     if (target < 0 || target >= sortedStyles.length) return;
     const next = [...sortedStyles];
     [next[index], next[target]] = [next[target], next[index]];
-    onSave({
-      ...product,
-      aiArt: { ...aiArt, styles: next.map((s, order) => ({ ...s, sortOrder: order + 1 })) },
-    });
+    setForm((prev) => ({ ...prev, styles: next.map((s, order) => ({ ...s, sortOrder: order + 1 })) }));
   }
 
   function updateStyleField<K extends keyof AiArtStyle>(field: K, value: AiArtStyle[K]) {
@@ -128,13 +136,10 @@ export function AiArtTab({ product, onSave }: Props) {
   }
 
   function toggleStyleActive(style: AiArtStyle) {
-    onSave({
-      ...product,
-      aiArt: {
-        ...aiArt,
-        styles: aiArt.styles.map((s) => (entityKey(s) === entityKey(style) ? { ...s, isActive: !s.isActive } : s)),
-      },
-    });
+    setForm((prev) => ({
+      ...prev,
+      styles: prev.styles.map((s) => (entityKey(s) === entityKey(style) ? { ...s, isActive: !s.isActive } : s)),
+    }));
   }
 
   return (
@@ -145,7 +150,21 @@ export function AiArtTab({ product, onSave }: Props) {
           <h2 className="text-lg font-medium text-gray-900">AI Art Configuration</h2>
           <p className="mt-1 text-sm text-gray-500">Configure AI-generated art styles for this product.</p>
         </div>
+        <button
+          type="button"
+          onClick={saveAll}
+          disabled={!hasChanges}
+          className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+        >
+          <Check className="h-4 w-4" /> Save Changes
+        </button>
       </div>
+
+      {hasChanges && (
+        <div className="rounded-md bg-blue-50 p-3 ring-1 ring-blue-100">
+          <p className="text-sm text-blue-700">You have unsaved changes. Click "Save Changes" to persist.</p>
+        </div>
+      )}
 
       {/* Settings Card */}
       <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-gray-200">
@@ -153,19 +172,19 @@ export function AiArtTab({ product, onSave }: Props) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Select
             label="Enable AI Art"
-            value={aiArt.enabled ? 'yes' : 'no'}
+            value={form.enabled ? 'yes' : 'no'}
             onChange={(e) => updateConfig('enabled', e.target.value === 'yes')}
             options={yesNoOptions}
           />
           <Input
             label="Section Title"
-            value={aiArt.sectionTitle}
+            value={form.sectionTitle}
             onChange={(e) => updateConfig('sectionTitle', e.target.value)}
             placeholder="AI Art Styles"
           />
           <Input
             label="Badge Text"
-            value={aiArt.badgeText}
+            value={form.badgeText}
             onChange={(e) => updateConfig('badgeText', e.target.value)}
             placeholder="Artwork fee added"
           />
@@ -173,37 +192,37 @@ export function AiArtTab({ product, onSave }: Props) {
             label="Max Upload Images"
             type="number"
             min={1}
-            value={aiArt.maxUploadImages}
+            value={form.maxUploadImages}
             onChange={(e) => updateConfig('maxUploadImages', Math.max(1, Number(e.target.value)))}
           />
           <Input
             label="Default Generated Image Count"
             type="number"
             min={1}
-            value={aiArt.defaultGeneratedImageCount}
+            value={form.defaultGeneratedImageCount}
             onChange={(e) => updateConfig('defaultGeneratedImageCount', Math.max(1, Number(e.target.value)))}
           />
           <Select
             label="Require Upload Before Style Selection"
-            value={aiArt.requireUploadBeforeStyleSelection ? 'yes' : 'no'}
+            value={form.requireUploadBeforeStyleSelection ? 'yes' : 'no'}
             onChange={(e) => updateConfig('requireUploadBeforeStyleSelection', e.target.value === 'yes')}
             options={yesNoOptions}
           />
           <Select
             label="Show Descriptions"
-            value={aiArt.showDescriptions ? 'yes' : 'no'}
+            value={form.showDescriptions ? 'yes' : 'no'}
             onChange={(e) => updateConfig('showDescriptions', e.target.value === 'yes')}
             options={yesNoOptions}
           />
           <Select
             label="Show Group Names"
-            value={aiArt.showGroupNames ? 'yes' : 'no'}
+            value={form.showGroupNames ? 'yes' : 'no'}
             onChange={(e) => updateConfig('showGroupNames', e.target.value === 'yes')}
             options={yesNoOptions}
           />
           <Select
             label="Show Additional Price"
-            value={aiArt.showAdditionalPrice ? 'yes' : 'no'}
+            value={form.showAdditionalPrice ? 'yes' : 'no'}
             onChange={(e) => updateConfig('showAdditionalPrice', e.target.value === 'yes')}
             options={yesNoOptions}
           />
@@ -211,14 +230,14 @@ export function AiArtTab({ product, onSave }: Props) {
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Textarea
             label="Help Text"
-            value={aiArt.helpText}
+            value={form.helpText}
             onChange={(e) => updateConfig('helpText', e.target.value)}
             rows={2}
             placeholder="Upload your pet photo. We will create the selected artwork style before printing."
           />
           <Textarea
             label="Generation Note"
-            value={aiArt.generationNote}
+            value={form.generationNote}
             onChange={(e) => updateConfig('generationNote', e.target.value)}
             rows={2}
             placeholder="Proof/revision available before production."
@@ -234,7 +253,7 @@ export function AiArtTab({ product, onSave }: Props) {
             <button
               type="button"
               onClick={startAddStyle}
-              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50"
             >
               <Plus className="h-4 w-4" /> Add Style
             </button>
@@ -377,14 +396,14 @@ export function AiArtTab({ product, onSave }: Props) {
       </div>
 
       {/* Live Preview Card */}
-      {aiArt.enabled && (
+      {form.enabled && (
         <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-gray-200">
           <h3 className="text-base font-semibold text-gray-900 mb-4">Frontend Preview</h3>
           <div className="rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200">
             <div className="flex items-center justify-between mb-4">
-              <h4 className="text-sm font-semibold text-gray-900">{aiArt.sectionTitle || 'AI Art Styles'}</h4>
-              {aiArt.badgeText && (
-                <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">{aiArt.badgeText}</span>
+              <h4 className="text-sm font-semibold text-gray-900">{form.sectionTitle || 'AI Art Styles'}</h4>
+              {form.badgeText && (
+                <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">{form.badgeText}</span>
               )}
             </div>
             <div className="flex flex-wrap gap-3">
@@ -401,19 +420,19 @@ export function AiArtTab({ product, onSave }: Props) {
                     )}
                   </div>
                   <p className="mt-2 text-sm font-medium text-gray-900 line-clamp-1">{style.name}</p>
-                  {aiArt.showAdditionalPrice && style.additionalPrice > 0 && (
+                  {form.showAdditionalPrice && style.additionalPrice > 0 && (
                     <p className="text-xs text-gray-500">+${style.additionalPrice.toFixed(0)}</p>
                   )}
-                  {aiArt.showDescriptions && style.description && (
+                  {form.showDescriptions && style.description && (
                     <p className="text-xs text-gray-500 mt-1 line-clamp-2">{style.description}</p>
                   )}
                 </div>
               ))}
             </div>
-            {(aiArt.helpText || aiArt.generationNote) && (
+            {(form.helpText || form.generationNote) && (
               <div className="mt-4 space-y-1 text-xs text-gray-600">
-                {aiArt.helpText && <p>{aiArt.helpText}</p>}
-                {aiArt.generationNote && <p className="text-gray-500">{aiArt.generationNote}</p>}
+                {form.helpText && <p>{form.helpText}</p>}
+                {form.generationNote && <p className="text-gray-500">{form.generationNote}</p>}
               </div>
             )}
           </div>
@@ -421,7 +440,7 @@ export function AiArtTab({ product, onSave }: Props) {
       )}
 
       {/* Disabled notice */}
-      {!aiArt.enabled && (
+      {!form.enabled && (
         <div className="rounded-lg bg-amber-50 p-4 ring-1 ring-amber-200">
           <div className="flex items-center gap-2 text-amber-700">
             <AlertCircle className="h-4 w-4" />
