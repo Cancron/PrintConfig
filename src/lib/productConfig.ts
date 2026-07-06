@@ -26,9 +26,12 @@ import type {
 
 const PRODUCT_TYPES: ProductType[] = [
   'Canvas Print',  
-  'Framed Print',  
-  'Art Print',
   'Metal Print',
+  'Framed Print',  
+  'Photo Print',
+  'Photo Book Print',
+  'AI Art Generation',
+  'Art Print',
   'T-Shirt',
   'Mug',
   'Business Card',
