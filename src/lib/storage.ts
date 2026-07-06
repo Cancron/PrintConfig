@@ -5,6 +5,7 @@ import { normalizeFrontendContent } from './frontendContent';
 import { normalizeEditorProductSelection } from './productSelection';
 import type {
   Account,
+  AiArtConfig,
   BleedSettings,
   EditorRules,
   ExportRules,
@@ -66,6 +67,27 @@ export const defaultExportRules: ExportRules = {
 
 export function createDefaultExportRules(): ExportRules {
   return { ...defaultExportRules };
+}
+
+export const defaultAiArtConfig: AiArtConfig = {
+  enabled: false,
+  sectionTitle: 'AI Art Styles',
+  badgeText: '',
+  helpText: '',
+  requireUploadBeforeStyleSelection: true,
+  maxUploadImages: 1,
+  defaultGeneratedImageCount: 4,
+  allowMultipleStyleSelection: false,
+  showDescriptions: true,
+  showAdditionalPrice: true,
+  allowArtName: false,
+  artNameFieldLabel: 'Pet name (optional)',
+  artNameFieldPlaceholder: 'e.g., Buddy, Luna, Max',
+  styles: [],
+};
+
+export function createDefaultAiArtConfig(): AiArtConfig {
+  return { ...defaultAiArtConfig, styles: [] };
 }
 
 export function loadAccount(): Account {
@@ -180,6 +202,7 @@ export function normalizeProduct(product: Product): Product {
     templates: (product.templates ?? []).map((template) => ({ ...template, surfaceId: surface?._id ?? template.surfaceId ?? '' })),
     roomPreviews: liftLegacyRoomPreviews({ ...product, variants, roomPreviews: sharedRooms }),
     variants: variants.map((variant) => ({ ...variant, roomPreviews: undefined })),
+    aiArt: product.aiArt ?? createDefaultAiArtConfig(),
   };
 }
 
