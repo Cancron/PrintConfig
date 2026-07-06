@@ -287,6 +287,47 @@ const editorProductSelectionSchema = new Schema(
   },
   { _id: false }
 );
+
+const aiArtStyleSchema = new Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    slug: { type: String, required: true, trim: true },
+    groupName: { type: String, default: '', trim: true },
+    description: { type: String, default: '' },
+    prompt: { type: String, required: true },
+    negativePrompt: { type: String, default: '' },
+    additionalPrice: { type: Number, default: 0, min: 0 },
+    previewImageUrl: { type: String, default: '' },
+    previewImageAssetId: { type: Schema.Types.ObjectId, ref: 'ImageAsset' },
+    thumbnailImageUrl: { type: String, default: '' },
+    thumbnailImageAssetId: { type: Schema.Types.ObjectId, ref: 'ImageAsset' },
+    sortOrder: { type: Number, default: 0 },
+    isActive: { type: Boolean, default: true },
+    tags: { type: [String], default: [] },
+    metadata: { type: Schema.Types.Mixed, default: () => ({}) },
+  },
+  { timestamps: true }
+);
+
+const aiArtSchema = new Schema(
+  {
+    enabled: { type: Boolean, default: false },
+    sectionTitle: { type: String, default: 'AI Art Styles', trim: true },
+    badgeText: { type: String, default: '' },
+    helpText: { type: String, default: '' },
+    generationNote: { type: String, default: '' },
+    requireUploadBeforeStyleSelection: { type: Boolean, default: true },
+    maxUploadImages: { type: Number, default: 1, min: 1 },
+    defaultGeneratedImageCount: { type: Number, default: 4, min: 1 },
+    allowMultipleStyleSelection: { type: Boolean, default: false },
+    showDescriptions: { type: Boolean, default: true },
+    showGroupNames: { type: Boolean, default: true },
+    showAdditionalPrice: { type: Boolean, default: true },
+    styles: { type: [aiArtStyleSchema], default: [] },
+  },
+  { _id: false }
+);
+
 const productSchema = new Schema(
   {
     accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
@@ -311,6 +352,7 @@ const productSchema = new Schema(
     editorRules: { type: editorRulesSchema, default: () => ({}) },
     exportRules: { type: exportRulesSchema, default: () => ({}) },
     templates: { type: [templateSchema], default: [] },
+    aiArt: { type: aiArtSchema, default: () => ({ enabled: false }) },
   },
   { timestamps: true }
 );

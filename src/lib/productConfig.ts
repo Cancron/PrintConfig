@@ -20,6 +20,8 @@ import type {
   VariantOptionDefinition,
   TemplateElement,
   DependencyRule,
+  AiArtConfig,
+  AiArtStyle,
 } from '../types';
 
 const PRODUCT_TYPES: ProductType[] = [
@@ -114,6 +116,7 @@ function buildImportCandidate(input: Record<string, unknown>): Product {
     editorProductSelection: normalizeEditorProductSelection(isRecord(input.editorProductSelection) ? input.editorProductSelection : undefined),
     templates: Array.isArray(input.templates) ? input.templates.filter(isRecord).map((template, index) => normalizeTemplate(template, id, surface?._id ?? '', now, index)) : [],
     variants: variants.map((variant, index) => normalizeVariant(variant, id, now, index)),
+    aiArt: normalizeAiArtConfig(isRecord(input.aiArt) ? input.aiArt : undefined, now),
     createdAt: now,
     updatedAt: now,
   };
@@ -328,6 +331,49 @@ function normalizeBox(input: unknown, fallback: number): ProductSurface['bleed']
     bottom: numberOr(input.bottom, fallback),
     left: numberOr(input.left, fallback),
     unit: normalizeUnit(input.unit),
+  };
+}
+
+function normalizeAiArtConfig(input: Record<string, unknown> | undefined, now: string): AiArtConfig {
+  const styles = Array.isArray(input?.styles) ? input.styles.filter(isRecord) : [];
+  return {
+    enabled: input?.enabled === true,
+    sectionTitle: typeof input?.sectionTitle === 'string' ? input.sectionTitle : 'AI Art Styles',
+    badgeText: typeof input?.badgeText === 'string' ? input.badgeText : '',
+    helpText: typeof input?.helpText === 'string' ? input.helpText : '',
+    generationNote: typeof input?.generationNote === 'string' ? input.generationNote : '',
+    requireUploadBeforeStyleSelection: input?.requireUploadBeforeStyleSelection !== false,
+    maxUploadImages: numberOr(input?.maxUploadImages, 1),
+    defaultGeneratedImageCount: numberOr(input?.defaultGeneratedImageCount, 4),
+    allowMultipleStyleSelection: input?.allowMultipleStyleSelection === true,
+    showDescriptions: input?.showDescriptions !== false,
+    showGroupNames: input?.showGroupNames !== false,
+    showAdditionalPrice: input?.showAdditionalPrice !== false,
+    styles: styles.map((style, index) => normalizeAiArtStyle(style, now, index)),
+  };
+}
+
+function normalizeAiArtStyle(input: Record<string, unknown>, now: string, index: number): AiArtStyle {
+  return {
+    _id: typeof input._id === 'string' ? input._id : '',
+    clientId: typeof input.clientId === 'string' ? input.clientId : crypto.randomUUID(),
+    name: typeof input.name === 'string' ? input.name : `Style ${index + 1}`,
+    slug: typeof input.slug === 'string' ? input.slug : `style-${index + 1}`,
+    groupName: typeof input.groupName === 'string' ? input.groupName : '',
+    description: typeof input.description === 'string' ? input.description : '',
+    prompt: typeof input.prompt === 'string' ? input.prompt : '',
+    negativePrompt: typeof input.negativePrompt === 'string' ? input.negativePrompt : '',
+    additionalPrice: numberOr(input.additionalPrice, 0),
+    previewImageUrl: typeof input.previewImageUrl === 'string' ? input.previewImageUrl : '',
+    previewImageAssetId: typeof input.previewImageAssetId === 'string' ? input.previewImageAssetId : undefined,
+    thumbnailImageUrl: typeof input.thumbnailImageUrl === 'string' ? input.thumbnailImageUrl : '',
+    thumbnailImageAssetId: typeof input.thumbnailImageAssetId === 'string' ? input.thumbnailImageAssetId : undefined,
+    sortOrder: numberOr(input.sortOrder, index + 1),
+    isActive: input.isActive !== false,
+    tags: Array.isArray(input.tags) ? input.tags.filter((t): t is string => typeof t === 'string') : [],
+    metadata: isRecord(input.metadata) ? input.metadata as Record<string, unknown> : {},
+    createdAt: typeof input.createdAt === 'string' ? input.createdAt : now,
+    updatedAt: typeof input.updatedAt === 'string' ? input.updatedAt : now,
   };
 }
 

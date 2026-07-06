@@ -18,6 +18,7 @@ import { ExportRulesTab } from '../components/product/ExportRulesTab';
 import { PreviewTab } from '../components/product/PreviewTab';
 import { TemplatesTab } from '../components/product/TemplatesTab';
 import { DesignGeneralTab } from '../components/product/DesignGeneralTab';
+import { AiArtTab } from '../components/product/AiArtTab';
 
 export function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -102,6 +103,7 @@ export function ProductDetail() {
     { _id: 'export-rules', label: 'Export Rules', content: <ExportRulesTab product={product} onSave={updateProduct} /> },
     { _id: 'templates', label: 'Templates', content: <TemplatesTab product={product} onSave={updateProduct} /> },
     { _id: 'preview', label: 'Preview', content: <PreviewTab product={product} onSave={updateProduct} /> },
+    { _id: 'ai-art', label: 'AI Art', content: <AiArtTab product={product} onSave={updateProduct} /> },
     { _id: 'json', label: 'JSON', content: <JsonPreviewTab product={product} /> },
     { _id: 'design', label: 'Design', content: <DesignGeneralTab product={product} onSave={updateProduct} /> },
   ];

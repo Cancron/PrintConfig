@@ -267,6 +267,37 @@ function validateProductShape(data: Record<string, any>) {
   if (dependencyIssues.length > 0) {
     throw new ApiError(400, `Dependency validation failed: ${dependencyIssues.join('; ')}`);
   }
+  // Validate AI Art configuration
+  if (data.aiArt && data.aiArt.enabled === true) {
+    if (!(data.aiArt.maxUploadImages > 0)) {
+      throw new ApiError(400, 'AI Art max upload images must be greater than 0.');
+    }
+    if (!(data.aiArt.defaultGeneratedImageCount > 0)) {
+      throw new ApiError(400, 'AI Art default generated image count must be greater than 0.');
+    }
+    const styleSlugs = new Set<string>();
+    for (const style of data.aiArt.styles ?? []) {
+      if (!String(style.name ?? '').trim()) {
+        throw new ApiError(400, 'AI Art style name is required.');
+      }
+      if (!String(style.slug ?? '').trim()) {
+        throw new ApiError(400, 'AI Art style slug is required.');
+      }
+      if (!/^(?=.*[a-z0-9])[a-z0-9_-]+$/.test(String(style.slug))) {
+        throw new ApiError(400, 'AI Art style slug may use lowercase letters, numbers, hyphens, and underscores only.');
+      }
+      if (styleSlugs.has(style.slug)) {
+        throw new ApiError(400, `AI Art style slug "${style.slug}" must be unique within product.`);
+      }
+      styleSlugs.add(style.slug);
+      if (!String(style.prompt ?? '').trim()) {
+        throw new ApiError(400, `AI Art style "${style.name}" must have a prompt.`);
+      }
+      if (style.additionalPrice !== undefined && (!Number.isFinite(Number(style.additionalPrice)) || Number(style.additionalPrice) < 0)) {
+        throw new ApiError(400, `AI Art style "${style.name}" additional price must be zero or greater.`);
+      }
+    }
+  }
 }
 
 async function assertUniqueSlug(data: Record<string, unknown>, id?: string) {
@@ -482,6 +513,49 @@ export async function getPublicProductConfig(id: string, merchantId?: string) {
     editorRules: { ...(product.editorRules ?? {}), allowCustomSize: product.editorRules?.allowCustomSize ?? false },
     exportRules: product.exportRules,
     variants: activeVariants,
+    aiArt: publicAiArtConfig(product.aiArt),
+  };
+}
+
+function publicAiArtConfig(aiArt: any) {
+  if (!aiArt || aiArt.enabled !== true) {
+    return undefined;
+  }
+  const activeStyles = (aiArt.styles ?? [])
+    .filter((style: any) => style.isActive !== false)
+    .sort((a: any, b: any) => {
+      const groupA = String(a.groupName ?? '');
+      const groupB = String(b.groupName ?? '');
+      if (groupA !== groupB) return groupA.localeCompare(groupB);
+      return Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0);
+    });
+  return {
+    enabled: true,
+    sectionTitle: aiArt.sectionTitle || 'AI Art Styles',
+    badgeText: aiArt.badgeText || '',
+    helpText: aiArt.helpText || '',
+    generationNote: aiArt.generationNote || '',
+    requireUploadBeforeStyleSelection: aiArt.requireUploadBeforeStyleSelection ?? true,
+    maxUploadImages: aiArt.maxUploadImages ?? 1,
+    defaultGeneratedImageCount: aiArt.defaultGeneratedImageCount ?? 4,
+    allowMultipleStyleSelection: aiArt.allowMultipleStyleSelection ?? false,
+    showDescriptions: aiArt.showDescriptions ?? true,
+    showGroupNames: aiArt.showGroupNames ?? true,
+    showAdditionalPrice: aiArt.showAdditionalPrice ?? true,
+    styles: activeStyles.map((style: any) => ({
+      _id: style._id,
+      name: style.name,
+      slug: style.slug,
+      groupName: style.groupName || '',
+      description: style.description || '',
+      prompt: style.prompt,
+      negativePrompt: style.negativePrompt || '',
+      additionalPrice: style.additionalPrice ?? 0,
+      previewImageUrl: style.previewImageUrl || '',
+      thumbnailImageUrl: style.thumbnailImageUrl || '',
+      sortOrder: style.sortOrder ?? 0,
+      tags: style.tags || [],
+    })),
   };
 }
 export async function listEditorProducts(apiPrivateKey: string) {

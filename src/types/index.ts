@@ -380,6 +380,44 @@ export interface ProductVariant {
   updatedAt: string;
 }
 
+export interface AiArtStyle {
+  _id: string;
+  clientId?: string;
+  name: string;
+  slug: string;
+  groupName: string;
+  description: string;
+  prompt: string;
+  negativePrompt: string;
+  additionalPrice: number;
+  previewImageUrl: string;
+  previewImageAssetId?: string;
+  thumbnailImageUrl: string;
+  thumbnailImageAssetId?: string;
+  sortOrder: number;
+  isActive: boolean;
+  tags: string[];
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AiArtConfig {
+  enabled: boolean;
+  sectionTitle: string;
+  badgeText: string;
+  helpText: string;
+  generationNote: string;
+  requireUploadBeforeStyleSelection: boolean;
+  maxUploadImages: number;
+  defaultGeneratedImageCount: number;
+  allowMultipleStyleSelection: boolean;
+  showDescriptions: boolean;
+  showGroupNames: boolean;
+  showAdditionalPrice: boolean;
+  styles: AiArtStyle[];
+}
+
 export interface Product {
   _id: string;
   accountId: string;
@@ -405,6 +443,7 @@ export interface Product {
   exportRules: ExportRules;
   templates: ProductTemplate[];
   variants: ProductVariant[];
+  aiArt: AiArtConfig;
   createdAt: string;
   updatedAt: string;
 }
