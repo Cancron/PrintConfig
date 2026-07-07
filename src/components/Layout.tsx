@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Images, LayoutDashboard, Package, Settings, Menu, X, Store, FolderTree } from 'lucide-react';
+import { Images, LayoutDashboard, Package, Settings, Menu, X, Store, FolderTree, LayoutTemplate } from 'lucide-react';
 import { useState } from 'react';
 import { useWorkspace } from '../hooks/useWorkspace';
 
@@ -8,6 +8,8 @@ const navItems = [
   { path: '/categories', label: 'Categories', icon: FolderTree },
   { path: '/products', label: 'Products', icon: Package },
   { path: '/image-library', label: 'Image Library', icon: Images },
+  { path: '/layouts/categories', label: 'Layout Categories', icon: LayoutTemplate },
+  { path: '/layouts/templates', label: 'Layout Templates', icon: LayoutTemplate },
   { path: '/merchant-settings', label: 'Merchant Settings', icon: Store },
 ];
 

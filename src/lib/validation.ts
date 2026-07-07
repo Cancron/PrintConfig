@@ -1,4 +1,4 @@
-import type { Product, ProductCategory, ProductSurface, ProductType, ProductUnit, ProductVariant, VariantOptionDefinition } from '../types';
+import type { LayoutCategory, LayoutElement, LayoutTemplate, Product, ProductCategory, ProductSurface, ProductType, ProductUnit, ProductVariant, VariantOptionDefinition } from '../types';
 import { missingRequiredVariantOptions } from './variantOptions';
 import { compatibleRooms, getVariantRoomOrientation } from './roomPreview';
 
@@ -228,5 +228,68 @@ export function validateCategory(input: {
   if (input.scope === 'merchant' && !input.merchantId) errors.scope = 'Select a merchant for merchant custom categories.';
   if (input.sortOrder === '' || Number.isNaN(sortOrder)) errors.sortOrder = 'Sort order must be numeric.';
 
+  return errors;
+}
+
+export function validateLayoutCategory(input: {
+  _id?: string | null;
+  name: string;
+  slug: string;
+  status: string;
+  scope: string;
+  merchantId?: string | null;
+  sortOrder: string | number;
+  existingCategories: LayoutCategory[];
+}): ValidationErrors {
+  const errors: ValidationErrors = {};
+  const slug = input.slug.trim().toLowerCase();
+  const sortOrder = Number(input.sortOrder);
+  if (!input.name.trim()) errors.name = 'Layout category name is required.';
+  if (!slug) errors.slug = 'Slug is required.';
+  else if (!URL_SAFE_SLUG.test(slug)) errors.slug = 'Use lowercase letters, numbers, and hyphens only.';
+  else if (input.existingCategories.some((category) => category._id !== input._id && category.slug.toLowerCase() === slug && category.scope === input.scope && (category.scope === 'shared' || category.merchantId === input.merchantId))) errors.slug = 'Slug must be unique in this layout category scope.';
+  if (input.status !== 'active' && input.status !== 'draft' && input.status !== 'archived') errors.status = 'Status is required.';
+  if (input.scope !== 'shared' && input.scope !== 'merchant') errors.scope = 'Scope is required.';
+  if (input.scope === 'merchant' && !input.merchantId) errors.scope = 'Select a merchant for merchant custom layout categories.';
+  if (input.sortOrder === '' || Number.isNaN(sortOrder)) errors.sortOrder = 'Sort order must be numeric.';
+  return errors;
+}
+
+export function validateLayoutTemplate(template: LayoutTemplate, existingTemplates: LayoutTemplate[] = []): ValidationErrors {
+  const errors: ValidationErrors = {};
+  const slug = template.slug.trim().toLowerCase();
+  if (!template.name.trim()) errors.name = 'Layout template name is required.';
+  if (!slug) errors.slug = 'Slug is required.';
+  else if (!URL_SAFE_SLUG.test(slug)) errors.slug = 'Use lowercase letters, numbers, and hyphens only.';
+  else if (existingTemplates.some((item) => item._id !== template._id && item.slug.toLowerCase() === slug && item.categoryId === template.categoryId && item.scope === template.scope && (item.scope === 'shared' || item.merchantId === template.merchantId))) errors.slug = 'Slug must be unique in this category and scope.';
+  if (!template.categoryId) errors.categoryId = 'Layout category is required.';
+  if (template.status !== 'active' && template.status !== 'draft' && template.status !== 'archived') errors.status = 'Status is required.';
+  if (template.scope !== 'shared' && template.scope !== 'merchant') errors.scope = 'Scope is required.';
+  if (template.scope === 'merchant' && !template.merchantId) errors.scope = 'Select a merchant for merchant custom templates.';
+  if (!template.templateType) errors.templateType = 'Template type is required.';
+  if (!template.orientation) errors.orientation = 'Orientation is required.';
+  if (template.pageCount < 1 || !Number.isFinite(template.pageCount)) errors.pageCount = 'Page count must be at least 1.';
+  if (template.canvasWidth <= 0 || !Number.isFinite(template.canvasWidth)) errors.canvasWidth = 'Canvas width must be greater than zero.';
+  if (template.canvasHeight <= 0 || !Number.isFinite(template.canvasHeight)) errors.canvasHeight = 'Canvas height must be greater than zero.';
+  if (!isProductUnit(template.unit)) errors.unit = 'Unit is required.';
+  if (template.dpi <= 0 || !Number.isFinite(template.dpi)) errors.dpi = 'DPI must be greater than zero.';
+  if (!Number.isFinite(template.sortOrder)) errors.sortOrder = 'Sort order must be numeric.';
+  template.pages.forEach((page, pageIndex) => {
+    if (page.width <= 0 || !Number.isFinite(page.width)) errors[`pages.${pageIndex}.width`] = 'Page width must be greater than zero.';
+    if (page.height <= 0 || !Number.isFinite(page.height)) errors[`pages.${pageIndex}.height`] = 'Page height must be greater than zero.';
+    page.elements.forEach((element, elementIndex) => Object.assign(errors, validateLayoutElement(element, `pages.${pageIndex}.elements.${elementIndex}`)));
+  });
+  return errors;
+}
+
+export function validateLayoutElement(element: LayoutElement, prefix = 'element'): ValidationErrors {
+  const errors: ValidationErrors = {};
+  if (!element.name.trim()) errors[`${prefix}.name`] = 'Element name is required.';
+  for (const field of ['x', 'y'] as const) {
+    if (!Number.isFinite(element[field]) || element[field] < 0 || element[field] > 100) errors[`${prefix}.${field}`] = 'Use a value from 0 to 100.';
+  }
+  for (const field of ['width', 'height'] as const) {
+    if (!Number.isFinite(element[field]) || element[field] <= 0 || element[field] > 100) errors[`${prefix}.${field}`] = 'Use a value greater than 0 and no more than 100.';
+  }
   return errors;
 }

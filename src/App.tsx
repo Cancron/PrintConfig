@@ -8,6 +8,8 @@ import { CreateProduct } from './pages/CreateProduct';
 import { ProductDetail } from './pages/ProductDetail';
 import { MerchantSettings } from './pages/MerchantSettings';
 import { ImageLibrary } from './pages/ImageLibrary';
+import { LayoutCategories, LayoutCategoryDetail } from './pages/LayoutCategories';
+import { LayoutTemplates, LayoutTemplateEditor } from './pages/LayoutTemplates';
 
 function App() {
   return (
@@ -22,6 +24,10 @@ function App() {
           <Route path="/products/:id" element={<ProductDetail />} />
           <Route path="/merchant-settings" element={<MerchantSettings />} />
           <Route path="/image-library" element={<ImageLibrary />} />
+          <Route path="/layouts/categories" element={<LayoutCategories />} />
+          <Route path="/layouts/categories/:id" element={<LayoutCategoryDetail />} />
+          <Route path="/layouts/templates" element={<LayoutTemplates />} />
+          <Route path="/layouts/templates/:id" element={<LayoutTemplateEditor />} />
         </Routes>
       </Layout>
     </BrowserRouter>

@@ -21,6 +21,13 @@ export type ProductStatus = 'Draft' | 'Active';
 export type MerchantStatus = 'Draft' | 'Active';
 export type ProductScope = 'shared' | 'merchant';
 export type ProductCategoryStatus = 'active' | 'draft' | 'archived';
+export type LayoutStatus = 'active' | 'draft' | 'archived';
+export type LayoutTemplateType = 'photo_collage' | 'photo_book' | 'calendar' | 'card' | 'poster' | 'canvas' | 'custom';
+export type LayoutOrientation = 'portrait' | 'landscape' | 'square' | 'custom';
+export type LayoutElementType = 'photo_placeholder' | 'text_placeholder' | 'shape' | 'background' | 'clipart' | 'static_image';
+export type LayoutPhotoFitMode = 'cover' | 'contain' | 'stretch';
+export type LayoutMaskShape = 'rectangle' | 'circle' | 'rounded_rectangle' | 'custom';
+export type LayoutShapeType = 'rectangle' | 'circle' | 'line';
 export type ProductUnit = 'inch' | 'mm' | 'px';
 export type ProductOptionDisplayType = 'Dropdown' | 'Radio Buttons' | 'Color Swatches' | 'Image Swatches' | 'Text Buttons';
 export type PriceModifierType = 'none' | 'fixed' | 'variant-fixed' | 'variant-override' | 'percentage';
@@ -109,6 +116,127 @@ export interface ProductCategory {
   updatedAt: string;
 }
 
+
+export interface LayoutCategory {
+  _id: string;
+  accountId: string;
+  merchantId?: string | null;
+  scope: ProductScope;
+  name: string;
+  slug: string;
+  description: string;
+  status: LayoutStatus;
+  thumbnailUrl: string;
+  thumbnailAssetId?: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LayoutPhotoSettings {
+  fitMode: LayoutPhotoFitMode;
+  allowCrop: boolean;
+  allowRotate: boolean;
+  allowReplace: boolean;
+  placeholderIndex: number;
+  maskShape: LayoutMaskShape;
+}
+
+export interface LayoutTextSettings {
+  defaultText: string;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: string;
+  color: string;
+  textAlign: 'left' | 'center' | 'right';
+  maxCharacters?: number;
+}
+
+export interface LayoutShapeSettings {
+  shapeType: LayoutShapeType;
+  fillColor: string;
+  strokeColor: string;
+  strokeWidth: number;
+  borderRadius: number;
+}
+
+export interface LayoutImageSettings {
+  imageUrl: string;
+  imageAssetId?: string;
+  opacity: number;
+}
+
+export interface LayoutElement {
+  _id: string;
+  clientId?: string;
+  type: LayoutElementType;
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  zIndex: number;
+  locked: boolean;
+  required: boolean;
+  editable: boolean;
+  style: Record<string, unknown>;
+  photoSettings: LayoutPhotoSettings;
+  textSettings: LayoutTextSettings;
+  shapeSettings: LayoutShapeSettings;
+  imageSettings: LayoutImageSettings;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LayoutTemplatePage {
+  _id: string;
+  clientId?: string;
+  pageNumber: number;
+  name: string;
+  width: number;
+  height: number;
+  backgroundColor: string;
+  backgroundImageUrl: string;
+  backgroundImageAssetId?: string;
+  elements: LayoutElement[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LayoutTemplate {
+  _id: string;
+  accountId: string;
+  merchantId?: string | null;
+  scope: ProductScope;
+  categoryId: string;
+  name: string;
+  slug: string;
+  description: string;
+  status: LayoutStatus;
+  thumbnailUrl: string;
+  thumbnailAssetId?: string;
+  templateType: LayoutTemplateType;
+  orientation: LayoutOrientation;
+  pageCount: number;
+  canvasWidth: number;
+  canvasHeight: number;
+  unit: ProductUnit;
+  dpi: number;
+  backgroundColor: string;
+  tags: string[];
+  sortOrder: number;
+  pages: LayoutTemplatePage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductLayoutSettings {
+  enabled: boolean;
+  allowedTemplateCategoryIds: string[];
+  allowedTemplateIds: string[];
+  requireTemplateSelection: boolean;
+}
 export type PrecheckStatus = 'success' | 'warning' | 'info' | 'error';
 export type FrontendLayoutStyle = 'standard' | 'compact' | 'premium';
 
@@ -443,6 +571,7 @@ export interface Product {
   editorRules: EditorRules;
   exportRules: ExportRules;
   templates: ProductTemplate[];
+  layoutSettings: ProductLayoutSettings;
   variants: ProductVariant[];
   aiArt: AiArtConfig;
   createdAt: string;

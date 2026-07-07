@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { ImageAsset, ImageFolder, Merchant, Product, ProductCategory } from '../types';
+import type { ImageAsset, ImageFolder, LayoutCategory, LayoutElement, LayoutTemplate, LayoutTemplatePage, Merchant, Product, ProductCategory } from '../types';
 import { normalizeVariantOptionDefinitions } from './variantOptions';
 import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
 import { normalizeFrontendContent } from './frontendContent';
@@ -60,6 +60,113 @@ function normalizeCategory(raw: any): ProductCategory {
   };
 }
 
+
+const defaultPhotoSettings = { fitMode: 'cover' as const, allowCrop: true, allowRotate: true, allowReplace: true, placeholderIndex: 1, maskShape: 'rectangle' as const };
+const defaultTextSettings = { defaultText: '', fontFamily: 'Arial', fontSize: 24, fontWeight: '400', color: '#111827', textAlign: 'center' as const };
+const defaultShapeSettings = { shapeType: 'rectangle' as const, fillColor: '#f3f4f6', strokeColor: '#111827', strokeWidth: 1, borderRadius: 0 };
+const defaultImageSettings = { imageUrl: '', opacity: 1 };
+
+function normalizeLayoutCategory(raw: any): LayoutCategory {
+  return {
+    _id: idOf(raw),
+    accountId: String(raw.accountId ?? ''),
+    merchantId: raw.merchantId ? String(raw.merchantId) : null,
+    scope: raw.scope === 'merchant' ? 'merchant' : 'shared',
+    name: raw.name ?? '',
+    slug: raw.slug ?? '',
+    description: raw.description ?? '',
+    status: raw.status === 'active' || raw.status === 'archived' ? raw.status : 'draft',
+    thumbnailUrl: raw.thumbnailUrl ?? '',
+    thumbnailAssetId: raw.thumbnailAssetId ? String(raw.thumbnailAssetId) : undefined,
+    sortOrder: Number(raw.sortOrder ?? 0),
+    createdAt: raw.createdAt ?? new Date().toISOString(),
+    updatedAt: raw.updatedAt ?? new Date().toISOString(),
+  };
+}
+
+function normalizeLayoutElement(raw: any): LayoutElement {
+  return {
+    ...raw,
+    _id: idOf(raw),
+    type: raw.type ?? 'photo_placeholder',
+    name: raw.name ?? 'Element',
+    x: Number(raw.x ?? 0),
+    y: Number(raw.y ?? 0),
+    width: Number(raw.width ?? 25),
+    height: Number(raw.height ?? 25),
+    rotation: Number(raw.rotation ?? 0),
+    zIndex: Number(raw.zIndex ?? 0),
+    locked: raw.locked === true,
+    required: raw.required === true,
+    editable: raw.editable !== false,
+    style: raw.style ?? {},
+    photoSettings: { ...defaultPhotoSettings, ...(raw.photoSettings ?? {}) },
+    textSettings: { ...defaultTextSettings, ...(raw.textSettings ?? {}) },
+    shapeSettings: { ...defaultShapeSettings, ...(raw.shapeSettings ?? {}) },
+    imageSettings: { ...defaultImageSettings, ...(raw.imageSettings ?? {}), imageAssetId: raw.imageSettings?.imageAssetId ? String(raw.imageSettings.imageAssetId) : undefined },
+    createdAt: raw.createdAt ?? new Date().toISOString(),
+    updatedAt: raw.updatedAt ?? new Date().toISOString(),
+  };
+}
+
+function normalizeLayoutPage(raw: any, template?: any): LayoutTemplatePage {
+  return {
+    ...raw,
+    _id: idOf(raw),
+    pageNumber: Number(raw.pageNumber ?? 1),
+    name: raw.name ?? 'Page',
+    width: Number(raw.width ?? template?.canvasWidth ?? 12),
+    height: Number(raw.height ?? template?.canvasHeight ?? 12),
+    backgroundColor: raw.backgroundColor ?? template?.backgroundColor ?? '#ffffff',
+    backgroundImageUrl: raw.backgroundImageUrl ?? '',
+    backgroundImageAssetId: raw.backgroundImageAssetId ? String(raw.backgroundImageAssetId) : undefined,
+    elements: (raw.elements ?? []).map(normalizeLayoutElement),
+    createdAt: raw.createdAt ?? new Date().toISOString(),
+    updatedAt: raw.updatedAt ?? new Date().toISOString(),
+  };
+}
+
+function normalizeLayoutTemplate(raw: any): LayoutTemplate {
+  return {
+    ...raw,
+    _id: idOf(raw),
+    accountId: String(raw.accountId ?? ''),
+    merchantId: raw.merchantId ? String(raw.merchantId) : null,
+    scope: raw.scope === 'merchant' ? 'merchant' : 'shared',
+    categoryId: String(raw.categoryId ?? ''),
+    name: raw.name ?? '',
+    slug: raw.slug ?? '',
+    description: raw.description ?? '',
+    status: raw.status === 'active' || raw.status === 'archived' ? raw.status : 'draft',
+    thumbnailUrl: raw.thumbnailUrl ?? '',
+    thumbnailAssetId: raw.thumbnailAssetId ? String(raw.thumbnailAssetId) : undefined,
+    templateType: raw.templateType ?? 'photo_collage',
+    orientation: raw.orientation ?? 'square',
+    pageCount: Number(raw.pageCount ?? 1),
+    canvasWidth: Number(raw.canvasWidth ?? 12),
+    canvasHeight: Number(raw.canvasHeight ?? 12),
+    unit: raw.unit === 'mm' || raw.unit === 'px' ? raw.unit : 'inch',
+    dpi: Number(raw.dpi ?? 300),
+    backgroundColor: raw.backgroundColor ?? '#ffffff',
+    tags: raw.tags ?? [],
+    sortOrder: Number(raw.sortOrder ?? 0),
+    pages: (raw.pages ?? []).map((page: any) => normalizeLayoutPage(page, raw)),
+    createdAt: raw.createdAt ?? new Date().toISOString(),
+    updatedAt: raw.updatedAt ?? new Date().toISOString(),
+  };
+}
+
+function layoutQuery(input: { accountId: string; merchantId?: string; categoryId?: string; scope?: string; status?: string; templateType?: string; orientation?: string; search?: string }) {
+  const params = new URLSearchParams({ accountId: input.accountId });
+  if (input.merchantId) params.set('merchantId', input.merchantId);
+  if (input.categoryId) params.set('categoryId', input.categoryId);
+  if (input.scope) params.set('scope', input.scope);
+  if (input.status) params.set('status', input.status);
+  if (input.templateType) params.set('templateType', input.templateType);
+  if (input.orientation) params.set('orientation', input.orientation);
+  if (input.search) params.set('search', input.search);
+  return params.toString();
+}
 function normalizeSurface(raw: any) {
   return raw ? { ...raw, _id: idOf(raw), productId: String(raw.productId ?? '') } : null;
 }
@@ -128,6 +235,7 @@ function normalizeProduct(raw: any): Product {
     editorRules: raw.editorRules ?? {},
     exportRules: raw.exportRules ?? {},
     templates: normalizeTemplates(raw.templates),
+    layoutSettings: { enabled: raw.layoutSettings?.enabled === true, allowedTemplateCategoryIds: (raw.layoutSettings?.allowedTemplateCategoryIds ?? []).map(String), allowedTemplateIds: (raw.layoutSettings?.allowedTemplateIds ?? []).map(String), requireTemplateSelection: raw.layoutSettings?.requireTemplateSelection === true },
     createdAt: raw.createdAt ?? new Date().toISOString(),
     updatedAt: raw.updatedAt ?? new Date().toISOString(),
   };
@@ -142,7 +250,7 @@ function apiPayload<T>(value: T): T {
     const output: Record<string, unknown> = {};
     for (const [key, child] of Object.entries(value)) {
       if (key === 'clientId' || key === 'id' || (key === '_id' && !child)) continue;
-      if (!child && ['productId', 'optionGroupId', 'variantId', 'surfaceId'].includes(key)) continue;
+      if (!child && ['productId', 'optionGroupId', 'variantId', 'surfaceId', 'categoryId', 'thumbnailAssetId', 'backgroundImageAssetId', 'imageAssetId'].includes(key)) continue;
       output[key] = apiPayload(child);
     }
     return output as T;
@@ -179,7 +287,22 @@ export const api = {
   listMerchants: (accountId: string) => request<any[]>(`/merchants?accountId=${encodeURIComponent(accountId)}`).then((items) => items.map(normalizeMerchant)),
   updateMerchant: (merchant: Merchant) => request<any>(`/merchants/${merchant._id}`, { method: 'PUT', body: JSON.stringify(merchantPayload(merchant)) }).then(normalizeMerchant),
   rotateMerchantApiKey: (merchantId: string) => request<any>(`/merchants/${merchantId}/api-key`, { method: 'POST' }).then((result) => ({ merchant: normalizeMerchant(result.merchant), apiPrivateKey: String(result.apiPrivateKey) })),
-  listCategories: (accountId: string, merchantId: string) => request<any[]>(`/categories?accountId=${encodeURIComponent(accountId)}&merchantId=${encodeURIComponent(merchantId)}`).then((items) => items.map(normalizeCategory)),
+  listLayoutCategories: (accountId: string, merchantId: string) => request<any[]>(`/layout-categories?${layoutQuery({ accountId, merchantId })}`).then((items) => items.map(normalizeLayoutCategory)),
+  getLayoutCategory: (id: string) => request<any>(`/layout-categories/${id}`).then(normalizeLayoutCategory),
+  createLayoutCategory: (category: LayoutCategory) => request<any>('/layout-categories', { method: 'POST', body: JSON.stringify(apiPayload(withoutRootId(category))) }).then(normalizeLayoutCategory),
+  updateLayoutCategory: (category: LayoutCategory) => request<any>(`/layout-categories/${category._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(category))) }).then(normalizeLayoutCategory),
+  deleteLayoutCategory: (id: string) => request(`/layout-categories/${id}`, { method: 'DELETE' }),
+  duplicateLayoutCategory: (id: string, includeTemplates: boolean) => request<any>(`/layout-categories/${id}/duplicate`, { method: 'POST', body: JSON.stringify({ includeTemplates }) }).then((result) => ({ category: normalizeLayoutCategory(result.category), templates: (result.templates ?? []).map(normalizeLayoutTemplate) })),
+  exportLayoutCategory: (id: string, includeTemplates = false) => request<any>(`/layout-categories/${id}/export?includeTemplates=${includeTemplates ? 'true' : 'false'}`).then((result) => ({ category: normalizeLayoutCategory(result.category), templates: (result.templates ?? []).map(normalizeLayoutTemplate) })),
+  importLayoutCategory: (payload: unknown) => request<any>('/layout-categories/import', { method: 'POST', body: JSON.stringify(payload) }).then((result) => ({ category: normalizeLayoutCategory(result.category), templates: (result.templates ?? []).map(normalizeLayoutTemplate) })),
+  listLayoutTemplates: (filters: { accountId: string; merchantId: string; categoryId?: string; scope?: string; status?: string; templateType?: string; orientation?: string; search?: string }) => request<any[]>(`/layout-templates?${layoutQuery(filters)}`).then((items) => items.map(normalizeLayoutTemplate)),
+  getLayoutTemplate: (id: string) => request<any>(`/layout-templates/${id}`).then(normalizeLayoutTemplate),
+  createLayoutTemplate: (template: LayoutTemplate) => request<any>('/layout-templates', { method: 'POST', body: JSON.stringify(apiPayload(withoutRootId(template))) }).then(normalizeLayoutTemplate),
+  updateLayoutTemplate: (template: LayoutTemplate) => request<any>(`/layout-templates/${template._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(template))) }).then(normalizeLayoutTemplate),
+  deleteLayoutTemplate: (id: string) => request(`/layout-templates/${id}`, { method: 'DELETE' }),
+  duplicateLayoutTemplate: (id: string) => request<any>(`/layout-templates/${id}/duplicate`, { method: 'POST' }).then(normalizeLayoutTemplate),
+  exportLayoutTemplate: (id: string) => request<any>(`/layout-templates/${id}/export`).then((result) => ({ template: normalizeLayoutTemplate(result.template), category: result.category ? normalizeLayoutCategory(result.category) : undefined })),
+  importLayoutTemplate: (payload: unknown) => request<any>('/layout-templates/import', { method: 'POST', body: JSON.stringify(payload) }).then(normalizeLayoutTemplate),  listCategories: (accountId: string, merchantId: string) => request<any[]>(`/categories?accountId=${encodeURIComponent(accountId)}&merchantId=${encodeURIComponent(merchantId)}`).then((items) => items.map(normalizeCategory)),
   createCategory: (category: ProductCategory) => request<any>('/categories', { method: 'POST', body: JSON.stringify(apiPayload(withoutRootId(category))) }).then(normalizeCategory),
   updateCategory: (category: ProductCategory) => request<any>(`/categories/${category._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(category))) }).then(normalizeCategory),
   deleteCategory: (id: string) => request(`/categories/${id}`, { method: 'DELETE' }),

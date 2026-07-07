@@ -9,7 +9,7 @@ import { ImageField } from '../components/gallery/ImageField';
 import { useProducts } from '../hooks/useProducts';
 import { useCategories } from '../hooks/useCategories';
 import { useWorkspace } from '../hooks/useWorkspace';
-import { createDefaultEditorRules, createDefaultExportRules } from '../lib/storage';
+import { createDefaultAiArtConfig, createDefaultEditorRules, createDefaultExportRules } from '../lib/storage';
 import { validateProductBasicInfo } from '../lib/validation';
 import { createDefaultVariantOptionDefinitions } from '../lib/variantOptions';
 import { createDefaultFrontendContent } from '../lib/frontendContent';
@@ -99,7 +99,9 @@ export function CreateProduct() {
       frontendContent: createDefaultFrontendContent(),
       editorProductSelection: createDefaultEditorProductSelection(),
       templates: [],
+      layoutSettings: { enabled: false, allowedTemplateCategoryIds: [], allowedTemplateIds: [], requireTemplateSelection: false },
       variants: [],
+      aiArt: createDefaultAiArtConfig(),
       createdAt: now,
       updatedAt: now,
     };

@@ -200,6 +200,7 @@ export function normalizeProduct(product: Product): Product {
     editorRules: { ...defaultEditorRules, ...(product.editorRules ?? {}) },
     exportRules: { ...defaultExportRules, ...(product.exportRules ?? {}) },
     templates: (product.templates ?? []).map((template) => ({ ...template, surfaceId: surface?._id ?? template.surfaceId ?? '' })),
+    layoutSettings: { enabled: product.layoutSettings?.enabled === true, allowedTemplateCategoryIds: product.layoutSettings?.allowedTemplateCategoryIds ?? [], allowedTemplateIds: product.layoutSettings?.allowedTemplateIds ?? [], requireTemplateSelection: product.layoutSettings?.requireTemplateSelection === true },
     roomPreviews: liftLegacyRoomPreviews({ ...product, variants, roomPreviews: sharedRooms }),
     variants: variants.map((variant) => ({ ...variant, roomPreviews: undefined })),
     aiArt: product.aiArt ?? createDefaultAiArtConfig(),
