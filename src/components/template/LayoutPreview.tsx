@@ -225,11 +225,11 @@ export function LayoutPreview({
 function renderElement(element: LayoutElement) {
   if (element.type === "photo_placeholder")
     return (
-      <div className="relative h-full w-full">
+      <div className="relative h-full w-full overflow-hidden">
         <img src={previewImage} alt="" className="h-full w-full object-cover" />
-        <span className="absolute inset-x-0 bottom-0 bg-slate-900/65 px-1 py-0.5 text-center text-[10px] font-medium text-white">
-          Photo {element.photoSettings.placeholderIndex}
-        </span>
+        {/* <span className="absolute inset-0 flex items-center justify-center bg-slate-900/10 p-1 text-center text-[11px] font-semibold leading-tight text-white drop-shadow">
+          {element.name}
+        </span> */}
       </div>
     );
   if (element.type === "text_placeholder")
