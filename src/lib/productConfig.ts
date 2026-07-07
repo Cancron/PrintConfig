@@ -118,6 +118,7 @@ function buildImportCandidate(input: Record<string, unknown>): Product {
     frontendContent: normalizeFrontendContent(isRecord(input.frontendContent) ? input.frontendContent : undefined),
     editorProductSelection: normalizeEditorProductSelection(isRecord(input.editorProductSelection) ? input.editorProductSelection : undefined),
     templates: Array.isArray(input.templates) ? input.templates.filter(isRecord).map((template, index) => normalizeTemplate(template, id, surface?._id ?? '', now, index)) : [],
+    layoutSettings: normalizeLayoutSettings(isRecord(input.layoutSettings) ? input.layoutSettings : undefined),
     variants: variants.map((variant, index) => normalizeVariant(variant, id, now, index)),
     aiArt: normalizeAiArtConfig(isRecord(input.aiArt) ? input.aiArt : undefined, now),
     createdAt: now,
@@ -294,6 +295,15 @@ function normalizeRoomPreview(input: Record<string, unknown>, now: string): Lega
     sortOrder: numberOr(input.sortOrder, 0),
     createdAt: typeof input.createdAt === 'string' ? input.createdAt : now,
     updatedAt: now,
+  };
+}
+
+function normalizeLayoutSettings(input?: Record<string, unknown>) {
+  return {
+    enabled: input?.enabled === true,
+    allowedTemplateCategoryIds: Array.isArray(input?.allowedTemplateCategoryIds) ? input.allowedTemplateCategoryIds.map(String) : [],
+    allowedTemplateIds: Array.isArray(input?.allowedTemplateIds) ? input.allowedTemplateIds.map(String) : [],
+    requireTemplateSelection: input?.requireTemplateSelection === true,
   };
 }
 function normalizeTemplate(input: Record<string, unknown>, productId: string, surfaceId: string, now: string, index: number): ProductTemplate {

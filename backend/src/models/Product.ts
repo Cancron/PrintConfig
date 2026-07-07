@@ -288,6 +288,16 @@ const editorProductSelectionSchema = new Schema(
   { _id: false }
 );
 
+const layoutSettingsSchema = new Schema(
+  {
+    enabled: { type: Boolean, default: false },
+    allowedTemplateCategoryIds: { type: [{ type: Schema.Types.ObjectId, ref: 'LayoutCategory' }], default: [] },
+    allowedTemplateIds: { type: [{ type: Schema.Types.ObjectId, ref: 'LayoutTemplate' }], default: [] },
+    requireTemplateSelection: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
 const aiArtStyleSchema = new Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -350,6 +360,7 @@ const productSchema = new Schema(
     editorRules: { type: editorRulesSchema, default: () => ({}) },
     exportRules: { type: exportRulesSchema, default: () => ({}) },
     templates: { type: [templateSchema], default: [] },
+    layoutSettings: { type: layoutSettingsSchema, default: () => ({}) },
     aiArt: { type: aiArtSchema, default: () => ({ enabled: false }) },
   },
   { timestamps: true }
