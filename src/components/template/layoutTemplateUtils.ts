@@ -47,6 +47,18 @@ export const scopeOptions: { value: ProductScope; label: string }[] = [
   { value: "shared", label: "Shared across all merchant sites" },
   { value: "merchant", label: "Only for selected merchant" },
 ];
+export const fontFamilyOptions = [
+  { value: "Arial", label: "Arial" },
+  { value: "Helvetica", label: "Helvetica" },
+  { value: "Georgia", label: "Georgia" },
+  { value: "Times New Roman", label: "Times New Roman" },
+  { value: "Verdana", label: "Verdana" },
+  { value: "Trebuchet MS", label: "Trebuchet MS" },
+  { value: "Courier New", label: "Courier New" },
+  { value: "Montserrat", label: "Montserrat" },
+  { value: "Playfair Display", label: "Playfair Display" },
+  { value: "Lato", label: "Lato" },
+];
 
 export function createTemplate(
   accountId: string,

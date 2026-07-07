@@ -1,5 +1,6 @@
 import type { PointerEvent } from "react";
 import type { LayoutElement, LayoutTemplatePage } from "../../types";
+import previewImage from "../../assets/img-preview.jpeg";
 import { formatLabel, keyOf } from "./layoutTemplateUtils";
 
 interface LayoutPreviewProps {
@@ -153,7 +154,7 @@ export function LayoutPreview({
 
   return (
     <div className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-gray-200">
-      <div className="mx-auto w-full max-w-3xl">
+      <div className="mx-auto w-full max-w-[600px]">
         <div
           data-layout-canvas="true"
           className="relative mx-auto overflow-hidden rounded-md touch-none select-none ring-1 ring-gray-300"
@@ -224,9 +225,12 @@ export function LayoutPreview({
 function renderElement(element: LayoutElement) {
   if (element.type === "photo_placeholder")
     return (
-      <span className="flex h-full w-full items-center justify-center font-medium text-slate-700">
-        Photo {element.photoSettings.placeholderIndex}
-      </span>
+      <div className="relative h-full w-full">
+        <img src={previewImage} alt="" className="h-full w-full object-cover" />
+        <span className="absolute inset-x-0 bottom-0 bg-slate-900/65 px-1 py-0.5 text-center text-[10px] font-medium text-white">
+          Photo {element.photoSettings.placeholderIndex}
+        </span>
+      </div>
     );
   if (element.type === "text_placeholder")
     return (

@@ -22,6 +22,7 @@ import {
   templateTypeOptions,
   unitOptions,
   slugifyLocal,
+  fontFamilyOptions,
 } from "./layoutTemplateUtils";
 
 export function TemplateSettings({
@@ -504,7 +505,7 @@ function TextSettings({
         }
         rows={2}
       />
-      <Input
+      <Select
         label="Font Family"
         value={element.textSettings.fontFamily}
         onChange={(event) =>
@@ -516,6 +517,7 @@ function TextSettings({
             },
           }))
         }
+        options={fontFamilyOptions}
       />
       <Input
         label="Font Size"

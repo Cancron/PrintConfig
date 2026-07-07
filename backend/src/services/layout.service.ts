@@ -13,8 +13,13 @@ const ORIENTATIONS = ['portrait', 'landscape', 'square', 'custom'];
 const UNITS = ['inch', 'mm', 'px'];
 const ELEMENT_TYPES = ['photo_placeholder', 'text_placeholder', 'shape', 'background', 'clipart', 'static_image'];
 
-export function layoutVisibleQuery(accountId: string, merchantId?: string) {
-  return { accountId, $or: [{ scope: 'shared' }, { scope: 'merchant', merchantId }] };
+export function layoutVisibleQuery(accountId: string, merchantId?: string | null) {
+  const query: Record<string, unknown> = { accountId };
+  const merchant = String(merchantId ?? '').trim();
+  query.$or = merchant && Types.ObjectId.isValid(merchant)
+    ? [{ scope: 'shared' }, { scope: 'merchant', merchantId: merchant }]
+    : [{ scope: 'shared' }];
+  return query;
 }
 
 function isObjectId(value: unknown) {
@@ -201,7 +206,12 @@ async function normalizeTemplatePayload(payload: Record<string, unknown>, id?: s
   payload.slug = validateSlug(payload.slug || slugify(String(payload.name ?? 'layout-template')));
   validateStatus(payload.status ?? 'draft');
   if (!payload.categoryId || !isObjectId(payload.categoryId)) throw new ApiError(400, 'Layout category is required.');
-  const category = await LayoutCategoryModel.findOne({ _id: payload.categoryId, ...layoutVisibleQuery(String(payload.accountId), String(payload.merchantId ?? '')) });
+  const merchantContextId = payload.merchantContextId ? String(payload.merchantContextId) : undefined;
+  delete payload.merchantContextId;
+  const category = await LayoutCategoryModel.findOne({
+    _id: payload.categoryId,
+    ...layoutVisibleQuery(String(payload.accountId), merchantContextId ?? (payload.merchantId ? String(payload.merchantId) : undefined)),
+  });
   if (!category) throw new ApiError(400, 'Layout category is not visible for this account and merchant.');
   if (!TEMPLATE_TYPES.includes(String(payload.templateType))) throw new ApiError(400, 'Template type is required.');
   if (!ORIENTATIONS.includes(String(payload.orientation))) throw new ApiError(400, 'Orientation is required.');

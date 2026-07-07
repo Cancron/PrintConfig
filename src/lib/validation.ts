@@ -255,17 +255,18 @@ export function validateLayoutCategory(input: {
   return errors;
 }
 
-export function validateLayoutTemplate(template: LayoutTemplate, existingTemplates: LayoutTemplate[] = []): ValidationErrors {
+export function validateLayoutTemplate(template: LayoutTemplate, existingTemplates: LayoutTemplate[] = [], merchantContextId?: string | null): ValidationErrors {
   const errors: ValidationErrors = {};
   const slug = template.slug.trim().toLowerCase();
+  const effectiveMerchantId = template.merchantId || merchantContextId || null;
   if (!template.name.trim()) errors.name = 'Layout template name is required.';
   if (!slug) errors.slug = 'Slug is required.';
   else if (!URL_SAFE_SLUG.test(slug)) errors.slug = 'Use lowercase letters, numbers, and hyphens only.';
-  else if (existingTemplates.some((item) => item._id !== template._id && item.slug.toLowerCase() === slug && item.categoryId === template.categoryId && item.scope === template.scope && (item.scope === 'shared' || item.merchantId === template.merchantId))) errors.slug = 'Slug must be unique in this category and scope.';
+  else if (existingTemplates.some((item) => item._id !== template._id && item.slug.toLowerCase() === slug && item.categoryId === template.categoryId && item.scope === template.scope && (item.scope === 'shared' || item.merchantId === effectiveMerchantId))) errors.slug = 'Slug must be unique in this category and scope.';
   if (!template.categoryId) errors.categoryId = 'Layout category is required.';
   if (template.status !== 'active' && template.status !== 'draft' && template.status !== 'archived') errors.status = 'Status is required.';
   if (template.scope !== 'shared' && template.scope !== 'merchant') errors.scope = 'Scope is required.';
-  if (template.scope === 'merchant' && !template.merchantId) errors.scope = 'Select a merchant for merchant custom templates.';
+  if (template.scope === 'merchant' && !effectiveMerchantId) errors.scope = 'Select a merchant for merchant custom templates.';
   if (!template.templateType) errors.templateType = 'Template type is required.';
   if (!template.orientation) errors.orientation = 'Orientation is required.';
   if (template.pageCount < 1 || !Number.isFinite(template.pageCount)) errors.pageCount = 'Page count must be at least 1.';

@@ -93,8 +93,8 @@ export function LayoutTemplateEditor() {
       (element) => keyOf(element) === selectedElementId,
     ) ?? null;
   const errors = useMemo(
-    () => validateLayoutTemplate(template, allTemplates),
-    [allTemplates, template],
+    () => validateLayoutTemplate(template, allTemplates, selectedMerchantId),
+    [allTemplates, selectedMerchantId, template],
   );
   const isValid = Object.keys(errors).length === 0;
 
@@ -237,6 +237,7 @@ export function LayoutTemplateEditor() {
     if (!isValid) return;
     const payload = {
       ...template,
+      merchantContextId: selectedMerchantId,
       merchantId: template.scope === "merchant" ? selectedMerchantId : null,
       pageCount: template.pages.length || template.pageCount,
     };
