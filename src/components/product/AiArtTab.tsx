@@ -32,6 +32,7 @@ export function AiArtTab({ product, onSave }: Props) {
 
   const styleErrors = useMemo(() => (styleForm ? validateStyle(styleForm, form.styles, editingStyleId) : {}), [editingStyleId, styleForm, form.styles]);
   const isStyleValid = Object.keys(styleErrors).length === 0;
+  const showAiArtConfig = form.enabled;
 
   useEffect(() => {
     setForm(JSON.parse(JSON.stringify(originalAiArt)));
@@ -167,53 +168,57 @@ export function AiArtTab({ product, onSave }: Props) {
             onChange={(e) => updateConfig('enabled', e.target.value === 'yes')}
             options={yesNoOptions}
           />
-          <Input
-            label="Section Title"
-            value={form.sectionTitle}
-            onChange={(e) => updateConfig('sectionTitle', e.target.value)}
-            placeholder="AI Art Styles"
-          />
-          <Input
-            label="Badge Text"
-            value={form.badgeText}
-            onChange={(e) => updateConfig('badgeText', e.target.value)}
-            placeholder="Artwork fee added"
-          />
-          <Input
-            label="Max Upload Images"
-            type="number"
-            min={1}
-            value={form.maxUploadImages}
-            onChange={(e) => updateConfig('maxUploadImages', Math.max(1, Number(e.target.value)))}
-          />
-          <Input
-            label="Default Generated Image Count"
-            type="number"
-            min={1}
-            value={form.defaultGeneratedImageCount}
-            onChange={(e) => updateConfig('defaultGeneratedImageCount', Math.max(1, Number(e.target.value)))}
-          />
-          <Select
-            label="Require Upload Before Style Selection"
-            value={form.requireUploadBeforeStyleSelection ? 'yes' : 'no'}
-            onChange={(e) => updateConfig('requireUploadBeforeStyleSelection', e.target.value === 'yes')}
-            options={yesNoOptions}
-          />
-          <Select
-            label="Show Additional Price"
-            value={form.showAdditionalPrice ? 'yes' : 'no'}
-            onChange={(e) => updateConfig('showAdditionalPrice', e.target.value === 'yes')}
-            options={yesNoOptions}
-          />
-          <Select
-            label="Allow Art Name"
-            value={form.allowArtName ? 'yes' : 'no'}
-            onChange={(e) => updateConfig('allowArtName', e.target.value === 'yes')}
-            options={yesNoOptions}
-          />
+          {showAiArtConfig && (
+            <>
+              <Input
+                label="Section Title"
+                value={form.sectionTitle}
+                onChange={(e) => updateConfig('sectionTitle', e.target.value)}
+                placeholder="AI Art Styles"
+              />
+              <Input
+                label="Badge Text"
+                value={form.badgeText}
+                onChange={(e) => updateConfig('badgeText', e.target.value)}
+                placeholder="Artwork fee added"
+              />
+              <Input
+                label="Max Upload Images"
+                type="number"
+                min={1}
+                value={form.maxUploadImages}
+                onChange={(e) => updateConfig('maxUploadImages', Math.max(1, Number(e.target.value)))}
+              />
+              <Input
+                label="Default Generated Image Count"
+                type="number"
+                min={1}
+                value={form.defaultGeneratedImageCount}
+                onChange={(e) => updateConfig('defaultGeneratedImageCount', Math.max(1, Number(e.target.value)))}
+              />
+              <Select
+                label="Require Upload Before Style Selection"
+                value={form.requireUploadBeforeStyleSelection ? 'yes' : 'no'}
+                onChange={(e) => updateConfig('requireUploadBeforeStyleSelection', e.target.value === 'yes')}
+                options={yesNoOptions}
+              />
+              <Select
+                label="Show Additional Price"
+                value={form.showAdditionalPrice ? 'yes' : 'no'}
+                onChange={(e) => updateConfig('showAdditionalPrice', e.target.value === 'yes')}
+                options={yesNoOptions}
+              />
+              <Select
+                label="Allow Art Name"
+                value={form.allowArtName ? 'yes' : 'no'}
+                onChange={(e) => updateConfig('allowArtName', e.target.value === 'yes')}
+                options={yesNoOptions}
+              />
+            </>
+          )}
         </div>
 
-        {form.allowArtName && (
+        {showAiArtConfig && form.allowArtName && (
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input
               label="Art Name Field Label"
@@ -230,19 +235,21 @@ export function AiArtTab({ product, onSave }: Props) {
           </div>
         )}
 
-        <div className="mt-4">
-          <Textarea
-            label="Help Text"
-            value={form.helpText}
-            onChange={(e) => updateConfig('helpText', e.target.value)}
-            rows={2}
-            placeholder="Upload your pet photo. We will create the selected artwork style before printing."
-          />
-        </div>
+        {showAiArtConfig && (
+          <div className="mt-4">
+            <Textarea
+              label="Help Text"
+              value={form.helpText}
+              onChange={(e) => updateConfig('helpText', e.target.value)}
+              rows={2}
+              placeholder="Upload your pet photo. We will create the selected artwork style before printing."
+            />
+          </div>
+        )}
       </div>
-
       {/* Styles Card */}
-      <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-gray-200">
+      {showAiArtConfig && (
+        <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-gray-200">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-gray-900">AI Art Styles</h3>
           {!styleForm && (
@@ -394,10 +401,11 @@ export function AiArtTab({ product, onSave }: Props) {
             ))}
           </div>
         )}
-      </div>
+        </div>
+      )}
 
       {/* Live Preview Card */}
-      {form.enabled && (
+      {showAiArtConfig && (
         <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-gray-200">
           <h3 className="text-base font-semibold text-gray-900 mb-4">Frontend Preview</h3>
           <div className="rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200">
@@ -447,7 +455,7 @@ export function AiArtTab({ product, onSave }: Props) {
       )}
 
       {/* Disabled notice */}
-      {!form.enabled && (
+      {!showAiArtConfig && (
         <div className="rounded-lg bg-amber-50 p-4 ring-1 ring-amber-200">
           <div className="flex items-center gap-2 text-amber-700">
             <AlertCircle className="h-4 w-4" />

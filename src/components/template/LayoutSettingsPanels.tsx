@@ -4,6 +4,7 @@ import { Select } from "../ui/Select";
 import { Textarea } from "../ui/Textarea";
 import { ImageField } from "../gallery/ImageField";
 import type {
+  Collage,
   LayoutElement,
   LayoutElementType,
   LayoutOrientation,
@@ -196,9 +197,11 @@ export function TemplateSettings({
 
 export function PageSettings({
   page,
+  collages = [],
   onUpdate,
 }: {
   page: LayoutTemplatePage;
+  collages?: Collage[];
   onUpdate: <K extends keyof LayoutTemplatePage>(
     field: K,
     value: LayoutTemplatePage[K],
@@ -211,6 +214,12 @@ export function PageSettings({
         label="Page Name"
         value={page.name}
         onChange={(event) => onUpdate("name", event.target.value)}
+      />
+      <Select
+        label="Collage"
+        value={page.collageId ?? ""}
+        onChange={(event) => onUpdate("collageId", event.target.value || null)}
+        options={[{ value: "", label: "No collage selected" }, ...collages.map((collage) => ({ value: collage._id, label: collage.name }))]}
       />
       <div className="grid grid-cols-2 gap-3">
         <Input
@@ -622,11 +631,12 @@ function ShapeSettings({
           { value: "rectangle", label: "Rectangle" },
           { value: "circle", label: "Circle" },
           { value: "line", label: "Line" },
+          { value: "path", label: "SVG Path" },
         ]}
       />
       <Input
         label="Fill"
-        type="color"
+        type={element.shapeSettings.shapeType === "path" ? "text" : "color"}
         value={element.shapeSettings.fillColor}
         onChange={(event) =>
           onUpdate((item) => ({
@@ -640,7 +650,7 @@ function ShapeSettings({
       />
       <Input
         label="Stroke"
-        type="color"
+        type={element.shapeSettings.shapeType === "path" ? "text" : "color"}
         value={element.shapeSettings.strokeColor}
         onChange={(event) =>
           onUpdate((item) => ({
@@ -680,6 +690,39 @@ function ShapeSettings({
           }))
         }
       />
+      {element.shapeSettings.shapeType === "path" && (
+        <>
+          <Textarea
+            label="SVG Path"
+            className="col-span-2 font-mono"
+            rows={4}
+            value={element.shapeSettings.svgPath ?? ""}
+            onChange={(event) =>
+              onUpdate((item) => ({
+                ...item,
+                shapeSettings: {
+                  ...item.shapeSettings,
+                  svgPath: event.target.value,
+                },
+              }))
+            }
+          />
+          <Input
+            label="SVG ViewBox"
+            className="col-span-2 font-mono"
+            value={element.shapeSettings.svgViewBox ?? ""}
+            onChange={(event) =>
+              onUpdate((item) => ({
+                ...item,
+                shapeSettings: {
+                  ...item.shapeSettings,
+                  svgViewBox: event.target.value,
+                },
+              }))
+            }
+          />
+        </>
+      )}
     </div>
   );
 }

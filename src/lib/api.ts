@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { ImageAsset, ImageFolder, LayoutCategory, LayoutElement, LayoutTemplate, LayoutTemplatePage, Merchant, Product, ProductCategory } from '../types';
+import type { Collage, ImageAsset, ImageFolder, LayoutCategory, LayoutElement, LayoutTemplate, LayoutTemplatePage, Merchant, Product, ProductCategory } from '../types';
 import { normalizeVariantOptionDefinitions } from './variantOptions';
 import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
 import { normalizeFrontendContent } from './frontendContent';
@@ -63,7 +63,7 @@ function normalizeCategory(raw: any): ProductCategory {
 
 const defaultPhotoSettings = { fitMode: 'cover' as const, allowCrop: true, allowRotate: true, allowReplace: true, placeholderIndex: 1, maskShape: 'rectangle' as const };
 const defaultTextSettings = { defaultText: '', fontFamily: 'Arial', fontSize: 24, fontWeight: '400', color: '#111827', textAlign: 'center' as const };
-const defaultShapeSettings = { shapeType: 'rectangle' as const, fillColor: '#f3f4f6', strokeColor: '#111827', strokeWidth: 1, borderRadius: 0 };
+const defaultShapeSettings = { shapeType: 'rectangle' as const, fillColor: '#f3f4f6', strokeColor: '#111827', strokeWidth: 1, borderRadius: 0, svgPath: '', svgViewBox: '' };
 const defaultImageSettings = { imageUrl: '', opacity: 1 };
 
 function normalizeLayoutCategory(raw: any): LayoutCategory {
@@ -120,6 +120,7 @@ function normalizeLayoutPage(raw: any, template?: any): LayoutTemplatePage {
     backgroundColor: raw.backgroundColor ?? template?.backgroundColor ?? '#ffffff',
     backgroundImageUrl: raw.backgroundImageUrl ?? '',
     backgroundImageAssetId: raw.backgroundImageAssetId ? String(raw.backgroundImageAssetId) : undefined,
+    collageId: raw.collageId ? String(raw.collageId) : null,
     elements: (raw.elements ?? []).map(normalizeLayoutElement),
     createdAt: raw.createdAt ?? new Date().toISOString(),
     updatedAt: raw.updatedAt ?? new Date().toISOString(),
@@ -156,6 +157,35 @@ function normalizeLayoutTemplate(raw: any): LayoutTemplate {
   };
 }
 
+function normalizeCollage(raw: any): Collage {
+  return {
+    ...raw,
+    _id: idOf(raw),
+    accountId: String(raw.accountId ?? ''),
+    merchantId: raw.merchantId ? String(raw.merchantId) : null,
+    scope: raw.scope ?? 'shared',
+    categoryId: raw.categoryId ? String(raw.categoryId) : '',
+    name: raw.name ?? '',
+    slug: raw.slug ?? '',
+    description: raw.description ?? '',
+    status: raw.status ?? 'draft',
+    thumbnailUrl: raw.thumbnailUrl ?? '',
+    thumbnailAssetId: raw.thumbnailAssetId ? String(raw.thumbnailAssetId) : undefined,
+    orientation: raw.orientation ?? 'square',
+    canvasWidth: Number(raw.canvasWidth ?? 12),
+    canvasHeight: Number(raw.canvasHeight ?? 12),
+    unit: raw.unit ?? 'inch',
+    dpi: Number(raw.dpi ?? 300),
+    backgroundColor: raw.backgroundColor ?? '#ffffff',
+    backgroundImageUrl: raw.backgroundImageUrl ?? '',
+    backgroundImageAssetId: raw.backgroundImageAssetId ? String(raw.backgroundImageAssetId) : undefined,
+    tags: raw.tags ?? [],
+    sortOrder: Number(raw.sortOrder ?? 0),
+    elements: (raw.elements ?? []).map(normalizeLayoutElement),
+    createdAt: raw.createdAt ?? new Date().toISOString(),
+    updatedAt: raw.updatedAt ?? new Date().toISOString(),
+  };
+}
 function layoutQuery(input: { accountId: string; merchantId?: string; categoryId?: string; scope?: string; status?: string; templateType?: string; orientation?: string; search?: string }) {
   const params = new URLSearchParams({ accountId: input.accountId });
   if (input.merchantId) params.set('merchantId', input.merchantId);
@@ -302,7 +332,16 @@ export const api = {
   deleteLayoutTemplate: (id: string) => request(`/layout-templates/${id}`, { method: 'DELETE' }),
   duplicateLayoutTemplate: (id: string) => request<any>(`/layout-templates/${id}/duplicate`, { method: 'POST' }).then(normalizeLayoutTemplate),
   exportLayoutTemplate: (id: string) => request<any>(`/layout-templates/${id}/export`).then((result) => ({ template: normalizeLayoutTemplate(result.template), category: result.category ? normalizeLayoutCategory(result.category) : undefined })),
-  importLayoutTemplate: (payload: unknown) => request<any>('/layout-templates/import', { method: 'POST', body: JSON.stringify(payload) }).then(normalizeLayoutTemplate),  listCategories: (accountId: string, merchantId: string) => request<any[]>(`/categories?accountId=${encodeURIComponent(accountId)}&merchantId=${encodeURIComponent(merchantId)}`).then((items) => items.map(normalizeCategory)),
+  importLayoutTemplate: (payload: unknown) => request<any>('/layout-templates/import', { method: 'POST', body: JSON.stringify(payload) }).then(normalizeLayoutTemplate),
+  listCollages: (filters: { accountId: string; merchantId: string; categoryId?: string; scope?: string; status?: string; orientation?: string; search?: string }) => request<any[]>(`/collages?${layoutQuery(filters)}`).then((items) => items.map(normalizeCollage)),
+  getCollage: (id: string) => request<any>(`/collages/${id}`).then(normalizeCollage),
+  createCollage: (collage: Collage) => request<any>('/collages', { method: 'POST', body: JSON.stringify(apiPayload(withoutRootId(collage))) }).then(normalizeCollage),
+  updateCollage: (collage: Collage) => request<any>(`/collages/${collage._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(collage))) }).then(normalizeCollage),
+  deleteCollage: (id: string) => request(`/collages/${id}`, { method: 'DELETE' }),
+  duplicateCollage: (id: string) => request<any>(`/collages/${id}/duplicate`, { method: 'POST' }).then(normalizeCollage),
+  exportCollage: (id: string) => request<any>(`/collages/${id}/export`).then((result) => ({ collage: normalizeCollage(result.collage), category: result.category ? normalizeLayoutCategory(result.category) : undefined })),
+  importCollage: (payload: unknown) => request<any>('/collages/import', { method: 'POST', body: JSON.stringify(payload) }).then(normalizeCollage),
+  listCategories: (accountId: string, merchantId: string) => request<any[]>(`/categories?accountId=${encodeURIComponent(accountId)}&merchantId=${encodeURIComponent(merchantId)}`).then((items) => items.map(normalizeCategory)),
   createCategory: (category: ProductCategory) => request<any>('/categories', { method: 'POST', body: JSON.stringify(apiPayload(withoutRootId(category))) }).then(normalizeCategory),
   updateCategory: (category: ProductCategory) => request<any>(`/categories/${category._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(category))) }).then(normalizeCategory),
   deleteCategory: (id: string) => request(`/categories/${id}`, { method: 'DELETE' }),
@@ -315,5 +354,4 @@ export const api = {
   exportProduct: (id: string) => request<any>(`/products/${id}/export`).then(normalizeProduct),
   importProduct: (product: Product) => request<any>('/products/import', { method: 'POST', body: JSON.stringify(productPayload(product)) }).then(normalizeProduct),
 };
-
 

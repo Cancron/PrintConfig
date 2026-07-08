@@ -7,6 +7,7 @@ import { imageFolderRoutes } from './routes/image-folder.routes.js';
 import { imageAssetRoutes } from './routes/image-asset.routes.js';
 import { layoutCategoryRoutes } from './routes/layout-category.routes.js';
 import { layoutTemplateRoutes } from './routes/layout-template.routes.js';
+import { collageRoutes } from './routes/collage.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const corsOptions: cors.CorsOptions = {
@@ -27,4 +28,5 @@ app.use('/api/image-folders', imageFolderRoutes);
 app.use('/api/image-assets', imageAssetRoutes);
 app.use('/api/layout-categories', layoutCategoryRoutes);
 app.use('/api/layout-templates', layoutTemplateRoutes);
+app.use('/api/collages', collageRoutes);
 app.use(errorHandler);

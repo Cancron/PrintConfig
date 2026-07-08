@@ -10,6 +10,7 @@ import { MerchantSettings } from './pages/MerchantSettings';
 import { ImageLibrary } from './pages/ImageLibrary';
 import { LayoutCategories, LayoutCategoryDetail } from './pages/LayoutCategories';
 import { LayoutTemplates, LayoutTemplateEditor } from './pages/LayoutTemplates';
+import { Collages, CollageEditor } from './pages/Collages';
 
 function App() {
   return (
@@ -27,6 +28,8 @@ function App() {
           <Route path="/layouts/categories" element={<LayoutCategories />} />
           <Route path="/layouts/categories/:id" element={<LayoutCategoryDetail />} />
           <Route path="/layouts/templates" element={<LayoutTemplates />} />
+          <Route path="/layouts/collages" element={<Collages />} />
+          <Route path="/layouts/collages/:id" element={<CollageEditor />} />
           <Route path="/layouts/templates/:id" element={<LayoutTemplateEditor />} />
         </Routes>
       </Layout>

@@ -51,14 +51,14 @@ export function LayoutPreview({
   }
 
   function startDrag(
-    event: PointerEvent<HTMLDivElement>,
+    event: PointerEvent<HTMLElement | SVGElement>,
     element: LayoutElement,
   ) {
     if (previewMode || element.locked) return;
     event.preventDefault();
     event.stopPropagation();
     onSelect(keyOf(element));
-    const canvas = event.currentTarget.parentElement;
+    const canvas = event.currentTarget.closest('[data-layout-canvas="true"]');
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const start = toPercent(event, rect);
@@ -172,12 +172,22 @@ export function LayoutPreview({
             .sort((a, b) => a.zIndex - b.zIndex)
             .map((element) => {
               const selected = keyOf(element) === selectedElementId;
+              const pathShape =
+                element.type === "shape" &&
+                element.shapeSettings.shapeType === "path" &&
+                Boolean(element.shapeSettings.svgPath);
               return (
                 <div
                   key={keyOf(element)}
-                  onPointerDown={(event) => startDrag(event, element)}
-                  onClick={() => onSelect(keyOf(element))}
-                  className={`absolute overflow-hidden border text-xs ${previewMode ? "cursor-default" : element.locked ? "cursor-not-allowed" : "cursor-move"} ${selected ? "border-slate-900 ring-2 ring-slate-900" : "border-dashed border-slate-500"}`}
+                  onPointerDown={
+                    pathShape
+                      ? undefined
+                      : (event) => startDrag(event, element)
+                  }
+                  onClick={
+                    pathShape ? undefined : () => onSelect(keyOf(element))
+                  }
+                  className={`absolute overflow-hidden text-xs ${pathShape ? "" : "border"} ${previewMode ? "cursor-default" : element.locked ? "cursor-not-allowed" : "cursor-move"} ${pathShape ? "" : selected ? "border-slate-900 ring-2 ring-slate-900" : "border-dashed border-slate-500"}`}
                   style={{
                     left: `${element.x}%`,
                     top: `${element.y}%`,
@@ -186,19 +196,27 @@ export function LayoutPreview({
                     transform: `rotate(${element.rotation}deg)`,
                     zIndex: element.zIndex,
                     background:
-                      element.type === "shape"
+                      element.type === "shape" &&
+                      element.shapeSettings.shapeType !== "path"
                         ? element.shapeSettings.fillColor
                         : element.type === "text_placeholder"
                           ? "rgba(255,255,255,0.78)"
-                          : "rgba(15,23,42,0.08)",
+                          : element.type === "shape"
+                            ? "transparent"
+                            : "rgba(15,23,42,0.08)",
                     borderRadius:
                       element.type === "photo_placeholder" &&
                       element.photoSettings.maskShape === "circle"
                         ? "9999px"
                         : element.shapeSettings.borderRadius || 4,
+                    pointerEvents: pathShape ? "none" : undefined,
                   }}
                 >
-                  {renderElement(element)}
+                  {renderElement(element, {
+                    selected,
+                    previewMode,
+                    onPathPointerDown: (event) => startDrag(event, element),
+                  })}
                   {selected &&
                     !previewMode &&
                     !element.locked &&
@@ -211,6 +229,7 @@ export function LayoutPreview({
                           startResize(event, element, handle)
                         }
                         className={`absolute h-3 w-3 rounded-full border border-slate-900 bg-white shadow ${handleClass(handle)}`}
+                        style={{ pointerEvents: "auto" }}
                       />
                     ))}
                 </div>
@@ -222,7 +241,14 @@ export function LayoutPreview({
   );
 }
 
-function renderElement(element: LayoutElement) {
+function renderElement(
+  element: LayoutElement,
+  options?: {
+    selected?: boolean;
+    previewMode?: boolean;
+    onPathPointerDown?: (event: PointerEvent<SVGPathElement>) => void;
+  },
+) {
   if (element.type === "photo_placeholder")
     return (
       <div className="relative h-full w-full overflow-hidden">
@@ -232,12 +258,27 @@ function renderElement(element: LayoutElement) {
         </span> */}
       </div>
     );
-  if (element.type === "text_placeholder")
+  if (element.type === "text_placeholder") {
+    const settings = element.textSettings;
     return (
-      <span className="flex h-full w-full items-center justify-center p-1 text-center font-medium text-gray-900">
-        {element.textSettings.defaultText || element.name}
-      </span>
+      <div
+        className="flex h-full w-full items-center overflow-hidden p-1 leading-tight"
+        style={{
+          color: settings.color,
+          fontFamily: settings.fontFamily,
+          fontSize: `${settings.fontSize}px`,
+          fontWeight: settings.fontWeight,
+        }}
+      >
+        <span
+          className="block w-full whitespace-pre-wrap"
+          style={{ textAlign: settings.textAlign }}
+        >
+          {settings.defaultText || element.name}
+        </span>
+      </div>
     );
+  }
   if (
     (element.type === "static_image" || element.type === "clipart") &&
     element.imageSettings.imageUrl
@@ -250,6 +291,43 @@ function renderElement(element: LayoutElement) {
         style={{ opacity: element.imageSettings.opacity }}
       />
     );
+  if (
+    element.type === "shape" &&
+    element.shapeSettings.shapeType === "path" &&
+    element.shapeSettings.svgPath
+  ) {
+    return (
+      <svg
+        className="h-full w-full overflow-visible"
+        viewBox={element.shapeSettings.svgViewBox || "0 0 100 100"}
+        preserveAspectRatio="none"
+        aria-label={element.name}
+        style={{ pointerEvents: "auto" }}
+      >
+        <path
+          d={element.shapeSettings.svgPath}
+          fill={element.shapeSettings.fillColor || "none"}
+          stroke={element.shapeSettings.strokeColor || "none"}
+          strokeWidth={element.shapeSettings.strokeWidth || 0}
+          className={options?.previewMode ? "cursor-default" : "cursor-move"}
+          style={{ pointerEvents: "visiblePainted" }}
+          onPointerDown={
+            options?.previewMode ? undefined : options?.onPathPointerDown
+          }
+        />
+        {options?.selected && !options.previewMode && (
+          <path
+            d={element.shapeSettings.svgPath}
+            fill="none"
+            stroke="#0f172a"
+            strokeWidth={Math.max(element.shapeSettings.strokeWidth || 1, 2)}
+            strokeDasharray="6 4"
+            pointerEvents="none"
+          />
+        )}
+      </svg>
+    );
+  }
   return (
     <span className="flex h-full w-full items-center justify-center text-slate-700">
       {formatLabel(element.type)}

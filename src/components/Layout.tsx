@@ -9,6 +9,7 @@ const navItems = [
   { path: '/products', label: 'Products', icon: Package },
   { path: '/image-library', label: 'Image Library', icon: Images },
   { path: '/layouts/categories', label: 'Layout Categories', icon: LayoutTemplate },
+  { path: '/layouts/collages', label: 'Collages', icon: LayoutTemplate },
   { path: '/layouts/templates', label: 'Layout Templates', icon: LayoutTemplate },
   { path: '/merchant-settings', label: 'Merchant Settings', icon: Store },
 ];
