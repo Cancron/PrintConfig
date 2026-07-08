@@ -232,12 +232,23 @@ function renderElement(element: LayoutElement) {
         </span> */}
       </div>
     );
-  if (element.type === "text_placeholder")
+  if (element.type === "text_placeholder") {
+    const settings = element.textSettings;
     return (
-      <span className="flex h-full w-full items-center justify-center p-1 text-center font-medium text-gray-900">
-        {element.textSettings.defaultText || element.name}
+      <span
+        className="flex h-full w-full items-center overflow-hidden p-1 leading-tight"
+        style={{
+          color: settings.color,
+          fontFamily: settings.fontFamily,
+          fontSize: `${settings.fontSize}px`,
+          fontWeight: settings.fontWeight,
+          textAlign: settings.textAlign,
+        }}
+      >
+        {settings.defaultText || element.name}
       </span>
     );
+  }
   if (
     (element.type === "static_image" || element.type === "clipart") &&
     element.imageSettings.imageUrl
