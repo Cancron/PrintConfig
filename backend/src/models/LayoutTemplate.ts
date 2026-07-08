@@ -32,11 +32,13 @@ const textSettingsSchema = new Schema(
 
 const shapeSettingsSchema = new Schema(
   {
-    shapeType: { type: String, enum: ['rectangle', 'circle', 'line'], default: 'rectangle' },
+    shapeType: { type: String, enum: ['rectangle', 'circle', 'line', 'path'], default: 'rectangle' },
     fillColor: { type: String, default: '#f3f4f6' },
     strokeColor: { type: String, default: '#111827' },
     strokeWidth: { type: Number, default: 1, min: 0 },
     borderRadius: { type: Number, default: 0, min: 0 },
+    svgPath: { type: String, default: '' },
+    svgViewBox: { type: String, default: '' },
   },
   { _id: false }
 );

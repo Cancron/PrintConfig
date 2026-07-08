@@ -157,6 +157,8 @@ export function createElement(
       strokeColor: "#111827",
       strokeWidth: 1,
       borderRadius: 4,
+      svgPath: "",
+      svgViewBox: "",
     },
     imageSettings: { imageUrl: "", opacity: 1 },
     createdAt: now,

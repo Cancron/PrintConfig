@@ -27,7 +27,7 @@ export type LayoutOrientation = 'portrait' | 'landscape' | 'square' | 'custom';
 export type LayoutElementType = 'photo_placeholder' | 'text_placeholder' | 'shape' | 'background' | 'clipart' | 'static_image';
 export type LayoutPhotoFitMode = 'cover' | 'contain' | 'stretch';
 export type LayoutMaskShape = 'rectangle' | 'circle' | 'rounded_rectangle' | 'custom';
-export type LayoutShapeType = 'rectangle' | 'circle' | 'line';
+export type LayoutShapeType = 'rectangle' | 'circle' | 'line' | 'path';
 export type ProductUnit = 'inch' | 'mm' | 'px';
 export type ProductOptionDisplayType = 'Dropdown' | 'Radio Buttons' | 'Color Swatches' | 'Image Swatches' | 'Text Buttons';
 export type PriceModifierType = 'none' | 'fixed' | 'variant-fixed' | 'variant-override' | 'percentage';
@@ -158,6 +158,8 @@ export interface LayoutShapeSettings {
   strokeColor: string;
   strokeWidth: number;
   borderRadius: number;
+  svgPath?: string;
+  svgViewBox?: string;
 }
 
 export interface LayoutImageSettings {

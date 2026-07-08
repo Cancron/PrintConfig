@@ -63,7 +63,7 @@ function normalizeCategory(raw: any): ProductCategory {
 
 const defaultPhotoSettings = { fitMode: 'cover' as const, allowCrop: true, allowRotate: true, allowReplace: true, placeholderIndex: 1, maskShape: 'rectangle' as const };
 const defaultTextSettings = { defaultText: '', fontFamily: 'Arial', fontSize: 24, fontWeight: '400', color: '#111827', textAlign: 'center' as const };
-const defaultShapeSettings = { shapeType: 'rectangle' as const, fillColor: '#f3f4f6', strokeColor: '#111827', strokeWidth: 1, borderRadius: 0 };
+const defaultShapeSettings = { shapeType: 'rectangle' as const, fillColor: '#f3f4f6', strokeColor: '#111827', strokeWidth: 1, borderRadius: 0, svgPath: '', svgViewBox: '' };
 const defaultImageSettings = { imageUrl: '', opacity: 1 };
 
 function normalizeLayoutCategory(raw: any): LayoutCategory {
@@ -354,5 +354,4 @@ export const api = {
   exportProduct: (id: string) => request<any>(`/products/${id}/export`).then(normalizeProduct),
   importProduct: (product: Product) => request<any>('/products/import', { method: 'POST', body: JSON.stringify(productPayload(product)) }).then(normalizeProduct),
 };
-
 

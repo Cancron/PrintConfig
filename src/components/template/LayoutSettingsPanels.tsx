@@ -631,11 +631,12 @@ function ShapeSettings({
           { value: "rectangle", label: "Rectangle" },
           { value: "circle", label: "Circle" },
           { value: "line", label: "Line" },
+          { value: "path", label: "SVG Path" },
         ]}
       />
       <Input
         label="Fill"
-        type="color"
+        type={element.shapeSettings.shapeType === "path" ? "text" : "color"}
         value={element.shapeSettings.fillColor}
         onChange={(event) =>
           onUpdate((item) => ({
@@ -649,7 +650,7 @@ function ShapeSettings({
       />
       <Input
         label="Stroke"
-        type="color"
+        type={element.shapeSettings.shapeType === "path" ? "text" : "color"}
         value={element.shapeSettings.strokeColor}
         onChange={(event) =>
           onUpdate((item) => ({
@@ -689,6 +690,39 @@ function ShapeSettings({
           }))
         }
       />
+      {element.shapeSettings.shapeType === "path" && (
+        <>
+          <Textarea
+            label="SVG Path"
+            className="col-span-2 font-mono"
+            rows={4}
+            value={element.shapeSettings.svgPath ?? ""}
+            onChange={(event) =>
+              onUpdate((item) => ({
+                ...item,
+                shapeSettings: {
+                  ...item.shapeSettings,
+                  svgPath: event.target.value,
+                },
+              }))
+            }
+          />
+          <Input
+            label="SVG ViewBox"
+            className="col-span-2 font-mono"
+            value={element.shapeSettings.svgViewBox ?? ""}
+            onChange={(event) =>
+              onUpdate((item) => ({
+                ...item,
+                shapeSettings: {
+                  ...item.shapeSettings,
+                  svgViewBox: event.target.value,
+                },
+              }))
+            }
+          />
+        </>
+      )}
     </div>
   );
 }
