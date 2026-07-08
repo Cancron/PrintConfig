@@ -199,11 +199,38 @@ export interface LayoutTemplatePage {
   backgroundColor: string;
   backgroundImageUrl: string;
   backgroundImageAssetId?: string;
+  collageId?: string | null;
   elements: LayoutElement[];
   createdAt: string;
   updatedAt: string;
 }
 
+export interface Collage {
+  _id: string;
+  accountId: string;
+  merchantId?: string | null;
+  scope: ProductScope;
+  categoryId: string;
+  name: string;
+  slug: string;
+  description: string;
+  status: LayoutStatus;
+  thumbnailUrl: string;
+  thumbnailAssetId?: string;
+  orientation: LayoutOrientation;
+  canvasWidth: number;
+  canvasHeight: number;
+  unit: ProductUnit;
+  dpi: number;
+  backgroundColor: string;
+  backgroundImageUrl: string;
+  backgroundImageAssetId?: string;
+  tags: string[];
+  sortOrder: number;
+  elements: LayoutElement[];
+  createdAt: string;
+  updatedAt: string;
+}
 export interface LayoutTemplate {
   _id: string;
   accountId: string;

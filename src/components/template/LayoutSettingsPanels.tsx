@@ -4,6 +4,7 @@ import { Select } from "../ui/Select";
 import { Textarea } from "../ui/Textarea";
 import { ImageField } from "../gallery/ImageField";
 import type {
+  Collage,
   LayoutElement,
   LayoutElementType,
   LayoutOrientation,
@@ -196,9 +197,11 @@ export function TemplateSettings({
 
 export function PageSettings({
   page,
+  collages = [],
   onUpdate,
 }: {
   page: LayoutTemplatePage;
+  collages?: Collage[];
   onUpdate: <K extends keyof LayoutTemplatePage>(
     field: K,
     value: LayoutTemplatePage[K],
@@ -211,6 +214,12 @@ export function PageSettings({
         label="Page Name"
         value={page.name}
         onChange={(event) => onUpdate("name", event.target.value)}
+      />
+      <Select
+        label="Collage"
+        value={page.collageId ?? ""}
+        onChange={(event) => onUpdate("collageId", event.target.value || null)}
+        options={[{ value: "", label: "No collage selected" }, ...collages.map((collage) => ({ value: collage._id, label: collage.name }))]}
       />
       <div className="grid grid-cols-2 gap-3">
         <Input

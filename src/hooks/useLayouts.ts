@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { LayoutCategory, LayoutTemplate } from '../types';
+import type { Collage, LayoutCategory, LayoutTemplate } from '../types';
 import { api } from '../lib/api';
 import { useWorkspace } from './useWorkspace';
 
@@ -7,6 +7,7 @@ export function useLayouts() {
   const { account, selectedMerchantId } = useWorkspace();
   const [categories, setCategories] = useState<LayoutCategory[]>([]);
   const [templates, setTemplates] = useState<LayoutTemplate[]>([]);
+  const [collages, setCollages] = useState<Collage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,11 +17,13 @@ export function useLayouts() {
     Promise.all([
       api.listLayoutCategories(account._id, selectedMerchantId),
       api.listLayoutTemplates({ accountId: account._id, merchantId: selectedMerchantId }),
+      api.listCollages({ accountId: account._id, merchantId: selectedMerchantId }),
     ])
-      .then(([nextCategories, nextTemplates]) => {
+      .then(([nextCategories, nextTemplates, nextCollages]) => {
         if (!active) return;
         setCategories(nextCategories);
         setTemplates(nextTemplates);
+        setCollages(nextCollages);
         setError(null);
       })
       .catch((err) => {
@@ -35,6 +38,7 @@ export function useLayouts() {
 
   const visibleCategories = useMemo(() => categories.filter((category) => category.accountId === account._id && (category.scope === 'shared' || category.merchantId === selectedMerchantId)).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)), [account._id, categories, selectedMerchantId]);
   const visibleTemplates = useMemo(() => templates.filter((template) => template.accountId === account._id && (template.scope === 'shared' || template.merchantId === selectedMerchantId)).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)), [account._id, templates, selectedMerchantId]);
+  const visibleCollages = useMemo(() => collages.filter((collage) => collage.accountId === account._id && (collage.scope === 'shared' || collage.merchantId === selectedMerchantId)).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)), [account._id, collages, selectedMerchantId]);
 
   const addCategory = useCallback(async (category: LayoutCategory) => {
     const saved = await api.createLayoutCategory(category);
@@ -84,6 +88,29 @@ export function useLayouts() {
     setTemplates((prev) => [...prev, saved]);
     return saved;
   }, []);
+  const addCollage = useCallback(async (collage: Collage) => {
+    const saved = await api.createCollage(collage);
+    setCollages((prev) => [...prev, saved]);
+    return saved;
+  }, []);
 
-  return { account, selectedMerchantId, categories: visibleCategories, allCategories: categories, templates: visibleTemplates, allTemplates: templates, loading, error, reload: load, addCategory, updateCategory, deleteCategory, duplicateCategory, addTemplate, updateTemplate, deleteTemplate, duplicateTemplate };
+  const updateCollage = useCallback(async (collage: Collage) => {
+    setCollages((prev) => prev.map((item) => (item._id === collage._id ? collage : item)));
+    const saved = await api.updateCollage(collage);
+    setCollages((prev) => prev.map((item) => (item._id === saved._id ? saved : item)));
+    return saved;
+  }, []);
+
+  const deleteCollage = useCallback(async (id: string) => {
+    await api.deleteCollage(id);
+    setCollages((prev) => prev.filter((item) => item._id !== id));
+  }, []);
+
+  const duplicateCollage = useCallback(async (id: string) => {
+    const saved = await api.duplicateCollage(id);
+    setCollages((prev) => [...prev, saved]);
+    return saved;
+  }, []);
+
+  return { account, selectedMerchantId, categories: visibleCategories, allCategories: categories, templates: visibleTemplates, allTemplates: templates, collages: visibleCollages, allCollages: collages, loading, error, reload: load, addCategory, updateCategory, deleteCategory, duplicateCategory, addTemplate, updateTemplate, deleteTemplate, duplicateTemplate, addCollage, updateCollage, deleteCollage, duplicateCollage };
 }

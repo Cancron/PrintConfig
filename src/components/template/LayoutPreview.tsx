@@ -235,18 +235,22 @@ function renderElement(element: LayoutElement) {
   if (element.type === "text_placeholder") {
     const settings = element.textSettings;
     return (
-      <span
+      <div
         className="flex h-full w-full items-center overflow-hidden p-1 leading-tight"
         style={{
           color: settings.color,
           fontFamily: settings.fontFamily,
           fontSize: `${settings.fontSize}px`,
           fontWeight: settings.fontWeight,
-          textAlign: settings.textAlign,
         }}
       >
-        {settings.defaultText || element.name}
-      </span>
+        <span
+          className="block w-full whitespace-pre-wrap"
+          style={{ textAlign: settings.textAlign }}
+        >
+          {settings.defaultText || element.name}
+        </span>
+      </div>
     );
   }
   if (

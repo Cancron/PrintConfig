@@ -1,9 +1,9 @@
 import { Schema, model } from 'mongoose';
 
-const templateTypes = ['photo_collage', 'photo_book', 'calendar', 'card', 'poster', 'canvas', 'custom'] as const;
-const orientations = ['portrait', 'landscape', 'square', 'custom'] as const;
-const units = ['inch', 'mm', 'px'] as const;
-const elementTypes = ['photo_placeholder', 'text_placeholder', 'shape', 'background', 'clipart', 'static_image'] as const;
+export const templateTypes = ['photo_collage', 'photo_book', 'calendar', 'card', 'poster', 'canvas', 'custom'] as const;
+export const orientations = ['portrait', 'landscape', 'square', 'custom'] as const;
+export const units = ['inch', 'mm', 'px'] as const;
+export const elementTypes = ['photo_placeholder', 'text_placeholder', 'shape', 'background', 'clipart', 'static_image'] as const;
 
 const photoSettingsSchema = new Schema(
   {
@@ -50,7 +50,7 @@ const imageSettingsSchema = new Schema(
   { _id: false }
 );
 
-const layoutElementSchema = new Schema(
+export const layoutElementSchema = new Schema(
   {
     type: { type: String, enum: elementTypes, required: true },
     name: { type: String, required: true, trim: true },
@@ -81,6 +81,7 @@ const layoutTemplatePageSchema = new Schema(
     backgroundColor: { type: String, default: '#ffffff' },
     backgroundImageUrl: { type: String, default: '' },
     backgroundImageAssetId: { type: Schema.Types.ObjectId, ref: 'ImageAsset' },
+    collageId: { type: Schema.Types.ObjectId, ref: 'Collage', default: null },
     elements: { type: [layoutElementSchema], default: [] },
   },
   { timestamps: true }

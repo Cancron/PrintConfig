@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { LayoutCategoryModel } from '../models/LayoutCategory.js';
 import { LayoutTemplateModel } from '../models/LayoutTemplate.js';
+import { CollageModel } from '../models/Collage.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { resolveAccountId } from './account.service.js';
 import { slugify } from '../utils/slug.js';
@@ -61,6 +62,11 @@ async function assertTemplateSlugUnique(data: Record<string, unknown>, id?: stri
   if (id) query._id = { $ne: id };
   if (await LayoutTemplateModel.findOne(query)) throw new ApiError(409, 'Layout template slug must be unique within account, scope, merchant, and category.');
 }
+async function assertCollageSlugUnique(data: Record<string, unknown>, id?: string) {
+  const query: Record<string, unknown> = { accountId: data.accountId, scope: data.scope, merchantId: data.scope === 'shared' ? null : data.merchantId, categoryId: data.categoryId, slug: data.slug };
+  if (id) query._id = { $ne: id };
+  if (await CollageModel.findOne(query)) throw new ApiError(409, 'Collage slug must be unique within account, scope, merchant, and category.');
+}
 
 function normalizeSearch(search?: string) {
   return String(search ?? '').trim();
@@ -108,7 +114,8 @@ export async function updateLayoutCategory(id: string, payload: Record<string, u
 
 export async function deleteLayoutCategory(id: string) {
   const templateCount = await LayoutTemplateModel.countDocuments({ categoryId: id });
-  if (templateCount > 0) throw new ApiError(409, 'Move or delete templates before deleting this layout category.');
+  const collageCount = await CollageModel.countDocuments({ categoryId: id });
+  if (templateCount > 0 || collageCount > 0) throw new ApiError(409, 'Move or delete templates and collages before deleting this layout category.');
   const category = await LayoutCategoryModel.findByIdAndDelete(id);
   if (!category) throw new ApiError(404, 'Layout category not found.');
   return category;
@@ -145,24 +152,33 @@ export async function importLayoutCategory(payload: Record<string, unknown>) {
   return { category, templates };
 }
 
-function normalizePages(data: Record<string, unknown>) {
+async function normalizePages(data: Record<string, unknown>, merchantContextId?: string) {
   const pages = Array.isArray(data.pages) ? data.pages as Record<string, unknown>[] : [];
   if (pages.length === 0) {
-    data.pages = [{ pageNumber: 1, name: 'Page 1', width: data.canvasWidth, height: data.canvasHeight, backgroundColor: data.backgroundColor || '#ffffff', elements: [] }];
+    data.pages = [{ pageNumber: 1, name: 'Page 1', width: data.canvasWidth, height: data.canvasHeight, backgroundColor: data.backgroundColor || '#ffffff', collageId: null, elements: [] }];
     return;
   }
-  data.pages = pages.map((page, index) => {
+  data.pages = await Promise.all(pages.map(async (page, index) => {
     const normalized = { ...page };
     normalized.pageNumber = Number(normalized.pageNumber || index + 1);
     normalized.name = String(normalized.name || `Page ${normalized.pageNumber}`);
     normalized.width = positiveNumber(normalized.width, 'Page width');
     normalized.height = positiveNumber(normalized.height, 'Page height');
     if (normalized.backgroundImageAssetId === '') delete normalized.backgroundImageAssetId;
+    if (!normalized.collageId) {
+      normalized.collageId = null;
+    } else {
+      if (!isObjectId(normalized.collageId)) throw new ApiError(400, 'Page collage must be a valid MongoDB ObjectId.');
+      const collage = await CollageModel.findOne({
+        _id: normalized.collageId,
+        ...layoutVisibleQuery(String(data.accountId), merchantContextId ?? (data.merchantId ? String(data.merchantId) : undefined)),
+      });
+      if (!collage) throw new ApiError(400, 'Selected collage is not visible for this account and merchant.');
+    }
     normalized.elements = normalizeElements(Array.isArray(normalized.elements) ? normalized.elements as Record<string, unknown>[] : []);
     return normalized;
-  });
+  }));
 }
-
 function normalizeElements(elements: Record<string, unknown>[]) {
   return elements.map((element, index) => {
     const normalized = { ...element };
@@ -223,7 +239,7 @@ async function normalizeTemplatePayload(payload: Record<string, unknown>, id?: s
   payload.sortOrder = Number(payload.sortOrder ?? 0);
   if (Number.isNaN(payload.sortOrder)) throw new ApiError(400, 'Sort order must be numeric.');
   payload.tags = Array.isArray(payload.tags) ? payload.tags.map((tag) => String(tag).trim()).filter(Boolean) : String(payload.tags ?? '').split(',').map((tag) => tag.trim()).filter(Boolean);
-  normalizePages(payload);
+  await normalizePages(payload, merchantContextId);
   payload.pageCount = Math.max(Number(payload.pageCount), (payload.pages as unknown[]).length);
   await assertTemplateSlugUnique(payload, id);
 }
@@ -284,6 +300,89 @@ export async function importLayoutTemplate(payload: Record<string, unknown>) {
   return createLayoutTemplate({ ...stripIds(rawTemplate), categoryId, status: 'draft', slug: `${String(rawTemplate.slug ?? slugify(String(rawTemplate.name ?? 'layout-template')))}-import-${Date.now()}` });
 }
 
+async function normalizeCollagePayload(payload: Record<string, unknown>, id?: string) {
+  normalizeScope(payload, 'collages');
+  normalizeRefs(payload);
+  if (!String(payload.name ?? '').trim()) throw new ApiError(400, 'Collage name is required.');
+  payload.slug = validateSlug(payload.slug || slugify(String(payload.name ?? 'collage')));
+  validateStatus(payload.status ?? 'draft');
+  if (!payload.categoryId || !isObjectId(payload.categoryId)) throw new ApiError(400, 'Layout category is required.');
+  const merchantContextId = payload.merchantContextId ? String(payload.merchantContextId) : undefined;
+  delete payload.merchantContextId;
+  const category = await LayoutCategoryModel.findOne({
+    _id: payload.categoryId,
+    ...layoutVisibleQuery(String(payload.accountId), merchantContextId ?? (payload.merchantId ? String(payload.merchantId) : undefined)),
+  });
+  if (!category) throw new ApiError(400, 'Layout category is not visible for this account and merchant.');
+  if (!ORIENTATIONS.includes(String(payload.orientation))) throw new ApiError(400, 'Orientation is required.');
+  if (!UNITS.includes(String(payload.unit))) throw new ApiError(400, 'Unit is required.');
+  payload.canvasWidth = positiveNumber(payload.canvasWidth, 'Canvas width');
+  payload.canvasHeight = positiveNumber(payload.canvasHeight, 'Canvas height');
+  payload.dpi = positiveNumber(payload.dpi, 'DPI');
+  payload.sortOrder = Number(payload.sortOrder ?? 0);
+  if (Number.isNaN(payload.sortOrder)) throw new ApiError(400, 'Sort order must be numeric.');
+  if (payload.backgroundImageAssetId === '') delete payload.backgroundImageAssetId;
+  payload.tags = Array.isArray(payload.tags) ? payload.tags.map((tag) => String(tag).trim()).filter(Boolean) : String(payload.tags ?? '').split(',').map((tag) => tag.trim()).filter(Boolean);
+  payload.elements = normalizeElements(Array.isArray(payload.elements) ? payload.elements as Record<string, unknown>[] : []);
+  await assertCollageSlugUnique(payload, id);
+}
+
+export async function listCollages(filters: { accountId?: string; merchantId?: string; categoryId?: string; scope?: string; status?: string; orientation?: string; search?: string }) {
+  const accountId = resolveAccountId(filters.accountId);
+  const query: Record<string, unknown> = layoutVisibleQuery(accountId, filters.merchantId);
+  if (filters.categoryId) query.categoryId = filters.categoryId;
+  if (filters.scope) query.scope = filters.scope;
+  if (filters.status) query.status = filters.status;
+  if (filters.orientation) query.orientation = filters.orientation;
+  const search = normalizeSearch(filters.search);
+  if (search) query.$and = [{ $or: [{ name: new RegExp(search, 'i') }, { description: new RegExp(search, 'i') }, { tags: new RegExp(search, 'i') }] }];
+  return CollageModel.find(query).sort({ sortOrder: 1, name: 1 });
+}
+
+export async function getCollage(id: string) {
+  const collage = await CollageModel.findById(id);
+  if (!collage) throw new ApiError(404, 'Collage not found.');
+  return collage;
+}
+
+export async function createCollage(payload: Record<string, unknown>) {
+  await normalizeCollagePayload(payload);
+  return CollageModel.create(payload);
+}
+
+export async function updateCollage(id: string, payload: Record<string, unknown>) {
+  await normalizeCollagePayload(payload, id);
+  const collage = await CollageModel.findByIdAndUpdate(id, payload, { new: true, runValidators: true });
+  if (!collage) throw new ApiError(404, 'Collage not found.');
+  return collage;
+}
+
+export async function deleteCollage(id: string) {
+  const usageCount = await LayoutTemplateModel.countDocuments({ 'pages.collageId': id });
+  if (usageCount > 0) throw new ApiError(409, 'Remove this collage from layout template pages before deleting it.');
+  const collage = await CollageModel.findByIdAndDelete(id);
+  if (!collage) throw new ApiError(404, 'Collage not found.');
+  return collage;
+}
+
+export async function duplicateCollage(id: string) {
+  const collage = await CollageModel.findById(id).lean();
+  if (!collage) throw new ApiError(404, 'Collage not found.');
+  return CollageModel.create({ ...stripIds(collage), name: `${collage.name} Copy`, slug: `${collage.slug}-copy-${Date.now()}`, status: 'draft' });
+}
+
+export async function exportCollage(id: string) {
+  const collage = await CollageModel.findById(id).lean();
+  if (!collage) throw new ApiError(404, 'Collage not found.');
+  const category = await LayoutCategoryModel.findById(collage.categoryId).lean();
+  return { collage, category };
+}
+
+export async function importCollage(payload: Record<string, unknown>) {
+  const rawCollage = (payload.collage && typeof payload.collage === 'object') ? payload.collage as Record<string, unknown> : payload;
+  const categoryId = String(payload.categoryId || rawCollage.categoryId || '');
+  return createCollage({ ...stripIds(rawCollage), categoryId, status: 'draft', slug: `${String(rawCollage.slug ?? slugify(String(rawCollage.name ?? 'collage')))}-import-${Date.now()}` });
+}
 function stripIds<T>(value: T): T {
   if (Array.isArray(value)) return value.map(stripIds) as T;
   if (value && typeof value === 'object') {
