@@ -18,7 +18,7 @@ import { CollapsibleSection, Notice } from "../components/template/layoutTemplat
 import { createElement, downloadJson, keyOf, orientationOptions, scopeOptions, slugifyLocal, statusOptions, unitOptions, formatLabel } from "../components/template/layoutTemplateUtils";
 
 export function Collages() {
-  const { account, selectedMerchantId, categories, duplicateCollage, deleteCollage } = useLayouts({ loadCollages: false });
+  const { categories, duplicateCollage, deleteCollage, listPagedCollages, invalidateCollageCache } = useLayouts({ loadCollages: false });
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [status, setStatus] = useState("");
@@ -46,13 +46,11 @@ export function Collages() {
     if (page > pageCount) setPage(pageCount);
   }, [page, pageCount]);
 
-  const loadPagedCollages = useCallback(() => {
+  const loadPagedCollages = useCallback((force = false) => {
     let active = true;
     setListLoading(true);
     setListError("");
-    api.listCollagesPaged({
-      accountId: account._id,
-      merchantId: selectedMerchantId,
+    listPagedCollages({
       categoryId,
       scope,
       status,
@@ -60,7 +58,7 @@ export function Collages() {
       search,
       page,
       pageSize,
-    })
+    }, force)
       .then((result) => {
         if (!active) return;
         setPagedCollages(result.items);
@@ -76,14 +74,14 @@ export function Collages() {
     return () => {
       active = false;
     };
-  }, [account._id, categoryId, orientation, page, pageSize, scope, search, selectedMerchantId, status]);
+  }, [categoryId, listPagedCollages, orientation, page, pageSize, scope, search, status]);
 
   useEffect(() => loadPagedCollages(), [loadPagedCollages]);
 
   async function handleDuplicate(collage: Collage) {
     await duplicateCollage(collage._id);
     setMessage("Collage duplicated.");
-    loadPagedCollages();
+    loadPagedCollages(true);
   }
   async function handleExport(collage: Collage) {
     downloadJson(`collage-${collage.slug || collage._id}.json`, await api.exportCollage(collage._id));
@@ -94,7 +92,8 @@ export function Collages() {
       setImportOpen(false);
       setImportJson("");
       setMessage("Collage imported.");
-      loadPagedCollages();
+      invalidateCollageCache();
+      loadPagedCollages(true);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Import failed.");
     }
@@ -111,7 +110,7 @@ export function Collages() {
       <Select label="Orientation" value={orientation} onChange={(event) => setOrientation(event.target.value)} options={[{ value: "", label: "All orientations" }, ...orientationOptions]} />
       <Select label="Scope" value={scope} onChange={(event) => setScope(event.target.value)} options={[{ value: "", label: "All scopes" }, ...scopeOptions]} />
     </div>
-    {listLoading && pagedCollages.length === 0 ? <Notice tone="info">Loading collages...</Notice> : pagination.total === 0 ? <EmptyState title="No collages found" description="Create a reusable one-page collage layout." /> : <><Table><TableHead><TableHeader>Thumbnail</TableHeader><TableHeader>Collage</TableHeader><TableHeader>Category</TableHeader><TableHeader>Orientation</TableHeader><TableHeader>Elements</TableHeader><TableHeader>Status</TableHeader><TableHeader>Scope</TableHeader><TableHeader className="text-right">Actions</TableHeader></TableHead><TableBody>{pagedCollages.map((collage) => <tr key={collage._id}><TableCell>{collage.thumbnailUrl ? <img src={collage.thumbnailUrl} alt={collage.name} className="h-12 w-12 rounded-md object-cover" /> : <div className="h-12 w-12 rounded-md bg-gray-100" />}</TableCell><TableCell><Link to={`/layouts/collages/${collage._id}`} className="font-medium text-gray-900 hover:text-slate-700">{collage.name}</Link><p className="mt-1 line-clamp-1 max-w-sm text-xs text-gray-500">{collage.description}</p></TableCell><TableCell>{categories.find((category) => category._id === collage.categoryId)?.name ?? "-"}</TableCell><TableCell>{formatLabel(collage.orientation)}</TableCell><TableCell>{collage.elements.length}</TableCell><TableCell><StatusBadge status={collage.status} /></TableCell><TableCell>{collage.scope === "shared" ? "Shared" : "Merchant"}</TableCell><TableCell className="text-right"><div className="flex justify-end gap-2"><Link to={`/layouts/collages/${collage._id}`} className="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Open"><Eye className="h-4 w-4" /></Link><Link to={`/layouts/collages/${collage._id}`} className="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Edit"><Pencil className="h-4 w-4" /></Link><button onClick={() => handleDuplicate(collage)} className="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Duplicate"><Copy className="h-4 w-4" /></button><button onClick={() => handleExport(collage)} className="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Export"><Download className="h-4 w-4" /></button><button onClick={() => { if (confirm("Delete this collage?")) deleteCollage(collage._id).then(loadPagedCollages).catch((error: unknown) => setMessage(error instanceof Error ? error.message : "Delete failed.")); }} className="rounded-md p-2 text-red-600 hover:bg-red-50" title="Delete"><Trash2 className="h-4 w-4" /></button></div></TableCell></tr>)}</TableBody></Table><PaginationControls loading={listLoading} page={currentPage} pageCount={pageCount} pageSize={pageSize} total={pagination.total} rangeStart={rangeStart} rangeEnd={rangeEnd} onPageChange={setPage} onPageSizeChange={setPageSize} /></>}
+    {listLoading && pagedCollages.length === 0 ? <Notice tone="info">Loading collages...</Notice> : pagination.total === 0 ? <EmptyState title="No collages found" description="Create a reusable one-page collage layout." /> : <><Table><TableHead><TableHeader>Thumbnail</TableHeader><TableHeader>Collage</TableHeader><TableHeader>Category</TableHeader><TableHeader>Orientation</TableHeader><TableHeader>Elements</TableHeader><TableHeader>Status</TableHeader><TableHeader>Scope</TableHeader><TableHeader className="text-right">Actions</TableHeader></TableHead><TableBody>{pagedCollages.map((collage) => <tr key={collage._id}><TableCell>{collage.thumbnailUrl ? <img src={collage.thumbnailUrl} alt={collage.name} className="h-12 w-12 rounded-md object-cover" /> : <div className="h-12 w-12 rounded-md bg-gray-100" />}</TableCell><TableCell><Link to={`/layouts/collages/${collage._id}`} className="font-medium text-gray-900 hover:text-slate-700">{collage.name}</Link><p className="mt-1 line-clamp-1 max-w-sm text-xs text-gray-500">{collage.description}</p></TableCell><TableCell>{categories.find((category) => category._id === collage.categoryId)?.name ?? "-"}</TableCell><TableCell>{formatLabel(collage.orientation)}</TableCell><TableCell>{collage.elements.length}</TableCell><TableCell><StatusBadge status={collage.status} /></TableCell><TableCell>{collage.scope === "shared" ? "Shared" : "Merchant"}</TableCell><TableCell className="text-right"><div className="flex justify-end gap-2"><Link to={`/layouts/collages/${collage._id}`} className="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Open"><Eye className="h-4 w-4" /></Link><Link to={`/layouts/collages/${collage._id}`} className="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Edit"><Pencil className="h-4 w-4" /></Link><button onClick={() => handleDuplicate(collage)} className="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Duplicate"><Copy className="h-4 w-4" /></button><button onClick={() => handleExport(collage)} className="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Export"><Download className="h-4 w-4" /></button><button onClick={() => { if (confirm("Delete this collage?")) deleteCollage(collage._id).then(() => loadPagedCollages(true)).catch((error: unknown) => setMessage(error instanceof Error ? error.message : "Delete failed.")); }} className="rounded-md p-2 text-red-600 hover:bg-red-50" title="Delete"><Trash2 className="h-4 w-4" /></button></div></TableCell></tr>)}</TableBody></Table><PaginationControls loading={listLoading} page={currentPage} pageCount={pageCount} pageSize={pageSize} total={pagination.total} rangeStart={rangeStart} rangeEnd={rangeEnd} onPageChange={setPage} onPageSizeChange={setPageSize} /></>}
     {importOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><div className="w-full max-w-2xl rounded-lg bg-white p-5 shadow-xl"><h2 className="text-lg font-semibold text-gray-900">Import Collage JSON</h2><Textarea className="mt-4 font-mono" rows={12} value={importJson} onChange={(event) => setImportJson(event.target.value)} placeholder="Paste collage JSON" /><div className="mt-4 flex justify-end gap-3"><button onClick={() => setImportOpen(false)} className="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300">Cancel</button><button onClick={handleImport} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white">Import</button></div></div></div>}
   </div>;
 }

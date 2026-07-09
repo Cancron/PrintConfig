@@ -11,28 +11,31 @@ import { ImageLibrary } from './pages/ImageLibrary';
 import { LayoutCategories, LayoutCategoryDetail } from './pages/LayoutCategories';
 import { LayoutTemplates, LayoutTemplateEditor } from './pages/LayoutTemplates';
 import { Collages, CollageEditor } from './pages/Collages';
+import { WorkspaceProvider } from './hooks/useWorkspace';
 
 function App() {
   return (
     <BrowserRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/categories" element={<ProductCategories />} />
-          <Route path="/categories/:id" element={<CategoryDetail />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/products/new" element={<CreateProduct />} />
-          <Route path="/products/:id" element={<ProductDetail />} />
-          <Route path="/merchant-settings" element={<MerchantSettings />} />
-          <Route path="/image-library" element={<ImageLibrary />} />
-          <Route path="/layouts/categories" element={<LayoutCategories />} />
-          <Route path="/layouts/categories/:id" element={<LayoutCategoryDetail />} />
-          <Route path="/layouts/templates" element={<LayoutTemplates />} />
-          <Route path="/layouts/collages" element={<Collages />} />
-          <Route path="/layouts/collages/:id" element={<CollageEditor />} />
-          <Route path="/layouts/templates/:id" element={<LayoutTemplateEditor />} />
-        </Routes>
-      </Layout>
+      <WorkspaceProvider>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/categories" element={<ProductCategories />} />
+            <Route path="/categories/:id" element={<CategoryDetail />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/products/new" element={<CreateProduct />} />
+            <Route path="/products/:id" element={<ProductDetail />} />
+            <Route path="/merchant-settings" element={<MerchantSettings />} />
+            <Route path="/image-library" element={<ImageLibrary />} />
+            <Route path="/layouts/categories" element={<LayoutCategories />} />
+            <Route path="/layouts/categories/:id" element={<LayoutCategoryDetail />} />
+            <Route path="/layouts/templates" element={<LayoutTemplates />} />
+            <Route path="/layouts/collages" element={<Collages />} />
+            <Route path="/layouts/collages/:id" element={<CollageEditor />} />
+            <Route path="/layouts/templates/:id" element={<LayoutTemplateEditor />} />
+          </Routes>
+        </Layout>
+      </WorkspaceProvider>
     </BrowserRouter>
   );
 }
