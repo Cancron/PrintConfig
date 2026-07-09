@@ -186,7 +186,7 @@ function normalizeCollage(raw: any): Collage {
     updatedAt: raw.updatedAt ?? new Date().toISOString(),
   };
 }
-function layoutQuery(input: { accountId: string; merchantId?: string; categoryId?: string; scope?: string; status?: string; templateType?: string; orientation?: string; search?: string }) {
+function layoutQuery(input: { accountId: string; merchantId?: string; categoryId?: string; scope?: string; status?: string; templateType?: string; orientation?: string; search?: string; page?: number; pageSize?: number }) {
   const params = new URLSearchParams({ accountId: input.accountId });
   if (input.merchantId) params.set('merchantId', input.merchantId);
   if (input.categoryId) params.set('categoryId', input.categoryId);
@@ -195,6 +195,8 @@ function layoutQuery(input: { accountId: string; merchantId?: string; categoryId
   if (input.templateType) params.set('templateType', input.templateType);
   if (input.orientation) params.set('orientation', input.orientation);
   if (input.search) params.set('search', input.search);
+  if (input.page) params.set('page', String(input.page));
+  if (input.pageSize) params.set('pageSize', String(input.pageSize));
   return params.toString();
 }
 function normalizeSurface(raw: any) {
@@ -334,6 +336,15 @@ export const api = {
   exportLayoutTemplate: (id: string) => request<any>(`/layout-templates/${id}/export`).then((result) => ({ template: normalizeLayoutTemplate(result.template), category: result.category ? normalizeLayoutCategory(result.category) : undefined })),
   importLayoutTemplate: (payload: unknown) => request<any>('/layout-templates/import', { method: 'POST', body: JSON.stringify(payload) }).then(normalizeLayoutTemplate),
   listCollages: (filters: { accountId: string; merchantId: string; categoryId?: string; scope?: string; status?: string; orientation?: string; search?: string }) => request<any[]>(`/collages?${layoutQuery(filters)}`).then((items) => items.map(normalizeCollage)),
+  listCollagesPaged: (filters: { accountId: string; merchantId: string; categoryId?: string; scope?: string; status?: string; orientation?: string; search?: string; page: number; pageSize: number }) => request<any>(`/collages?${layoutQuery(filters)}`).then((result) => ({
+    items: (result.items ?? []).map(normalizeCollage),
+    pagination: {
+      page: Number(result.pagination?.page ?? filters.page),
+      pageSize: Number(result.pagination?.pageSize ?? filters.pageSize),
+      total: Number(result.pagination?.total ?? 0),
+      pageCount: Number(result.pagination?.pageCount ?? 1),
+    },
+  })),
   getCollage: (id: string) => request<any>(`/collages/${id}`).then(normalizeCollage),
   createCollage: (collage: Collage) => request<any>('/collages', { method: 'POST', body: JSON.stringify(apiPayload(withoutRootId(collage))) }).then(normalizeCollage),
   updateCollage: (collage: Collage) => request<any>(`/collages/${collage._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(collage))) }).then(normalizeCollage),
@@ -354,4 +365,3 @@ export const api = {
   exportProduct: (id: string) => request<any>(`/products/${id}/export`).then(normalizeProduct),
   importProduct: (product: Product) => request<any>('/products/import', { method: 'POST', body: JSON.stringify(productPayload(product)) }).then(normalizeProduct),
 };
-

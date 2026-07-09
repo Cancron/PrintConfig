@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Copy, Download, Eye, ImagePlus, Layers, Pencil, Plus, Trash2, Type, Upload } from "lucide-react";
 import { PageHeader } from "../components/PageHeader";
@@ -18,7 +18,7 @@ import { CollapsibleSection, Notice } from "../components/template/layoutTemplat
 import { createElement, downloadJson, keyOf, orientationOptions, scopeOptions, slugifyLocal, statusOptions, unitOptions, formatLabel } from "../components/template/layoutTemplateUtils";
 
 export function Collages() {
-  const { collages, categories, duplicateCollage, deleteCollage, reload } = useLayouts();
+  const { categories, duplicateCollage, deleteCollage, listPagedCollages, invalidateCollageCache } = useLayouts({ loadCollages: false });
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [status, setStatus] = useState("");
@@ -27,20 +27,61 @@ export function Collages() {
   const [importOpen, setImportOpen] = useState(false);
   const [importJson, setImportJson] = useState("");
   const [message, setMessage] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [pagedCollages, setPagedCollages] = useState<Collage[]>([]);
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 25, total: 0, pageCount: 1 });
+  const [listLoading, setListLoading] = useState(false);
+  const [listError, setListError] = useState("");
+  const currentPage = pagination.page;
+  const pageCount = pagination.pageCount;
+  const rangeStart = pagination.total === 0 ? 0 : (currentPage - 1) * pagination.pageSize + 1;
+  const rangeEnd = Math.min(pagination.total, currentPage * pagination.pageSize);
 
-  const filtered = useMemo(() => collages.filter((collage) => {
-    const q = search.trim().toLowerCase();
-    if (q && !`${collage.name} ${collage.description} ${collage.tags.join(" ")}`.toLowerCase().includes(q)) return false;
-    if (categoryId && collage.categoryId !== categoryId) return false;
-    if (status && collage.status !== status) return false;
-    if (orientation && collage.orientation !== orientation) return false;
-    if (scope && collage.scope !== scope) return false;
-    return true;
-  }), [categoryId, collages, orientation, scope, search, status]);
+  useEffect(() => {
+    setPage(1);
+  }, [categoryId, orientation, pageSize, scope, search, status]);
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
+
+  const loadPagedCollages = useCallback((force = false) => {
+    let active = true;
+    setListLoading(true);
+    setListError("");
+    listPagedCollages({
+      categoryId,
+      scope,
+      status,
+      orientation,
+      search,
+      page,
+      pageSize,
+    }, force)
+      .then((result) => {
+        if (!active) return;
+        setPagedCollages(result.items);
+        setPagination(result.pagination);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setListError(error instanceof Error ? error.message : "Could not load collages.");
+      })
+      .finally(() => {
+        if (active) setListLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [categoryId, listPagedCollages, orientation, page, pageSize, scope, search, status]);
+
+  useEffect(() => loadPagedCollages(), [loadPagedCollages]);
 
   async function handleDuplicate(collage: Collage) {
     await duplicateCollage(collage._id);
     setMessage("Collage duplicated.");
+    loadPagedCollages(true);
   }
   async function handleExport(collage: Collage) {
     downloadJson(`collage-${collage.slug || collage._id}.json`, await api.exportCollage(collage._id));
@@ -51,7 +92,8 @@ export function Collages() {
       setImportOpen(false);
       setImportJson("");
       setMessage("Collage imported.");
-      reload();
+      invalidateCollageCache();
+      loadPagedCollages(true);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Import failed.");
     }
@@ -60,6 +102,7 @@ export function Collages() {
   return <div>
     <PageHeader title="Collages" description="Reusable one-page designs for templates, photo books, and collage products." action={<div className="flex gap-2"><button onClick={() => setImportOpen(true)} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50"><Upload className="h-4 w-4" /> Import</button><Link to="/layouts/collages/new" className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"><Plus className="h-4 w-4" /> New Collage</Link></div>} />
     {message && <Notice tone={message.includes("failed") || message.includes("required") ? "warning" : "success"}>{message}</Notice>}
+    {listError && <Notice tone="warning">{listError}</Notice>}
     <div className="mb-4 grid gap-3 rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200 md:grid-cols-5">
       <Input label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search collages" />
       <Select label="Category" value={categoryId} onChange={(event) => setCategoryId(event.target.value)} options={[{ value: "", label: "All categories" }, ...categories.map((category) => ({ value: category._id, label: category.name }))]} />
@@ -67,7 +110,7 @@ export function Collages() {
       <Select label="Orientation" value={orientation} onChange={(event) => setOrientation(event.target.value)} options={[{ value: "", label: "All orientations" }, ...orientationOptions]} />
       <Select label="Scope" value={scope} onChange={(event) => setScope(event.target.value)} options={[{ value: "", label: "All scopes" }, ...scopeOptions]} />
     </div>
-    {filtered.length === 0 ? <EmptyState title="No collages found" description="Create a reusable one-page collage layout." /> : <Table><TableHead><TableHeader>Thumbnail</TableHeader><TableHeader>Collage</TableHeader><TableHeader>Category</TableHeader><TableHeader>Orientation</TableHeader><TableHeader>Elements</TableHeader><TableHeader>Status</TableHeader><TableHeader>Scope</TableHeader><TableHeader className="text-right">Actions</TableHeader></TableHead><TableBody>{filtered.map((collage) => <tr key={collage._id}><TableCell>{collage.thumbnailUrl ? <img src={collage.thumbnailUrl} alt={collage.name} className="h-12 w-12 rounded-md object-cover" /> : <div className="h-12 w-12 rounded-md bg-gray-100" />}</TableCell><TableCell><Link to={`/layouts/collages/${collage._id}`} className="font-medium text-gray-900 hover:text-slate-700">{collage.name}</Link><p className="mt-1 line-clamp-1 max-w-sm text-xs text-gray-500">{collage.description}</p></TableCell><TableCell>{categories.find((category) => category._id === collage.categoryId)?.name ?? "-"}</TableCell><TableCell>{formatLabel(collage.orientation)}</TableCell><TableCell>{collage.elements.length}</TableCell><TableCell><StatusBadge status={collage.status} /></TableCell><TableCell>{collage.scope === "shared" ? "Shared" : "Merchant"}</TableCell><TableCell className="text-right"><div className="flex justify-end gap-2"><Link to={`/layouts/collages/${collage._id}`} className="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Open"><Eye className="h-4 w-4" /></Link><Link to={`/layouts/collages/${collage._id}`} className="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Edit"><Pencil className="h-4 w-4" /></Link><button onClick={() => handleDuplicate(collage)} className="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Duplicate"><Copy className="h-4 w-4" /></button><button onClick={() => handleExport(collage)} className="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Export"><Download className="h-4 w-4" /></button><button onClick={() => { if (confirm("Delete this collage?")) deleteCollage(collage._id).catch((error: unknown) => setMessage(error instanceof Error ? error.message : "Delete failed.")); }} className="rounded-md p-2 text-red-600 hover:bg-red-50" title="Delete"><Trash2 className="h-4 w-4" /></button></div></TableCell></tr>)}</TableBody></Table>}
+    {listLoading && pagedCollages.length === 0 ? <Notice tone="info">Loading collages...</Notice> : pagination.total === 0 ? <EmptyState title="No collages found" description="Create a reusable one-page collage layout." /> : <><Table><TableHead><TableHeader>Thumbnail</TableHeader><TableHeader>Collage</TableHeader><TableHeader>Category</TableHeader><TableHeader>Orientation</TableHeader><TableHeader>Elements</TableHeader><TableHeader>Status</TableHeader><TableHeader>Scope</TableHeader><TableHeader className="text-right">Actions</TableHeader></TableHead><TableBody>{pagedCollages.map((collage) => <tr key={collage._id}><TableCell>{collage.thumbnailUrl ? <img src={collage.thumbnailUrl} alt={collage.name} className="h-12 w-12 rounded-md object-cover" /> : <div className="h-12 w-12 rounded-md bg-gray-100" />}</TableCell><TableCell><Link to={`/layouts/collages/${collage._id}`} className="font-medium text-gray-900 hover:text-slate-700">{collage.name}</Link><p className="mt-1 line-clamp-1 max-w-sm text-xs text-gray-500">{collage.description}</p></TableCell><TableCell>{categories.find((category) => category._id === collage.categoryId)?.name ?? "-"}</TableCell><TableCell>{formatLabel(collage.orientation)}</TableCell><TableCell>{collage.elements.length}</TableCell><TableCell><StatusBadge status={collage.status} /></TableCell><TableCell>{collage.scope === "shared" ? "Shared" : "Merchant"}</TableCell><TableCell className="text-right"><div className="flex justify-end gap-2"><Link to={`/layouts/collages/${collage._id}`} className="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Open"><Eye className="h-4 w-4" /></Link><Link to={`/layouts/collages/${collage._id}`} className="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Edit"><Pencil className="h-4 w-4" /></Link><button onClick={() => handleDuplicate(collage)} className="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Duplicate"><Copy className="h-4 w-4" /></button><button onClick={() => handleExport(collage)} className="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Export"><Download className="h-4 w-4" /></button><button onClick={() => { if (confirm("Delete this collage?")) deleteCollage(collage._id).then(() => loadPagedCollages(true)).catch((error: unknown) => setMessage(error instanceof Error ? error.message : "Delete failed.")); }} className="rounded-md p-2 text-red-600 hover:bg-red-50" title="Delete"><Trash2 className="h-4 w-4" /></button></div></TableCell></tr>)}</TableBody></Table><PaginationControls loading={listLoading} page={currentPage} pageCount={pageCount} pageSize={pageSize} total={pagination.total} rangeStart={rangeStart} rangeEnd={rangeEnd} onPageChange={setPage} onPageSizeChange={setPageSize} /></>}
     {importOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><div className="w-full max-w-2xl rounded-lg bg-white p-5 shadow-xl"><h2 className="text-lg font-semibold text-gray-900">Import Collage JSON</h2><Textarea className="mt-4 font-mono" rows={12} value={importJson} onChange={(event) => setImportJson(event.target.value)} placeholder="Paste collage JSON" /><div className="mt-4 flex justify-end gap-3"><button onClick={() => setImportOpen(false)} className="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300">Cancel</button><button onClick={handleImport} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white">Import</button></div></div></div>}
   </div>;
 }
@@ -339,6 +382,74 @@ function parseSvgNumber(value: string | null) {
 function clampPercent(value: number, min = 0) {
   return Number(Math.min(100, Math.max(min, value)).toFixed(4));
 }
+
+function PaginationControls({
+  loading,
+  page,
+  pageCount,
+  pageSize,
+  total,
+  rangeStart,
+  rangeEnd,
+  onPageChange,
+  onPageSizeChange,
+}: {
+  loading?: boolean;
+  page: number;
+  pageCount: number;
+  pageSize: number;
+  total: number;
+  rangeStart: number;
+  rangeEnd: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
+}) {
+  return (
+    <div className="mt-4 flex flex-col gap-3 rounded-lg bg-white px-4 py-3 text-sm text-gray-600 shadow-sm ring-1 ring-gray-200 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        Showing <span className="font-medium text-gray-900">{rangeStart}</span> to{" "}
+        <span className="font-medium text-gray-900">{rangeEnd}</span> of{" "}
+        <span className="font-medium text-gray-900">{total}</span> collages
+        {loading && <span className="ml-2 text-gray-400">Loading...</span>}
+      </div>
+      <div className="flex items-center gap-3">
+        <Select
+          // label="Rows"
+          value={String(pageSize)}
+          onChange={(event) => onPageSizeChange(Number(event.target.value))}
+          options={[
+            { value: "10", label: "10" },
+            { value: "25", label: "25" },
+            { value: "50", label: "50" },
+            { value: "100", label: "100" },
+          ]}
+        />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onPageChange(Math.max(1, page - 1))}
+            disabled={page <= 1}
+            className="rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300"
+          >
+            Previous
+          </button>
+          <span className="min-w-24 text-center text-sm text-gray-600">
+            Page {page} of {pageCount}
+          </span>
+          <button
+            type="button"
+            onClick={() => onPageChange(Math.min(pageCount, page + 1))}
+            disabled={page >= pageCount}
+            className="rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   return <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 ring-inset ${status === "active" ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20" : status === "archived" ? "bg-gray-50 text-gray-600 ring-gray-500/20" : "bg-amber-50 text-amber-700 ring-amber-600/20"}`}>{formatLabel(status)}</span>;
 }

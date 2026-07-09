@@ -327,7 +327,7 @@ async function normalizeCollagePayload(payload: Record<string, unknown>, id?: st
   await assertCollageSlugUnique(payload, id);
 }
 
-export async function listCollages(filters: { accountId?: string; merchantId?: string; categoryId?: string; scope?: string; status?: string; orientation?: string; search?: string }) {
+export async function listCollages(filters: { accountId?: string; merchantId?: string; categoryId?: string; scope?: string; status?: string; orientation?: string; search?: string; page?: string | number; pageSize?: string | number }) {
   const accountId = resolveAccountId(filters.accountId);
   const query: Record<string, unknown> = layoutVisibleQuery(accountId, filters.merchantId);
   if (filters.categoryId) query.categoryId = filters.categoryId;
@@ -336,6 +336,28 @@ export async function listCollages(filters: { accountId?: string; merchantId?: s
   if (filters.orientation) query.orientation = filters.orientation;
   const search = normalizeSearch(filters.search);
   if (search) query.$and = [{ $or: [{ name: new RegExp(search, 'i') }, { description: new RegExp(search, 'i') }, { tags: new RegExp(search, 'i') }] }];
+  const page = Number(filters.page);
+  const pageSize = Number(filters.pageSize);
+  if (Number.isFinite(page) && page > 0 && Number.isFinite(pageSize) && pageSize > 0) {
+    const safePageSize = Math.min(100, Math.max(1, Math.floor(pageSize)));
+    const safePage = Math.max(1, Math.floor(page));
+    const total = await CollageModel.countDocuments(query);
+    const pageCount = Math.max(1, Math.ceil(total / safePageSize));
+    const currentPage = Math.min(safePage, pageCount);
+    const items = await CollageModel.find(query)
+      .sort({ sortOrder: 1, name: 1 })
+      .skip((currentPage - 1) * safePageSize)
+      .limit(safePageSize);
+    return {
+      items,
+      pagination: {
+        page: currentPage,
+        pageSize: safePageSize,
+        total,
+        pageCount,
+      },
+    };
+  }
   return CollageModel.find(query).sort({ sortOrder: 1, name: 1 });
 }
 
