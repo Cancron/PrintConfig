@@ -27,7 +27,7 @@ const scopeOptions = [
 
 export function LayoutCategories() {
   const navigate = useNavigate();
-  const { categories, allCategories, templates, account, selectedMerchantId, addCategory, updateCategory, deleteCategory, duplicateCategory, loading, error, reload } = useLayouts();
+  const { categories, allCategories, templates, account, selectedMerchantId, addCategory, updateCategory, deleteCategory, duplicateCategory, loading, error, reload } = useLayouts({loadCollages: false});
   const { merchants, selectedMerchant } = useWorkspace();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('');

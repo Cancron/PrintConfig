@@ -407,6 +407,8 @@ export async function importCollage(payload: Record<string, unknown>) {
 }
 function stripIds<T>(value: T): T {
   if (Array.isArray(value)) return value.map(stripIds) as T;
+  if (isObjectIdValue(value)) return String(value) as T;
+  if (value instanceof Date) return value.toISOString() as T;
   if (value && typeof value === 'object') {
     const output: Record<string, unknown> = {};
     for (const [key, child] of Object.entries(value)) {
@@ -416,4 +418,8 @@ function stripIds<T>(value: T): T {
     return output as T;
   }
   return value;
+}
+
+function isObjectIdValue(value: unknown) {
+  return value instanceof Types.ObjectId || Boolean(value && typeof value === 'object' && (value as { _bsontype?: string })._bsontype === 'ObjectId');
 }
