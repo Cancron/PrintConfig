@@ -38,7 +38,7 @@ export function LayoutTemplatesList() {
     loading,
     error,
     reload,
-  } = useLayouts();
+  } = useLayouts({loadCollages: false});
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [templateType, setTemplateType] = useState("");

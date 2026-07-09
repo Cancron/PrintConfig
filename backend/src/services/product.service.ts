@@ -518,14 +518,14 @@ export async function getPublicProductConfig(id: string, merchantId?: string) {
 }
 
 function publicAiArtConfig(aiArt: any) {
-  if (!aiArt || aiArt.enabled !== true) {
+  if (!aiArt) {
     return undefined;
   }
   const activeStyles = (aiArt.styles ?? [])
     .filter((style: any) => style.isActive !== false)
     .sort((a: any, b: any) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0));
   return {
-    enabled: true,
+    enabled: aiArt.enabled === true,
     sectionTitle: aiArt.sectionTitle || 'AI Art Styles',
     badgeText: aiArt.badgeText || '',
     helpText: aiArt.helpText || '',
