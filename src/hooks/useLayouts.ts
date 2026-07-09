@@ -3,7 +3,8 @@ import type { Collage, LayoutCategory, LayoutTemplate } from '../types';
 import { api } from '../lib/api';
 import { useWorkspace } from './useWorkspace';
 
-export function useLayouts() {
+export function useLayouts(options: { loadCollages?: boolean } = {}) {
+  const loadCollages = options.loadCollages !== false;
   const { account, selectedMerchantId } = useWorkspace();
   const [categories, setCategories] = useState<LayoutCategory[]>([]);
   const [templates, setTemplates] = useState<LayoutTemplate[]>([]);
@@ -17,7 +18,7 @@ export function useLayouts() {
     Promise.all([
       api.listLayoutCategories(account._id, selectedMerchantId),
       api.listLayoutTemplates({ accountId: account._id, merchantId: selectedMerchantId }),
-      api.listCollages({ accountId: account._id, merchantId: selectedMerchantId }),
+      loadCollages ? api.listCollages({ accountId: account._id, merchantId: selectedMerchantId }) : Promise.resolve([]),
     ])
       .then(([nextCategories, nextTemplates, nextCollages]) => {
         if (!active) return;
@@ -32,7 +33,7 @@ export function useLayouts() {
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [account._id, selectedMerchantId]);
+  }, [account._id, loadCollages, selectedMerchantId]);
 
   useEffect(() => load(), [load]);
 
