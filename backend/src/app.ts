@@ -11,10 +11,27 @@ import { layoutTemplateRoutes } from './routes/layout-template.routes.js';
 import { collageRoutes } from './routes/collage.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
+const allowedOrigins = new Set([
+  'https://photo-book-prints.lovable.app',
+  'https://photo-book-prints.onrender.com',
+]);
+
+function isAllowedOrigin(origin: string) {
+  if (allowedOrigins.has(origin.replace(/\/$/, ''))) return true;
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+}
+
 const corsOptions: cors.CorsOptions = {
-  origin: true,
+  origin(origin, callback) {
+    if (!origin || isAllowedOrigin(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error(`CORS origin not allowed: ${origin}`));
+  },
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'Accept', 'X-Requested-With'],
 };
 
 export const app = express();
