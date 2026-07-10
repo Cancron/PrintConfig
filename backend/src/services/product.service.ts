@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { randomBytes } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { Types } from 'mongoose';
 import { ProductModel } from '../models/Product.js';
 import { ProductCategoryModel } from '../models/ProductCategory.js';
+import { MerchantModel } from '../models/Merchant.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { applyModifier, getVariantConfiguredPrice } from '../utils/pricing.js';
 import { slugify } from '../utils/slug.js';
@@ -585,6 +589,124 @@ export async function getEditorProductConfig(id: string, apiPrivateKey: string) 
   const merchant = await authenticateApiPrivateKey(apiPrivateKey);
   if (!merchant) throw new ApiError(401, 'A valid merchant API private key is required.');
   return getPublicProductConfig(id, String(merchant._id));
+}
+
+const DESIGN_UPLOAD_MIME_EXTENSIONS: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+};
+
+export async function savePublicDesignUpload(input: {
+  productId: string;
+  merchantId: string;
+  userKey: string;
+  designData?: unknown;
+  file?: Express.Multer.File;
+  origin: string;
+}) {
+  const designData = parseDesignData(input.designData);
+  if (!input.file && designData === undefined) throw new ApiError(400, 'Image file or designData is required.');
+  if (input.file && !DESIGN_UPLOAD_MIME_EXTENSIONS[input.file.mimetype]) throw new ApiError(400, 'Only JPG, PNG, and WebP images are allowed.');
+
+  const { merchant, product, userKey } = await resolvePublicDesignContext(input.productId, input.merchantId, input.userKey);
+  const absoluteDirectory = designDirectory(String(merchant._id), userKey, String(product._id));
+  await mkdir(absoluteDirectory, { recursive: true });
+
+  let image: Record<string, unknown> | null = null;
+  if (input.file) {
+    const extension = DESIGN_UPLOAD_MIME_EXTENSIONS[input.file.mimetype];
+    const filename = `${Date.now()}-${randomBytes(8).toString('hex')}${extension}`;
+    await writeFile(path.join(absoluteDirectory, filename), input.file.buffer);
+    const publicPath = designPublicPath(String(merchant._id), userKey, String(product._id), filename);
+    image = {
+      url: `${input.origin}${publicPath}`,
+      filename,
+      originalName: input.file.originalname,
+      mimeType: input.file.mimetype,
+      size: input.file.size,
+    };
+  }
+
+  if (designData !== undefined) {
+    await writeFile(path.join(absoluteDirectory, 'design.json'), JSON.stringify(designData, null, 2), 'utf8');
+  }
+
+  return {
+    ...(image ?? {}),
+    image,
+    // designData,
+    designSaved: designData !== undefined,
+    merchantId: String(merchant._id),
+    productId: String(product._id),
+    userKey,
+  };
+}
+
+export async function getPublicDesignWithProduct(input: { productId: string; merchantId: string; userKey: string }) {
+  const { product, merchant, userKey } = await resolvePublicDesignContext(input.productId, input.merchantId, input.userKey);
+  const productData = await getPublicProductConfig(String(product._id), String(merchant._id));
+  const designPath = path.join(designDirectory(String(merchant._id), userKey, String(product._id)), 'design.json');
+  let designData: unknown = null;
+  let designExists = false;
+  try {
+    designData = JSON.parse(await readFile(designPath, 'utf8'));
+    designExists = true;
+  } catch (error: any) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+  return {
+    product: productData,
+    design: designData,
+    designExists,
+    merchantId: String(merchant._id),
+    productId: String(product._id),
+    userKey,
+  };
+}
+
+async function resolvePublicDesignContext(productId: string, merchantId: string, rawUserKey: string) {
+  if (!Types.ObjectId.isValid(productId)) throw new ApiError(400, 'productId must be a valid MongoDB ObjectId.');
+  if (!Types.ObjectId.isValid(merchantId)) throw new ApiError(400, 'merchantId must be a valid MongoDB ObjectId.');
+  const userKey = sanitizeUploadSegment(rawUserKey);
+  if (!userKey) throw new ApiError(400, 'userKey is required.');
+
+  const merchant = await MerchantModel.findOne({ _id: merchantId, status: 'active' }).lean();
+  if (!merchant) throw new ApiError(404, 'Merchant not found.');
+
+  const product = await ProductModel.findOne({
+    _id: productId,
+    status: 'active',
+    accountId: merchant.accountId,
+    $or: [{ scope: 'shared' }, { scope: 'merchant', merchantId: merchant._id }],
+  }).lean();
+  if (!product) throw new ApiError(404, 'Product not found.');
+
+  return { merchant, product, userKey };
+}
+
+function parseDesignData(value: unknown) {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch {
+      throw new ApiError(400, 'designData must be valid JSON.');
+    }
+  }
+  return value;
+}
+
+function designDirectory(merchantId: string, userKey: string, productId: string) {
+  return path.resolve(process.cwd(), 'uploads', 'designs', merchantId, userKey, productId);
+}
+
+function designPublicPath(merchantId: string, userKey: string, productId: string, filename: string) {
+  return `/uploads/designs/${encodeURIComponent(merchantId)}/${encodeURIComponent(userKey)}/${encodeURIComponent(productId)}/${encodeURIComponent(filename)}`;
+}
+
+function sanitizeUploadSegment(value: string) {
+  return value.trim().replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120);
 }
 export async function calculatePrice(id: string, variantId: string, selectedOptions: Record<string, string>) {
   const product = await ProductModel.findById(id).lean();

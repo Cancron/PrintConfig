@@ -1,5 +1,6 @@
 import cors from 'cors';
 import express from 'express';
+import path from 'node:path';
 import { categoryRoutes } from './routes/category.routes.js';
 import { merchantRoutes } from './routes/merchant.routes.js';
 import { productRoutes } from './routes/product.routes.js';
@@ -20,6 +21,7 @@ export const app = express();
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '5mb' }));
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'product-config-api' }));
 app.use('/api/merchants', merchantRoutes);
 app.use('/api/categories', categoryRoutes);
