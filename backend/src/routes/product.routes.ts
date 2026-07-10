@@ -1,8 +1,24 @@
 import { Router } from 'express';
+import multer from 'multer';
 import * as controller from '../controllers/product.controller.js';
+import { ApiError } from '../middleware/errorHandler.js';
 
 export const productRoutes = Router();
+const designUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 12 * 1024 * 1024, fieldSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => {
+    if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
+      callback(null, true);
+      return;
+    }
+    callback(new ApiError(400, 'Only JPG, PNG, and WebP images are allowed.'));
+  },
+});
+
 productRoutes.get('/', controller.list);
+productRoutes.post('/public/:productId/design-upload', designUpload.single('image'), controller.publicDesignUpload);
+productRoutes.get('/public/:productId/design', controller.publicDesign);
 productRoutes.get('/public/:id/config', controller.publicConfig);
 productRoutes.get('/editor', controller.editorList);
 productRoutes.get('/editor/:id/config', controller.editorConfig);
