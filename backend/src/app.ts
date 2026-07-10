@@ -14,6 +14,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 const allowedOrigins = new Set([
   'https://photo-book-prints.lovable.app',
   'https://photo-book-prints.onrender.com',
+  'https://photo-book-studio.onrender.com',
 ]);
 
 function isAllowedOrigin(origin: string) {
