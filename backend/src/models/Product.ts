@@ -188,34 +188,6 @@ const exportRulesSchema = new Schema(
   { _id: false }
 );
 
-const templateElementSchema = new Schema(
-  {
-    name: String,
-    type: { type: String, enum: ['photo', 'text'] },
-    x: Number,
-    y: Number,
-    width: Number,
-    height: Number,
-    required: Boolean,
-    locked: Boolean,
-    editable: Boolean,
-  },
-  { timestamps: true }
-);
-
-const templateSchema = new Schema(
-  {
-    productId: { type: Schema.Types.ObjectId, ref: 'Product' },
-    name: String,
-    status: String,
-    variantId: { type: Schema.Types.ObjectId },
-    surfaceId: { type: Schema.Types.ObjectId },
-    thumbnailUrl: String,
-    elements: { type: [templateElementSchema], default: [] },
-  },
-  { timestamps: true }
-);
-
 const productTrustBadgeSchema = new Schema(
   {
     icon: { type: String, default: '' },
@@ -291,8 +263,9 @@ const editorProductSelectionSchema = new Schema(
 const layoutSettingsSchema = new Schema(
   {
     enabled: { type: Boolean, default: false },
-    allowedTemplateCategoryIds: { type: [{ type: Schema.Types.ObjectId, ref: 'LayoutCategory' }], default: [] },
+    mode: { type: String, enum: ['none', 'all', 'specific', 'by-tags'], default: 'none' },
     allowedTemplateIds: { type: [{ type: Schema.Types.ObjectId, ref: 'LayoutTemplate' }], default: [] },
+    allowedTemplateTags: { type: [String], default: [] },
     requireTemplateSelection: { type: Boolean, default: false },
   },
   { _id: false }
@@ -359,7 +332,6 @@ const productSchema = new Schema(
     variants: { type: [variantSchema], default: [] },
     editorRules: { type: editorRulesSchema, default: () => ({}) },
     exportRules: { type: exportRulesSchema, default: () => ({}) },
-    templates: { type: [templateSchema], default: [] },
     layoutSettings: { type: layoutSettingsSchema, default: () => ({}) },
     aiArt: { type: aiArtSchema, default: () => ({ enabled: false }) },
   },
@@ -378,7 +350,6 @@ productSchema.pre('validate', function setNestedProductRefs() {
     variant.productId = this._id;
     for (const roomPreview of variant.roomPreviews ?? []) roomPreview.variantId = variant._id;
   }
-  for (const template of this.templates ?? []) template.productId = this._id;
 });
 productSchema.index({ accountId: 1, scope: 1, merchantId: 1, categoryId: 1, slug: 1 }, { unique: true });
 export const ProductModel = model('Product', productSchema);

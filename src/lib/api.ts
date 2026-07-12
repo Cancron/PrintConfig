@@ -212,17 +212,6 @@ function normalizeOptionGroups(groups: any[] = []) {
   }));
 }
 
-function normalizeTemplates(templates: any[] = []) {
-  return templates.map((template) => ({
-    ...template,
-    _id: idOf(template),
-    productId: String(template.productId ?? ''),
-    variantId: String(template.variantId ?? ''),
-    surfaceId: String(template.surfaceId ?? ''),
-    elements: (template.elements ?? []).map((element: any) => ({ ...element, _id: idOf(element) })),
-  }));
-}
-
 function normalizeFolder(raw: any): ImageFolder {
   return { ...raw, _id: idOf(raw), accountId: String(raw.accountId ?? ''), merchantId: raw.merchantId ? String(raw.merchantId) : null, parentFolderId: raw.parentFolderId ? String(raw.parentFolderId) : null };
 }
@@ -266,14 +255,31 @@ function normalizeProduct(raw: any): Product {
     variants,
     editorRules: raw.editorRules ?? {},
     exportRules: raw.exportRules ?? {},
-    templates: normalizeTemplates(raw.templates),
-    layoutSettings: { enabled: raw.layoutSettings?.enabled === true, allowedTemplateCategoryIds: (raw.layoutSettings?.allowedTemplateCategoryIds ?? []).map(String), allowedTemplateIds: (raw.layoutSettings?.allowedTemplateIds ?? []).map(String), requireTemplateSelection: raw.layoutSettings?.requireTemplateSelection === true },
+    layoutSettings: normalizeProductLayoutSettings(raw.layoutSettings),
     createdAt: raw.createdAt ?? new Date().toISOString(),
     updatedAt: raw.updatedAt ?? new Date().toISOString(),
   };
   product.roomPreviews = liftLegacyRoomPreviews(product);
   product.variants = product.variants.map((variant) => ({ ...variant, roomPreviews: undefined }));
   return product;
+}
+
+function normalizeProductLayoutSettings(raw: any) {
+  const legacyCategoryIds = (raw?.allowedTemplateCategoryIds ?? []).map(String);
+  const allowedTemplateIds = (raw?.allowedTemplateIds ?? []).map(String);
+  const allowedTemplateTags = (raw?.allowedTemplateTags ?? []).map(String);
+  const mode = raw?.mode === 'all' || raw?.mode === 'specific' || raw?.mode === 'by-tags'
+    ? raw.mode
+    : raw?.enabled === true
+      ? allowedTemplateIds.length > 0 ? 'specific' : legacyCategoryIds.length > 0 ? 'by-tags' : 'all'
+      : 'none';
+  return {
+    enabled: raw?.enabled === true && mode !== 'none',
+    mode,
+    allowedTemplateIds,
+    allowedTemplateTags,
+    requireTemplateSelection: raw?.requireTemplateSelection === true,
+  };
 }
 
 function apiPayload<T>(value: T): T {

@@ -1,6 +1,6 @@
 import type { PointerEvent } from "react";
 import type { LayoutElement, LayoutTemplatePage } from "../../types";
-import previewImage from "../../assets/img-preview.jpeg";
+import previewImage from "../../assets/img-preview.jpg";
 import { formatLabel, keyOf } from "./layoutTemplateUtils";
 
 interface LayoutPreviewProps {
