@@ -238,7 +238,7 @@ export interface LayoutTemplate {
   accountId: string;
   merchantId?: string | null;
   scope: ProductScope;
-  categoryId: string;
+  categoryId?: string | null;
   name: string;
   slug: string;
   description: string;

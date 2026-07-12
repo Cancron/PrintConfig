@@ -262,8 +262,7 @@ export function validateLayoutTemplate(template: LayoutTemplate, existingTemplat
   if (!template.name.trim()) errors.name = 'Layout template name is required.';
   if (!slug) errors.slug = 'Slug is required.';
   else if (!URL_SAFE_SLUG.test(slug)) errors.slug = 'Use lowercase letters, numbers, and hyphens only.';
-  else if (existingTemplates.some((item) => item._id !== template._id && item.slug.toLowerCase() === slug && item.categoryId === template.categoryId && item.scope === template.scope && (item.scope === 'shared' || item.merchantId === effectiveMerchantId))) errors.slug = 'Slug must be unique in this category and scope.';
-  if (!template.categoryId) errors.categoryId = 'Layout category is required.';
+  else if (existingTemplates.some((item) => item._id !== template._id && item.slug.toLowerCase() === slug && item.scope === template.scope && (item.scope === 'shared' || item.merchantId === effectiveMerchantId))) errors.slug = 'Slug must be unique in this scope.';
   if (template.status !== 'active' && template.status !== 'draft' && template.status !== 'archived') errors.status = 'Status is required.';
   if (template.scope !== 'shared' && template.scope !== 'merchant') errors.scope = 'Scope is required.';
   if (template.scope === 'merchant' && !effectiveMerchantId) errors.scope = 'Select a merchant for merchant custom templates.';

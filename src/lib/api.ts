@@ -134,7 +134,7 @@ function normalizeLayoutTemplate(raw: any): LayoutTemplate {
     accountId: String(raw.accountId ?? ''),
     merchantId: raw.merchantId ? String(raw.merchantId) : null,
     scope: raw.scope === 'merchant' ? 'merchant' : 'shared',
-    categoryId: String(raw.categoryId ?? ''),
+    categoryId: raw.categoryId ? String(raw.categoryId) : null,
     name: raw.name ?? '',
     slug: raw.slug ?? '',
     description: raw.description ?? '',
@@ -333,7 +333,7 @@ export const api = {
   updateLayoutTemplate: (template: LayoutTemplate) => request<any>(`/layout-templates/${template._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(template))) }).then(normalizeLayoutTemplate),
   deleteLayoutTemplate: (id: string) => request(`/layout-templates/${id}`, { method: 'DELETE' }),
   duplicateLayoutTemplate: (id: string) => request<any>(`/layout-templates/${id}/duplicate`, { method: 'POST' }).then(normalizeLayoutTemplate),
-  exportLayoutTemplate: (id: string) => request<any>(`/layout-templates/${id}/export`).then((result) => ({ template: normalizeLayoutTemplate(result.template), category: result.category ? normalizeLayoutCategory(result.category) : undefined })),
+  exportLayoutTemplate: (id: string) => request<any>(`/layout-templates/${id}/export`).then((result) => ({ template: normalizeLayoutTemplate(result.template) })),
   importLayoutTemplate: (payload: unknown) => request<any>('/layout-templates/import', { method: 'POST', body: JSON.stringify(payload) }).then(normalizeLayoutTemplate),
   listCollages: (filters: { accountId: string; merchantId: string; categoryId?: string; scope?: string; status?: string; orientation?: string; search?: string }) => request<any[]>(`/collages?${layoutQuery(filters)}`).then((items) => items.map(normalizeCollage)),
   listCollagesPaged: (filters: { accountId: string; merchantId: string; categoryId?: string; scope?: string; status?: string; orientation?: string; search?: string; page: number; pageSize: number }) => request<any>(`/collages?${layoutQuery(filters)}`).then((result) => ({

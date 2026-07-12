@@ -94,7 +94,7 @@ const layoutTemplateSchema = new Schema(
     accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
     merchantId: { type: Schema.Types.ObjectId, ref: 'Merchant', default: null, index: true },
     scope: { type: String, enum: ['shared', 'merchant'], required: true, index: true },
-    categoryId: { type: Schema.Types.ObjectId, ref: 'LayoutCategory', required: true, index: true },
+    categoryId: { type: Schema.Types.ObjectId, ref: 'LayoutCategory', default: null, index: true },
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true, trim: true },
     description: { type: String, default: '' },
@@ -116,7 +116,7 @@ const layoutTemplateSchema = new Schema(
   { timestamps: true }
 );
 
-layoutTemplateSchema.index({ accountId: 1, scope: 1, merchantId: 1, categoryId: 1, slug: 1 }, { unique: true });
+layoutTemplateSchema.index({ accountId: 1, scope: 1, merchantId: 1, slug: 1 }, { unique: true });
 layoutTemplateSchema.index({ accountId: 1, scope: 1, merchantId: 1, templateType: 1 });
 layoutTemplateSchema.index({ name: 'text', description: 'text', tags: 'text' });
 
