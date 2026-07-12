@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Copy, Download, Eye, ImagePlus, Layers, Pencil, Plus, Trash2, Type, Upload } from "lucide-react";
+import { Copy, Download, Eye, ImagePlus, Layers, Loader2, Pencil, Plus, Trash2, Type, Upload } from "lucide-react";
 import { PageHeader } from "../components/PageHeader";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Input } from "../components/ui/Input";
@@ -11,6 +11,8 @@ import { ImageField } from "../components/gallery/ImageField";
 import { useLayouts } from "../hooks/useLayouts";
 import { useWorkspace } from "../hooks/useWorkspace";
 import { api } from "../lib/api";
+import { generateAndUploadCollagePreview } from "../lib/collagePreview";
+import { formatFileSize } from "../lib/gallery";
 import type { Collage, LayoutElement, LayoutElementType, LayoutOrientation, LayoutStatus, ProductScope, ProductUnit } from "../types";
 import { LayoutPreview } from "../components/template/LayoutPreview";
 import { ElementSettings } from "../components/template/LayoutSettingsPanels";
@@ -127,6 +129,7 @@ export function CollageEditor() {
   const [selectedElementId, setSelectedElementId] = useState("");
   const [previewMode, setPreviewMode] = useState(false);
   const [message, setMessage] = useState("");
+  const [generatingPreview, setGeneratingPreview] = useState(false);
   const [openPanels, setOpenPanels] = useState({ collage: true, element: false });
 
   useEffect(() => { if (!isNew && source) { setCollage(source); setSelectedElementId(""); } }, [isNew, source]);
@@ -162,11 +165,42 @@ export function CollageEditor() {
   }
   function duplicateElement() { if (!selectedElement) return; const copy = { ...selectedElement, _id: "", clientId: crypto.randomUUID(), name: `${selectedElement.name} Copy`, x: Math.min(95, selectedElement.x + 3), y: Math.min(95, selectedElement.y + 3) }; setCollage((prev) => ({ ...prev, elements: [...prev.elements, copy] })); selectElement(keyOf(copy)); }
   function deleteElement() { if (!selectedElement) return; setCollage((prev) => ({ ...prev, elements: prev.elements.filter((element) => keyOf(element) !== keyOf(selectedElement)) })); setSelectedElementId(""); }
-  async function save() { if (!isValid) return; const payload = { ...collage, merchantContextId: selectedMerchantId, merchantId: collage.scope === "merchant" ? selectedMerchantId : null }; const saved = isNew ? await addCollage(payload) : await updateCollage(payload); setMessage("Collage saved."); navigate(`/layouts/collages/${saved._id}`); }
+  async function saveCollage(nextCollage: Collage, successMessage: string, createNew = isNew) { const payload = { ...nextCollage, merchantContextId: selectedMerchantId, merchantId: nextCollage.scope === "merchant" ? selectedMerchantId : null }; const saved = createNew ? await addCollage(payload) : await updateCollage(payload); setCollage(saved); setMessage(successMessage); navigate(`/layouts/collages/${saved._id}`); return saved; }
+  async function save() {
+    if (!isValid || generatingPreview) return;
+    const saved = await saveCollage(collage, "Collage saved.", isNew);
+    if (saved.thumbnailUrl) return;
+    setGeneratingPreview(true);
+    try {
+      const preview = await generateAndUploadCollagePreview({ collage: saved, accountId: account._id, selectedMerchantId });
+      const nextCollage = { ...saved, thumbnailUrl: preview.asset.publicUrl, thumbnailAssetId: preview.asset._id };
+      await saveCollage(nextCollage, `Collage saved. Preview generated automatically (${formatFileSize(preview.blob.size)}, ${preview.width} x ${preview.height}).`, false);
+    } catch (error) {
+      setMessage(error instanceof Error ? `Collage saved, but preview generation failed: ${error.message}` : "Collage saved, but preview generation failed.");
+    } finally {
+      setGeneratingPreview(false);
+    }
+  }
+  async function generatePreviewImage() {
+    if (!isValid || generatingPreview) return;
+    setGeneratingPreview(true);
+    setMessage("");
+    try {
+      const baseCollage = collage._id ? collage : await saveCollage(collage, "Collage saved.", true);
+      const preview = await generateAndUploadCollagePreview({ collage: baseCollage, accountId: account._id, selectedMerchantId });
+      const nextCollage = { ...baseCollage, thumbnailUrl: preview.asset.publicUrl, thumbnailAssetId: preview.asset._id };
+      setCollage(nextCollage);
+      await saveCollage(nextCollage, `Preview generated and saved (${formatFileSize(preview.blob.size)}, ${preview.width} x ${preview.height}).`, false);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Preview generation failed.");
+    } finally {
+      setGeneratingPreview(false);
+    }
+  }
   async function remove() { if (!collage._id || !confirm("Delete this collage?")) return; await deleteCollage(collage._id); navigate("/layouts/collages"); }
   async function exportJson() { downloadJson(`collage-${collage.slug || "draft"}.json`, collage._id ? await api.exportCollage(collage._id) : { collage }); }
 
-  return <div><PageHeader title={isNew ? "Create Collage" : collage.name} description="Edit one reusable collage layout with normalized percentage coordinates." action={<div className="flex flex-wrap gap-2"><button onClick={() => setPreviewMode((value) => !value)} className="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50">{previewMode ? "Edit" : "Preview"}</button><button onClick={exportJson} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50"><Download className="h-4 w-4" /> Export</button>{!isNew && <button onClick={remove} className="rounded-md bg-white px-4 py-2 text-sm font-medium text-red-600 ring-1 ring-red-200 hover:bg-red-50">Delete</button>}<button onClick={save} disabled={!isValid} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">Save</button></div>} />{message && <Notice tone="success">{message}</Notice>}<div className="grid gap-6 grid-cols-1 xl:grid-cols-[1fr_380px]"><main className="space-y-4"><Toolbar onAdd={addElement} onImportSvg={importSvgFile} /><LayoutPreview page={page} selectedElementId={selectedElementId} onSelect={selectElement} onChange={updateElement} previewMode={previewMode} /></main><aside className="space-y-1 rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200"><CollapsibleSection title="Collage Settings" open={openPanels.collage} onToggle={() => setOpenPanels((prev) => ({ ...prev, collage: !prev.collage }))}><CollageSettings collage={collage} categories={categories} selectedMerchantName={selectedMerchant?.name} errors={errors} onUpdate={update} /></CollapsibleSection><CollapsibleSection title="Element Settings" open={openPanels.element} onToggle={() => setOpenPanels((prev) => ({ ...prev, element: !prev.element }))}>{selectedElement ? <ElementSettings element={selectedElement} onUpdate={(updater) => updateElement(keyOf(selectedElement), updater)} onDuplicate={duplicateElement} onDelete={deleteElement} /> : <div className="rounded-md bg-gray-50 p-3 text-sm text-gray-600">Select an element on the canvas to edit its settings.</div>}</CollapsibleSection><pre className="max-h-72 overflow-auto rounded-lg bg-gray-950 p-4 text-xs text-gray-100">{JSON.stringify(collage, null, 2)}</pre></aside></div></div>;
+  return <div><PageHeader title={isNew ? "Create Collage" : collage.name} description="Edit one reusable collage layout with normalized percentage coordinates." action={<div className="flex flex-wrap gap-2"><button onClick={() => setPreviewMode((value) => !value)} className="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50">{previewMode ? "Edit" : "Preview"}</button><button onClick={exportJson} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50"><Download className="h-4 w-4" /> Export</button><button onClick={generatePreviewImage} disabled={!isValid || generatingPreview} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400">{generatingPreview ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}{generatingPreview ? "Generating..." : "Generate Preview Image"}</button>{!isNew && <button onClick={remove} className="rounded-md bg-white px-4 py-2 text-sm font-medium text-red-600 ring-1 ring-red-200 hover:bg-red-50">Delete</button>}<button onClick={save} disabled={!isValid || generatingPreview} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">Save</button></div>} />{message && <Notice tone={message.includes("failed") || message.includes("required") || message.includes("Could not") ? "warning" : "success"}>{message}</Notice>}<div className="grid gap-6 grid-cols-1 xl:grid-cols-[1fr_380px]"><main className="space-y-4"><Toolbar onAdd={addElement} onImportSvg={importSvgFile} /><LayoutPreview page={page} selectedElementId={selectedElementId} onSelect={selectElement} onChange={updateElement} previewMode={previewMode} /></main><aside className="space-y-1 rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200"><CollapsibleSection title="Collage Settings" open={openPanels.collage} onToggle={() => setOpenPanels((prev) => ({ ...prev, collage: !prev.collage }))}><CollageSettings collage={collage} categories={categories} selectedMerchantName={selectedMerchant?.name} errors={errors} onUpdate={update} /></CollapsibleSection><CollapsibleSection title="Element Settings" open={openPanels.element} onToggle={() => setOpenPanels((prev) => ({ ...prev, element: !prev.element }))}>{selectedElement ? <ElementSettings element={selectedElement} onUpdate={(updater) => updateElement(keyOf(selectedElement), updater)} onDuplicate={duplicateElement} onDelete={deleteElement} /> : <div className="rounded-md bg-gray-50 p-3 text-sm text-gray-600">Select an element on the canvas to edit its settings.</div>}</CollapsibleSection><pre className="max-h-72 overflow-auto rounded-lg bg-gray-950 p-4 text-xs text-gray-100">{JSON.stringify(collage, null, 2)}</pre></aside></div></div>;
 }
 
 function CollageSettings({ collage, categories, selectedMerchantName, errors, onUpdate }: { collage: Collage; categories: { _id: string; name: string }[]; selectedMerchantName?: string; errors: Record<string, string>; onUpdate: <K extends keyof Collage>(field: K, value: Collage[K]) => void }) {
