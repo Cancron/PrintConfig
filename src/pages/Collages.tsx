@@ -173,6 +173,7 @@ export function CollageEditor() {
     setGeneratingPreview(true);
     try {
       const preview = await generateAndUploadCollagePreview({ collage: saved, accountId: account._id, selectedMerchantId });
+      downloadPreviewBlob(preview.blob, saved.slug || saved._id);
       const nextCollage = { ...saved, thumbnailUrl: preview.asset.publicUrl, thumbnailAssetId: preview.asset._id };
       await saveCollage(nextCollage, `Collage saved. Preview generated automatically (${formatFileSize(preview.blob.size)}, ${preview.width} x ${preview.height}).`, false);
     } catch (error) {
@@ -188,6 +189,7 @@ export function CollageEditor() {
     try {
       const baseCollage = collage._id ? collage : await saveCollage(collage, "Collage saved.", true);
       const preview = await generateAndUploadCollagePreview({ collage: baseCollage, accountId: account._id, selectedMerchantId });
+      downloadPreviewBlob(preview.blob, baseCollage.slug || baseCollage._id);
       const nextCollage = { ...baseCollage, thumbnailUrl: preview.asset.publicUrl, thumbnailAssetId: preview.asset._id };
       setCollage(nextCollage);
       await saveCollage(nextCollage, `Preview generated and saved (${formatFileSize(preview.blob.size)}, ${preview.width} x ${preview.height}).`, false);
@@ -196,6 +198,14 @@ export function CollageEditor() {
     } finally {
       setGeneratingPreview(false);
     }
+  }
+  function downloadPreviewBlob(blob: Blob, name: string) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${name || "collage"}-generated-preview.webp`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
   async function remove() { if (!collage._id || !confirm("Delete this collage?")) return; await deleteCollage(collage._id); navigate("/layouts/collages"); }
   async function exportJson() { downloadJson(`collage-${collage.slug || "draft"}.json`, collage._id ? await api.exportCollage(collage._id) : { collage }); }

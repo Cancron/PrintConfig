@@ -28,9 +28,14 @@ export async function generateAndUploadCollagePreview(input: {
     ? `accounts/${accountId}/merchants/${merchantId}/root/collage-previews/${filename}`
     : `accounts/${accountId}/shared/root/collage-previews/${filename}`;
   const file = new File([rendered.blob], filename, { type: rendered.blob.type || "image/webp" });
-  const { error: uploadError } = await supabase.storage.from(GALLERY_BUCKET).upload(storagePath, file, { upsert: true });
+  await supabase.storage.from(GALLERY_BUCKET).remove([storagePath]);
+  const { error: uploadError } = await supabase.storage.from(GALLERY_BUCKET).upload(storagePath, file, {
+    upsert: true,
+    cacheControl: "0",
+  });
   if (uploadError) throw new Error(`Supabase upload failed: ${uploadError.message}`);
   const { data } = supabase.storage.from(GALLERY_BUCKET).getPublicUrl(storagePath);
+  const publicUrl = `${data.publicUrl}?v=${Date.now()}`;
   const now = new Date().toISOString();
   const metadata: ImageAsset = {
     _id: "",
@@ -41,9 +46,9 @@ export async function generateAndUploadCollagePreview(input: {
     name: `${collage.name || "Collage"} Preview`,
     filename,
     originalFilename: filename,
-    url: data.publicUrl,
-    publicUrl: data.publicUrl,
-    thumbnailUrl: data.publicUrl,
+    url: publicUrl,
+    publicUrl,
+    thumbnailUrl: publicUrl,
     storageProvider: "supabase",
     bucket: GALLERY_BUCKET,
     storagePath,
@@ -117,6 +122,7 @@ async function drawElement(
   ctx.translate(x + width / 2, y + height / 2);
   ctx.rotate(((element.rotation || 0) * Math.PI) / 180);
   ctx.translate(-width / 2, -height / 2);
+  clipElementBounds(ctx, element, width, height);
 
   if (element.type === "photo_placeholder") drawPhotoPlaceholder(ctx, element, width, height, photoPreview);
   else if (element.type === "text_placeholder") drawTextPlaceholder(ctx, element, width, height, canvasWidth);
@@ -131,6 +137,23 @@ async function drawElement(
   ctx.restore();
 }
 
+function clipElementBounds(ctx: CanvasRenderingContext2D, element: LayoutElement, width: number, height: number) {
+  if (element.type === "photo_placeholder" && element.photoSettings.maskShape === "circle") {
+    ctx.beginPath();
+    ctx.ellipse(width / 2, height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
+    ctx.clip();
+    return;
+  }
+  if (element.type === "photo_placeholder" && element.photoSettings.maskShape === "rounded_rectangle") {
+    roundedRect(ctx, 0, 0, width, height, Math.min(width, height) * 0.08);
+    ctx.clip();
+    return;
+  }
+  ctx.beginPath();
+  ctx.rect(0, 0, width, height);
+  ctx.clip();
+}
+
 function drawPhotoPlaceholder(
   ctx: CanvasRenderingContext2D,
   element: LayoutElement,
@@ -138,39 +161,39 @@ function drawPhotoPlaceholder(
   height: number,
   photoPreview: HTMLImageElement | null,
 ) {
-  ctx.save();
-  if (element.photoSettings.maskShape === "circle") {
-    ctx.beginPath();
-    ctx.ellipse(width / 2, height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
-    ctx.clip();
-  } else if (element.photoSettings.maskShape === "rounded_rectangle") {
-    roundedRect(ctx, 0, 0, width, height, Math.min(width, height) * 0.08);
-    ctx.clip();
-  }
   ctx.fillStyle = "#e2e8f0";
   ctx.fillRect(0, 0, width, height);
   if (photoPreview) drawImageFit(ctx, photoPreview, 0, 0, width, height, element.photoSettings.fitMode);
-  ctx.restore();
 }
 
 function drawTextPlaceholder(ctx: CanvasRenderingContext2D, element: LayoutElement, width: number, height: number, canvasWidth: number) {
   const settings = element.textSettings;
   const fontSize = Math.max(4, Math.min(height * 0.75, settings.fontSize * (canvasWidth / 600)));
+  const padding = Math.max(1, canvasWidth / 300);
   ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
   ctx.fillRect(0, 0, width, height);
-  ctx.fillStyle = settings.color || "#111827";
+  ctx.fillStyle = toCanvasPaint(settings.color, "#111827");
   ctx.font = `${settings.fontWeight || "400"} ${fontSize}px ${settings.fontFamily || "Arial"}`;
-  ctx.textBaseline = "middle";
+  ctx.textBaseline = "top";
   ctx.textAlign = settings.textAlign;
-  const textX = settings.textAlign === "left" ? 2 : settings.textAlign === "right" ? width - 2 : width / 2;
-  ctx.fillText(settings.defaultText || element.name, textX, height / 2, Math.max(1, width - 4));
+  const maxTextWidth = Math.max(1, width - padding * 2);
+  const lines = wrapText(ctx, settings.defaultText || element.name, maxTextWidth);
+  const lineHeight = fontSize * 1.15;
+  const totalHeight = lines.length * lineHeight;
+  const textX = settings.textAlign === "left" ? padding : settings.textAlign === "right" ? width - padding : width / 2;
+  let textY = Math.max(padding, (height - totalHeight) / 2);
+  for (const line of lines) {
+    if (textY > height - padding) break;
+    ctx.fillText(line, textX, textY, maxTextWidth);
+    textY += lineHeight;
+  }
 }
 
 function drawShape(ctx: CanvasRenderingContext2D, element: LayoutElement, width: number, height: number) {
   const settings = element.shapeSettings;
-  ctx.fillStyle = settings.fillColor || "transparent";
-  ctx.strokeStyle = settings.strokeColor || "transparent";
-  ctx.lineWidth = Math.max(0, settings.strokeWidth || 0);
+  ctx.fillStyle = toCanvasPaint(settings.fillColor, "transparent");
+  ctx.strokeStyle = toCanvasPaint(settings.strokeColor, "transparent");
+  ctx.lineWidth = previewStrokeWidth(settings.strokeWidth);
   if (settings.shapeType === "circle") {
     ctx.beginPath();
     ctx.ellipse(width / 2, height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
@@ -198,6 +221,39 @@ function drawSvgPath(ctx: CanvasRenderingContext2D, svgPath: string, svgViewBox:
   ctx.fill(path);
   if (ctx.lineWidth > 0) ctx.stroke(path);
   ctx.restore();
+}
+
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
+  const lines: string[] = [];
+  for (const sourceLine of text.split(/\r?\n/)) {
+    const words = sourceLine.split(/\s+/).filter(Boolean);
+    if (words.length === 0) {
+      lines.push("");
+      continue;
+    }
+    let current = words[0];
+    for (const word of words.slice(1)) {
+      const next = `${current} ${word}`;
+      if (ctx.measureText(next).width <= maxWidth) current = next;
+      else {
+        lines.push(current);
+        current = word;
+      }
+    }
+    lines.push(current);
+  }
+  return lines;
+}
+
+function previewStrokeWidth(strokeWidth: number) {
+  if (!strokeWidth || strokeWidth <= 0) return 0;
+  return Math.max(0.5, strokeWidth);
+}
+
+function toCanvasPaint(value: string | undefined, fallback: string) {
+  const paint = (value || "").trim();
+  if (!paint || paint.toLowerCase() === "none") return fallback;
+  return paint;
 }
 
 function drawImageFallback(ctx: CanvasRenderingContext2D, width: number, height: number) {
