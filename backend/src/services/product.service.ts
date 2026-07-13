@@ -1,7 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 import { Types } from 'mongoose';
 import { ProductModel } from '../models/Product.js';
 import { ProductCategoryModel } from '../models/ProductCategory.js';
@@ -16,6 +14,7 @@ import { normalizeFrontendContentPayload, publicFrontendContent } from '../utils
 import { visibleQuery } from './category.service.js';
 import { resolveAccountId } from './account.service.js';
 import { authenticateApiPrivateKey } from './merchant.service.js';
+import { galleryBucket, getSupabaseAdmin } from '../config/supabase.js';
 
 export type DependencyCondition = 'equals' | 'not_equals' | 'in' | 'not_in';
 
@@ -740,17 +739,27 @@ export async function savePublicDesignUpload(input: {
   if (input.file && !DESIGN_UPLOAD_MIME_EXTENSIONS[input.file.mimetype]) throw new ApiError(400, 'Only JPG, PNG, and WebP images are allowed.');
 
   const { merchant, product, userKey } = await resolvePublicDesignContext(input.productId, input.merchantId, input.userKey);
-  const absoluteDirectory = designDirectory(String(merchant._id), userKey, String(product._id));
-  await mkdir(absoluteDirectory, { recursive: true });
+  const supabase = getSupabaseAdmin();
+  const prefix = designTempPrefix(String(merchant._id), userKey, String(product._id));
 
   let image: Record<string, unknown> | null = null;
   if (input.file) {
     const extension = DESIGN_UPLOAD_MIME_EXTENSIONS[input.file.mimetype];
     const filename = `${Date.now()}-${randomBytes(8).toString('hex')}${extension}`;
-    await writeFile(path.join(absoluteDirectory, filename), input.file.buffer);
-    const publicPath = designPublicPath(String(merchant._id), userKey, String(product._id), filename);
+    const storagePath = `${prefix}/images/${filename}`;
+    const { error: uploadError } = await supabase.storage.from(galleryBucket).upload(storagePath, input.file.buffer, {
+      contentType: input.file.mimetype,
+      upsert: false,
+      cacheControl: '3600',
+    });
+    if (uploadError) throw new ApiError(502, `Supabase image upload failed: ${uploadError.message}`);
+    const { data } = supabase.storage.from(galleryBucket).getPublicUrl(storagePath);
     image = {
-      url: `${input.origin}${publicPath}`,
+      url: data.publicUrl,
+      publicUrl: data.publicUrl,
+      storageProvider: 'supabase',
+      bucket: galleryBucket,
+      storagePath,
       filename,
       originalName: input.file.originalname,
       mimeType: input.file.mimetype,
@@ -759,7 +768,13 @@ export async function savePublicDesignUpload(input: {
   }
 
   if (designData !== undefined) {
-    await writeFile(path.join(absoluteDirectory, 'design.json'), JSON.stringify(designData, null, 2), 'utf8');
+    const designStoragePath = `${prefix}/design.json`;
+    const { error: designUploadError } = await supabase.storage.from(galleryBucket).upload(
+      designStoragePath,
+      Buffer.from(JSON.stringify(designData, null, 2), 'utf8'),
+      { contentType: 'application/json', upsert: true, cacheControl: '0' }
+    );
+    if (designUploadError) throw new ApiError(502, `Supabase design save failed: ${designUploadError.message}`);
   }
 
   return {
@@ -767,6 +782,7 @@ export async function savePublicDesignUpload(input: {
     image,
     // designData,
     designSaved: designData !== undefined,
+    designStoragePath: designData !== undefined ? `${prefix}/design.json` : undefined,
     merchantId: String(merchant._id),
     productId: String(product._id),
     userKey,
@@ -776,19 +792,21 @@ export async function savePublicDesignUpload(input: {
 export async function getPublicDesignWithProduct(input: { productId: string; merchantId: string; userKey: string }) {
   const { product, merchant, userKey } = await resolvePublicDesignContext(input.productId, input.merchantId, input.userKey);
   const productData = await getPublicProductConfig(String(product._id), String(merchant._id));
-  const designPath = path.join(designDirectory(String(merchant._id), userKey, String(product._id)), 'design.json');
+  const designStoragePath = `${designTempPrefix(String(merchant._id), userKey, String(product._id))}/design.json`;
   let designData: unknown = null;
   let designExists = false;
-  try {
-    designData = JSON.parse(await readFile(designPath, 'utf8'));
+  const { data, error } = await getSupabaseAdmin().storage.from(galleryBucket).download(designStoragePath);
+  if (error) {
+    if (!isStorageNotFound(error)) throw new ApiError(502, `Supabase design read failed: ${error.message}`);
+  } else if (data) {
+    designData = JSON.parse(await data.text());
     designExists = true;
-  } catch (error: any) {
-    if (error?.code !== 'ENOENT') throw error;
   }
   return {
     product: productData,
     design: designData,
     designExists,
+    designStoragePath: designExists ? designStoragePath : null,
     merchantId: String(merchant._id),
     productId: String(product._id),
     userKey,
@@ -827,12 +845,13 @@ function parseDesignData(value: unknown) {
   return value;
 }
 
-function designDirectory(merchantId: string, userKey: string, productId: string) {
-  return path.resolve(process.cwd(), 'uploads', 'designs', merchantId, userKey, productId);
+function designTempPrefix(merchantId: string, userKey: string, productId: string) {
+  return `designs/tmp/${merchantId}/${userKey}/${productId}`;
 }
 
-function designPublicPath(merchantId: string, userKey: string, productId: string, filename: string) {
-  return `/uploads/designs/${encodeURIComponent(merchantId)}/${encodeURIComponent(userKey)}/${encodeURIComponent(productId)}/${encodeURIComponent(filename)}`;
+function isStorageNotFound(error: { message?: string; statusCode?: string | number; name?: string }) {
+  const message = String(error.message ?? '').toLowerCase();
+  return error.statusCode === 404 || error.statusCode === '404' || message.includes('not found') || message.includes('object not found');
 }
 
 function sanitizeUploadSegment(value: string) {
