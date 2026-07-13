@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { Select } from '../ui/Select';
 import { Textarea } from '../ui/Textarea';
 import { api } from '../../lib/api';
 import type { LayoutTemplate, ProductScope } from '../../types';
@@ -27,14 +26,13 @@ export function Notice({ tone, children }: { tone: 'info' | 'warning' | 'success
   return <div className={`mb-4 rounded-md p-3 text-sm ring-1 ring-inset ${styles}`}>{children}</div>;
 }
 
-export function ImportTemplateModal({ categories, onClose, onImported }: { categories: { _id: string; name: string }[]; onClose: () => void; onImported: (template: LayoutTemplate) => void }) {
+export function ImportTemplateModal({ onClose, onImported }: { onClose: () => void; onImported: (template: LayoutTemplate) => void }) {
   const [json, setJson] = useState('');
-  const [categoryId, setCategoryId] = useState(categories[0]?._id ?? '');
   const [error, setError] = useState('');
   async function submit() {
     try {
       setError('');
-      const saved = await api.importLayoutTemplate({ ...JSON.parse(json), categoryId });
+      const saved = await api.importLayoutTemplate(JSON.parse(json));
       onImported(saved);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not import template JSON.');
@@ -49,15 +47,6 @@ export function ImportTemplateModal({ categories, onClose, onImported }: { categ
           </h2>
         </div>
         <div className="space-y-4 p-5">
-          <Select
-            label="Import into Category"
-            value={categoryId}
-            onChange={(event) => setCategoryId(event.target.value)}
-            options={categories.map((category) => ({
-              value: category._id,
-              label: category.name,
-            }))}
-          />
           <Textarea
             label="JSON"
             value={json}
@@ -75,7 +64,7 @@ export function ImportTemplateModal({ categories, onClose, onImported }: { categ
           </button>
           <button
             onClick={submit}
-            disabled={!json.trim() || !categoryId}
+            disabled={!json.trim()}
             className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:bg-slate-300"
           >
             Import

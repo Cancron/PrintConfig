@@ -63,7 +63,6 @@ export const fontFamilyOptions = [
 export function createTemplate(
   accountId: string,
   _selectedMerchantId: string,
-  categoryId: string,
 ): LayoutTemplate {
   const now = new Date().toISOString();
   return {
@@ -71,7 +70,7 @@ export function createTemplate(
     accountId,
     merchantId: null,
     scope: "shared",
-    categoryId,
+    categoryId: null,
     name: "",
     slug: "",
     description: "",

@@ -58,9 +58,9 @@ async function assertCategorySlugUnique(data: Record<string, unknown>, id?: stri
 }
 
 async function assertTemplateSlugUnique(data: Record<string, unknown>, id?: string) {
-  const query: Record<string, unknown> = { accountId: data.accountId, scope: data.scope, merchantId: data.scope === 'shared' ? null : data.merchantId, categoryId: data.categoryId, slug: data.slug };
+  const query: Record<string, unknown> = { accountId: data.accountId, scope: data.scope, merchantId: data.scope === 'shared' ? null : data.merchantId, slug: data.slug };
   if (id) query._id = { $ne: id };
-  if (await LayoutTemplateModel.findOne(query)) throw new ApiError(409, 'Layout template slug must be unique within account, scope, merchant, and category.');
+  if (await LayoutTemplateModel.findOne(query)) throw new ApiError(409, 'Layout template slug must be unique within account, scope, and merchant.');
 }
 async function assertCollageSlugUnique(data: Record<string, unknown>, id?: string) {
   const query: Record<string, unknown> = { accountId: data.accountId, scope: data.scope, merchantId: data.scope === 'shared' ? null : data.merchantId, categoryId: data.categoryId, slug: data.slug };
@@ -113,43 +113,31 @@ export async function updateLayoutCategory(id: string, payload: Record<string, u
 }
 
 export async function deleteLayoutCategory(id: string) {
-  const templateCount = await LayoutTemplateModel.countDocuments({ categoryId: id });
   const collageCount = await CollageModel.countDocuments({ categoryId: id });
-  if (templateCount > 0 || collageCount > 0) throw new ApiError(409, 'Move or delete templates and collages before deleting this layout category.');
+  if (collageCount > 0) throw new ApiError(409, 'Move or delete collages before deleting this layout category.');
   const category = await LayoutCategoryModel.findByIdAndDelete(id);
   if (!category) throw new ApiError(404, 'Layout category not found.');
   return category;
 }
 
-export async function duplicateLayoutCategory(id: string, includeTemplates = false) {
+export async function duplicateLayoutCategory(id: string, _includeTemplates = false) {
   const category = await LayoutCategoryModel.findById(id).lean();
   if (!category) throw new ApiError(404, 'Layout category not found.');
   const copy = await LayoutCategoryModel.create({ ...stripIds(category), name: `${category.name} Copy`, slug: `${category.slug}-copy-${Date.now()}`, status: 'draft' });
-  let templates: unknown[] = [];
-  if (includeTemplates) {
-    const sourceTemplates = await LayoutTemplateModel.find({ categoryId: id }).lean();
-    templates = await LayoutTemplateModel.insertMany(sourceTemplates.map((template) => ({ ...stripIds(template), categoryId: copy._id, name: `${template.name} Copy`, slug: `${template.slug}-copy-${Date.now()}`, status: 'draft' })));
-  }
-  return { category: copy, templates };
+  return { category: copy, templates: [] };
 }
 
-export async function exportLayoutCategory(id: string, includeTemplates = false) {
+export async function exportLayoutCategory(id: string, _includeTemplates = false) {
   const category = await LayoutCategoryModel.findById(id).lean();
   if (!category) throw new ApiError(404, 'Layout category not found.');
-  const templates = includeTemplates ? await LayoutTemplateModel.find({ categoryId: id }).sort({ sortOrder: 1, name: 1 }).lean() : [];
-  return { category, templates };
+  return { category, templates: [] };
 }
 
 export async function importLayoutCategory(payload: Record<string, unknown>) {
   const rawCategory = (payload.category && typeof payload.category === 'object') ? payload.category as Record<string, unknown> : payload;
   const importSlug = String(rawCategory.slug ?? slugify(String(rawCategory.name ?? 'layout-category')));
   const category = await createLayoutCategory({ ...stripIds(rawCategory), status: 'draft', slug: `${importSlug}-import-${Date.now()}` });
-  const importedTemplates = Array.isArray(payload.templates) ? payload.templates as Record<string, unknown>[] : [];
-  const templates = [];
-  for (const template of importedTemplates) {
-    templates.push(await createLayoutTemplate({ ...stripIds(template), categoryId: category._id, accountId: category.accountId, merchantId: category.merchantId, scope: category.scope, status: 'draft', slug: `${String(template.slug ?? slugify(String(template.name ?? 'layout-template')))}-import-${Date.now()}` }));
-  }
-  return { category, templates };
+  return { category, templates: [] };
 }
 
 async function normalizePages(data: Record<string, unknown>, merchantContextId?: string) {
@@ -221,14 +209,9 @@ async function normalizeTemplatePayload(payload: Record<string, unknown>, id?: s
   if (!String(payload.name ?? '').trim()) throw new ApiError(400, 'Layout template name is required.');
   payload.slug = validateSlug(payload.slug || slugify(String(payload.name ?? 'layout-template')));
   validateStatus(payload.status ?? 'draft');
-  if (!payload.categoryId || !isObjectId(payload.categoryId)) throw new ApiError(400, 'Layout category is required.');
   const merchantContextId = payload.merchantContextId ? String(payload.merchantContextId) : undefined;
   delete payload.merchantContextId;
-  const category = await LayoutCategoryModel.findOne({
-    _id: payload.categoryId,
-    ...layoutVisibleQuery(String(payload.accountId), merchantContextId ?? (payload.merchantId ? String(payload.merchantId) : undefined)),
-  });
-  if (!category) throw new ApiError(400, 'Layout category is not visible for this account and merchant.');
+  payload.categoryId = null;
   if (!TEMPLATE_TYPES.includes(String(payload.templateType))) throw new ApiError(400, 'Template type is required.');
   if (!ORIENTATIONS.includes(String(payload.orientation))) throw new ApiError(400, 'Orientation is required.');
   if (!UNITS.includes(String(payload.unit))) throw new ApiError(400, 'Unit is required.');
@@ -247,7 +230,6 @@ async function normalizeTemplatePayload(payload: Record<string, unknown>, id?: s
 export async function listLayoutTemplates(filters: { accountId?: string; merchantId?: string; categoryId?: string; scope?: string; status?: string; templateType?: string; orientation?: string; search?: string }) {
   const accountId = resolveAccountId(filters.accountId);
   const query: Record<string, unknown> = layoutVisibleQuery(accountId, filters.merchantId);
-  if (filters.categoryId) query.categoryId = filters.categoryId;
   if (filters.scope) query.scope = filters.scope;
   if (filters.status) query.status = filters.status;
   if (filters.templateType) query.templateType = filters.templateType;
@@ -284,20 +266,20 @@ export async function deleteLayoutTemplate(id: string) {
 export async function duplicateLayoutTemplate(id: string) {
   const template = await LayoutTemplateModel.findById(id).lean();
   if (!template) throw new ApiError(404, 'Layout template not found.');
-  return LayoutTemplateModel.create({ ...stripIds(template), name: `${template.name} Copy`, slug: `${template.slug}-copy-${Date.now()}`, status: 'draft' });
+  return LayoutTemplateModel.create({ ...stripIds(template), categoryId: null, name: `${template.name} Copy`, slug: `${template.slug}-copy-${Date.now()}`, status: 'draft' });
 }
 
 export async function exportLayoutTemplate(id: string) {
   const template = await LayoutTemplateModel.findById(id).lean();
   if (!template) throw new ApiError(404, 'Layout template not found.');
-  const category = await LayoutCategoryModel.findById(template.categoryId).lean();
-  return { template, category };
+  return { template };
 }
 
 export async function importLayoutTemplate(payload: Record<string, unknown>) {
   const rawTemplate = (payload.template && typeof payload.template === 'object') ? payload.template as Record<string, unknown> : payload;
-  const categoryId = String(payload.categoryId || rawTemplate.categoryId || '');
-  return createLayoutTemplate({ ...stripIds(rawTemplate), categoryId, status: 'draft', slug: `${String(rawTemplate.slug ?? slugify(String(rawTemplate.name ?? 'layout-template')))}-import-${Date.now()}` });
+  const template = stripIds(rawTemplate) as Record<string, unknown>;
+  delete template.categoryId;
+  return createLayoutTemplate({ ...template, status: 'draft', slug: `${String(rawTemplate.slug ?? slugify(String(rawTemplate.name ?? 'layout-template')))}-import-${Date.now()}` });
 }
 
 async function normalizeCollagePayload(payload: Record<string, unknown>, id?: string) {

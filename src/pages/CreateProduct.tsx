@@ -98,8 +98,7 @@ export function CreateProduct() {
       roomPreviews: [],
       frontendContent: createDefaultFrontendContent(),
       editorProductSelection: createDefaultEditorProductSelection(),
-      templates: [],
-      layoutSettings: { enabled: false, allowedTemplateCategoryIds: [], allowedTemplateIds: [], requireTemplateSelection: false },
+      layoutSettings: { enabled: false, mode: 'none', allowedTemplateIds: [], allowedTemplateTags: [], requireTemplateSelection: false },
       variants: [],
       aiArt: createDefaultAiArtConfig(),
       createdAt: now,
@@ -138,7 +137,5 @@ export function CreateProduct() {
     </div>
   );
 }
-
-
 
 

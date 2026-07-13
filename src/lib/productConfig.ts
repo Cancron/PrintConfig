@@ -14,14 +14,14 @@ import type {
   ProductScope,
   ProductStatus,
   ProductSurface,
-  ProductTemplate,
   ProductType,
   ProductVariant,
   VariantOptionDefinition,
-  TemplateElement,
   DependencyRule,
   AiArtConfig,
   AiArtStyle,
+  ProductLayoutSettings,
+  ProductLayoutTemplateMode,
 } from '../types';
 
 const PRODUCT_TYPES: ProductType[] = [
@@ -76,15 +76,6 @@ function clearImportedIds(product: Product): Product {
       values: group.values.map((value) => ({ ...value, _id: '', clientId: crypto.randomUUID(), optionGroupId: '' })),
     })),
     variants: product.variants.map((variant) => ({ ...variant, _id: '', clientId: crypto.randomUUID(), productId: '', roomPreviews: undefined })),
-    templates: product.templates.map((template) => ({
-      ...template,
-      _id: '',
-      clientId: crypto.randomUUID(),
-      productId: '',
-      variantId: '',
-      surfaceId: '',
-      elements: template.elements.map((element) => ({ ...element, _id: '', clientId: crypto.randomUUID() })),
-    })),
   };
 }
 function buildImportCandidate(input: Record<string, unknown>): Product {
@@ -117,7 +108,6 @@ function buildImportCandidate(input: Record<string, unknown>): Product {
     roomPreviews: Array.isArray(input.roomPreviews) ? input.roomPreviews.filter(isRecord).map((room, index) => normalizeSharedRoomPreview(room, id, index)) : [],
     frontendContent: normalizeFrontendContent(isRecord(input.frontendContent) ? input.frontendContent : undefined),
     editorProductSelection: normalizeEditorProductSelection(isRecord(input.editorProductSelection) ? input.editorProductSelection : undefined),
-    templates: Array.isArray(input.templates) ? input.templates.filter(isRecord).map((template, index) => normalizeTemplate(template, id, surface?._id ?? '', now, index)) : [],
     layoutSettings: normalizeLayoutSettings(isRecord(input.layoutSettings) ? input.layoutSettings : undefined),
     variants: variants.map((variant, index) => normalizeVariant(variant, id, now, index)),
     aiArt: normalizeAiArtConfig(isRecord(input.aiArt) ? input.aiArt : undefined, now),
@@ -298,44 +288,23 @@ function normalizeRoomPreview(input: Record<string, unknown>, now: string): Lega
   };
 }
 
-function normalizeLayoutSettings(input?: Record<string, unknown>) {
+function normalizeLayoutSettings(input?: Record<string, unknown>): ProductLayoutSettings {
+  const legacyCategoryIds = Array.isArray(input?.allowedTemplateCategoryIds) ? input.allowedTemplateCategoryIds.map(String) : [];
+  const allowedTemplateIds = Array.isArray(input?.allowedTemplateIds) ? input.allowedTemplateIds.map(String) : [];
+  const allowedTemplateTags = Array.isArray(input?.allowedTemplateTags) ? input.allowedTemplateTags.map(String) : [];
+  const mode: ProductLayoutTemplateMode = input?.mode === 'all' || input?.mode === 'specific' || input?.mode === 'by-tags'
+    ? input.mode
+    : input?.enabled === true
+      ? allowedTemplateIds.length > 0 ? 'specific' : legacyCategoryIds.length > 0 ? 'by-tags' : 'all'
+      : 'none';
   return {
-    enabled: input?.enabled === true,
-    allowedTemplateCategoryIds: Array.isArray(input?.allowedTemplateCategoryIds) ? input.allowedTemplateCategoryIds.map(String) : [],
-    allowedTemplateIds: Array.isArray(input?.allowedTemplateIds) ? input.allowedTemplateIds.map(String) : [],
+    enabled: input?.enabled === true && mode !== 'none',
+    mode,
+    allowedTemplateIds,
+    allowedTemplateTags,
     requireTemplateSelection: input?.requireTemplateSelection === true,
   };
 }
-function normalizeTemplate(input: Record<string, unknown>, productId: string, surfaceId: string, now: string, index: number): ProductTemplate {
-  return {
-    _id: typeof input._id === 'string' ? input._id : '',
-    productId,
-    name: typeof input.name === 'string' ? input.name : `Template ${index + 1}`,
-    status: normalizeStatus(input.status),
-    variantId: typeof input.variantId === 'string' ? input.variantId : '',
-    surfaceId: surfaceId || (typeof input.surfaceId === 'string' ? input.surfaceId : ''),
-    thumbnailUrl: typeof input.thumbnailUrl === 'string' ? input.thumbnailUrl : '',
-    elements: Array.isArray(input.elements) ? input.elements.filter(isRecord).map(normalizeElement) : [],
-    createdAt: now,
-    updatedAt: now,
-  };
-}
-
-function normalizeElement(input: Record<string, unknown>, index: number): TemplateElement {
-  return {
-    _id: typeof input._id === 'string' ? input._id : '',
-    name: typeof input.name === 'string' ? input.name : `Placeholder ${index + 1}`,
-    type: input.type === 'text' ? 'text' : 'photo',
-    x: numberOr(input.x, 0),
-    y: numberOr(input.y, 0),
-    width: numberOr(input.width, 10),
-    height: numberOr(input.height, 10),
-    required: input.required !== false,
-    locked: input.locked === true,
-    editable: input.editable !== false,
-  };
-}
-
 function normalizeBox(input: unknown, fallback: number): ProductSurface['bleed'] {
   if (!isRecord(input)) return { top: fallback, right: fallback, bottom: fallback, left: fallback, unit: 'inch' };
   return {

@@ -5,6 +5,8 @@ import path from 'node:path';
 import { Types } from 'mongoose';
 import { ProductModel } from '../models/Product.js';
 import { ProductCategoryModel } from '../models/ProductCategory.js';
+import { LayoutTemplateModel } from '../models/LayoutTemplate.js';
+import { CollageModel } from '../models/Collage.js';
 import { MerchantModel } from '../models/Merchant.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { applyModifier, getVariantConfiguredPrice } from '../utils/pricing.js';
@@ -167,6 +169,36 @@ async function validateEditorProductSelection(data: Record<string, any>, product
 }
 function normalizeFrontendContent(data: Record<string, any>) {
   data.frontendContent = normalizeFrontendContentPayload(data.frontendContent);
+}
+function normalizeLayoutSettings(data: Record<string, any>) {
+  const input = data.layoutSettings ?? {};
+  const legacyCategoryIds = Array.isArray(input.allowedTemplateCategoryIds) ? input.allowedTemplateCategoryIds : [];
+  const mode = input.mode === 'all' || input.mode === 'specific' || input.mode === 'by-tags' ? input.mode : input.enabled === true ? (input.allowedTemplateIds?.length ? 'specific' : legacyCategoryIds.length ? 'by-tags' : 'all') : 'none';
+  data.layoutSettings = {
+    enabled: mode !== 'none' && input.enabled !== false,
+    mode: input.enabled === false ? 'none' : mode,
+    allowedTemplateIds: Array.isArray(input.allowedTemplateIds) ? input.allowedTemplateIds.map(String).filter(Boolean) : [],
+    allowedTemplateTags: Array.isArray(input.allowedTemplateTags) ? input.allowedTemplateTags.map((tag: unknown) => String(tag).trim()).filter(Boolean) : [],
+    requireTemplateSelection: input.requireTemplateSelection === true,
+  };
+}
+async function validateLayoutSettings(data: Record<string, any>) {
+  const settings = data.layoutSettings ?? {};
+  if (!settings.enabled || settings.mode === 'none') return;
+  if (settings.mode === 'specific') {
+    const ids = (settings.allowedTemplateIds ?? []).map(String);
+    if (ids.length === 0) throw new ApiError(400, 'Select at least one layout template.');
+    if (new Set(ids).size !== ids.length) throw new ApiError(400, 'Layout template selections must be unique.');
+    if (ids.some((id: string) => !Types.ObjectId.isValid(id))) throw new ApiError(400, 'Layout template selections must contain valid ObjectIds.');
+    const visibility: Record<string, unknown>[] = [{ scope: 'shared' }];
+    if (data.scope === 'merchant' && data.merchantId) visibility.push({ scope: 'merchant', merchantId: data.merchantId });
+    else visibility.push({ scope: 'merchant' });
+    const count = await LayoutTemplateModel.countDocuments({ _id: { $in: ids }, accountId: data.accountId, status: 'active', $or: visibility });
+    if (count !== ids.length) throw new ApiError(400, 'Selected layout templates must be active and visible within this account.');
+  }
+  if (settings.mode === 'by-tags' && (settings.allowedTemplateTags ?? []).length === 0) {
+    throw new ApiError(400, 'Add at least one layout template tag.');
+  }
 }
 function normalizeRoomOwnership(data: Record<string, any>) {
   const lifted = liftLegacyProductRooms(data);
@@ -331,9 +363,11 @@ export async function createProduct(payload: Record<string, any>) {
   payload.slug = payload.slug || slugify(String(payload.name ?? 'product'));
   normalizeFrontendContent(payload);
   normalizeEditorProductSelection(payload);
+  normalizeLayoutSettings(payload);
   normalizeRoomOwnership(payload);
   validateProductShape(payload);
   await validateEditorProductSelection(payload);
+  await validateLayoutSettings(payload);
   await assertUniqueSlug(payload);
   return ProductModel.create(payload);
 }
@@ -344,9 +378,11 @@ export async function updateProduct(id: string, payload: Record<string, any>) {
   payload.slug = payload.slug || slugify(String(payload.name ?? 'product'));
   normalizeFrontendContent(payload);
   normalizeEditorProductSelection(payload);
+  normalizeLayoutSettings(payload);
   normalizeRoomOwnership(payload);
   validateProductShape(payload);
   await validateEditorProductSelection(payload, id);
+  await validateLayoutSettings(payload);
   await assertUniqueSlug(payload, id);
   return ProductModel.findByIdAndUpdate(id, payload, { new: true, runValidators: true });
 }
@@ -361,9 +397,6 @@ export async function duplicateProduct(id: string, payload: { scope?: 'shared' |
   const scope = payload.scope ?? product.scope;
   const sharedRoomData = liftLegacyProductRooms(product);
   const source = { ...product, roomPreviews: sharedRoomData.roomPreviews, variants: sharedRoomData.variants };
-  const templateVariantIndexes = (product.templates ?? []).map((template: any) =>
-    (product.variants ?? []).findIndex((variant: any) => String(variant._id) === String(template.variantId)),
-  );
   const copy = new ProductModel({
     ...stripIds(source),
     name: `${product.name} Copy`,
@@ -371,12 +404,6 @@ export async function duplicateProduct(id: string, payload: { scope?: 'shared' |
     status: 'draft',
     scope,
     merchantId: scope === 'shared' ? null : payload.merchantId ?? product.merchantId,
-  });
-  copy.templates.forEach((template: any, index: number) => {
-    const variantIndex = templateVariantIndexes[index];
-    template.productId = copy._id;
-    template.surfaceId = (copy.surface as any)?._id;
-    template.variantId = variantIndex >= 0 ? copy.variants[variantIndex]?._id : undefined;
   });
   return copy.save();
 }
@@ -406,6 +433,107 @@ function publicProductSummary(product: any) {
     basePrice: product.basePrice,
     scope: product.scope,
   };
+}
+
+function publicLayoutTemplateSummary(template: any) {
+  return {
+    _id: String(template._id),
+    name: template.name,
+    slug: template.slug,
+    description: template.description ?? '',
+    templateType: template.templateType,
+    orientation: template.orientation,
+    thumbnailUrl: template.thumbnailUrl ?? '',
+    pageCount: template.pageCount,
+    canvasWidth: template.canvasWidth,
+    canvasHeight: template.canvasHeight,
+    unit: template.unit,
+    dpi: template.dpi,
+    tags: template.tags ?? [],
+    scope: template.scope,
+    pages: (template.pages ?? []).map((page: any) => ({
+      _id: String(page._id),
+      pageNumber: page.pageNumber,
+      name: page.name,
+      width: page.width,
+      height: page.height,
+      backgroundColor: page.backgroundColor,
+      backgroundImageUrl: page.backgroundImageUrl,
+      collageId: page.collageId ? String(page.collageId) : null,
+    })),
+  };
+}
+function publicCollageSummary(collage: any) {
+  return {
+    _id: String(collage._id),
+    name: collage.name,
+    slug: collage.slug,
+    orientation: collage.orientation,
+    canvasWidth: collage.canvasWidth,
+    canvasHeight: collage.canvasHeight,
+    unit: collage.unit,
+    dpi: collage.dpi,
+    backgroundColor: collage.backgroundColor,
+    backgroundImageUrl: collage.backgroundImageUrl,
+    tags: collage.tags ?? [],
+    elements: collage.elements ?? [],
+  };
+}
+
+async function resolvePublicLayoutTemplates(product: any, merchantId?: string) {
+  const settings = product.layoutSettings ?? { enabled: false, mode: 'none' };
+  const mode = settings.enabled === true ? settings.mode ?? 'all' : 'none';
+  if (mode === 'none') return { enabled: false, mode: 'none', requireTemplateSelection: false, templates: [] };
+  const visibility: Record<string, unknown>[] = [{ scope: 'shared' }];
+  if (merchantId) visibility.push({ scope: 'merchant', merchantId });
+  else if (product.scope === 'merchant' && product.merchantId) visibility.push({ scope: 'merchant', merchantId: product.merchantId });
+  const query: Record<string, any> = {
+    accountId: product.accountId,
+    status: 'active',
+    $or: visibility,
+  };
+  if (mode === 'specific') {
+    const ids = (settings.allowedTemplateIds ?? []).map(String);
+    query._id = { $in: ids };
+    const templates = await LayoutTemplateModel.find(query).lean();
+    const byId = new Map(templates.map((template: any) => [String(template._id), template]));
+    const collages = await resolvePublicTemplateCollages(templates, product, merchantId);
+    return {
+      enabled: true,
+      mode,
+      requireTemplateSelection: settings.requireTemplateSelection === true,
+      templates: ids.map((templateId: string) => byId.get(templateId)).filter(Boolean).map(publicLayoutTemplateSummary),
+      collages,
+    };
+  }
+  if (mode === 'by-tags') {
+    const tags = (settings.allowedTemplateTags ?? []).map(String).filter(Boolean);
+    query.tags = { $in: tags };
+  }
+  const templates = await LayoutTemplateModel.find(query).sort({ sortOrder: 1, name: 1 }).lean();
+  return {
+    enabled: true,
+    mode,
+    requireTemplateSelection: settings.requireTemplateSelection === true,
+    templates: templates.map(publicLayoutTemplateSummary),
+    collages: await resolvePublicTemplateCollages(templates, product, merchantId),
+  };
+}
+
+async function resolvePublicTemplateCollages(templates: any[], product: any, merchantId?: string) {
+  const collageIds = Array.from(new Set(templates.flatMap((template: any) => (template.pages ?? []).map((page: any) => String(page.collageId ?? '')).filter(Boolean))));
+  if (collageIds.length === 0) return [];
+  const visibility: Record<string, unknown>[] = [{ scope: 'shared' }];
+  if (merchantId) visibility.push({ scope: 'merchant', merchantId });
+  else if (product.scope === 'merchant' && product.merchantId) visibility.push({ scope: 'merchant', merchantId: product.merchantId });
+  const collages = await CollageModel.find({
+    _id: { $in: collageIds },
+    accountId: product.accountId,
+    status: 'active',
+    $or: visibility,
+  }).lean();
+  const byId = new Map(collages.map((collage: any) => [String(collage._id), collage]));
+  return collageIds.map((collageId) => byId.get(collageId)).filter(Boolean).map(publicCollageSummary);
 }
 
 async function resolvePublicProductSelection(product: any, merchantId?: string) {
@@ -485,6 +613,7 @@ export async function getPublicProductConfig(id: string, merchantId?: string) {
   if (product.status !== 'active') throw new ApiError(404, 'Product not found.');
   const sharedRoomData = liftLegacyProductRooms(product);
   const productSelection = await resolvePublicProductSelection(product, merchantId);
+  const layoutTemplates = await resolvePublicLayoutTemplates(product, merchantId);
   const activeVariants = (sharedRoomData.variants ?? []).filter((variant: any) => variant.status === 'active').map((variant: any) => ({
     _id: variant._id,
     name: variant.name,
@@ -514,6 +643,7 @@ export async function getPublicProductConfig(id: string, merchantId?: string) {
     roomPreviews: sharedRoomData.roomPreviews.slice().sort((a: any, b: any) => a.sortOrder - b.sortOrder),
     frontendContent: publicFrontendContent(product.frontendContent),
     productSelection,
+    layoutTemplates,
     editorRules: { ...(product.editorRules ?? {}), allowCustomSize: product.editorRules?.allowCustomSize ?? false },
     exportRules: product.exportRules,
     variants: activeVariants,

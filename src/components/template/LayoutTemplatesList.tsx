@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Copy, Download, Plus, Search, Trash2, Upload } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { PageHeader } from "../PageHeader";
 import { EmptyState } from "../ui/EmptyState";
 import {
@@ -31,7 +31,6 @@ import {
 export function LayoutTemplatesList() {
   const navigate = useNavigate();
   const {
-    categories,
     templates,
     deleteTemplate,
     duplicateTemplate,
@@ -40,16 +39,11 @@ export function LayoutTemplatesList() {
     reload,
   } = useLayouts({loadCollages: false});
   const [search, setSearch] = useState("");
-  const [categoryId, setCategoryId] = useState("");
   const [templateType, setTemplateType] = useState("");
   const [orientation, setOrientation] = useState("");
   const [scope, setScope] = useState("");
   const [status, setStatus] = useState("");
   const [importOpen, setImportOpen] = useState(false);
-  const categoryById = useMemo(
-    () => new Map(categories.map((category) => [category._id, category])),
-    [categories],
-  );
   const filtered = templates.filter((template) => {
     const query = search.toLowerCase();
     return (
@@ -57,7 +51,6 @@ export function LayoutTemplatesList() {
         template.name.toLowerCase().includes(query) ||
         template.description.toLowerCase().includes(query) ||
         template.tags.join(" ").toLowerCase().includes(query)) &&
-      (!categoryId || template.categoryId === categoryId) &&
       (!templateType || template.templateType === templateType) &&
       (!orientation || template.orientation === orientation) &&
       (!scope || template.scope === scope) &&
@@ -112,12 +105,6 @@ export function LayoutTemplatesList() {
             />
           </div>
           <Filter
-            value={categoryId}
-            onChange={setCategoryId}
-            all="All Categories"
-            options={categories.map((c) => ({ value: c._id, label: c.name }))}
-          />
-          <Filter
             value={templateType}
             onChange={setTemplateType}
             all="All Types"
@@ -155,7 +142,6 @@ export function LayoutTemplatesList() {
             <TableHead>
               <TableHeader>Thumbnail</TableHeader>
               <TableHeader>Template</TableHeader>
-              <TableHeader>Category</TableHeader>
               <TableHeader>Type</TableHeader>
               <TableHeader>Orientation</TableHeader>
               <TableHeader>Pages</TableHeader>
@@ -188,10 +174,6 @@ export function LayoutTemplatesList() {
                       {template.canvasWidth} x {template.canvasHeight}{" "}
                       {template.unit}
                     </p>
-                  </TableCell>
-                  <TableCell>
-                    {categoryById.get(template.categoryId)?.name ??
-                      "Missing category"}
                   </TableCell>
                   <TableCell>{formatLabel(template.templateType)}</TableCell>
                   <TableCell>{formatLabel(template.orientation)}</TableCell>
@@ -246,7 +228,6 @@ export function LayoutTemplatesList() {
       </div>
       {importOpen && (
         <ImportTemplateModal
-          categories={categories}
           onClose={() => setImportOpen(false)}
           onImported={async (template) => {
             setImportOpen(false);

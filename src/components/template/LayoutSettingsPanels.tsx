@@ -28,13 +28,11 @@ import {
 
 export function TemplateSettings({
   template,
-  categories,
   selectedMerchantName,
   errors,
   onUpdate,
 }: {
   template: LayoutTemplate;
-  categories: { _id: string; name: string }[];
   selectedMerchantName?: string;
   errors: Record<string, string>;
   onUpdate: <K extends keyof LayoutTemplate>(
@@ -59,16 +57,6 @@ export function TemplateSettings({
         value={template.slug}
         onChange={(event) => onUpdate("slug", event.target.value)}
         error={errors.slug}
-      />
-      <Select
-        label="Category"
-        value={template.categoryId}
-        onChange={(event) => onUpdate("categoryId", event.target.value)}
-        options={categories.map((category) => ({
-          value: category._id,
-          label: category.name,
-        }))}
-        error={errors.categoryId}
       />
       <Textarea
         label="Description"

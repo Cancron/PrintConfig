@@ -22,6 +22,7 @@ export type MerchantStatus = 'Draft' | 'Active';
 export type ProductScope = 'shared' | 'merchant';
 export type ProductCategoryStatus = 'active' | 'draft' | 'archived';
 export type LayoutStatus = 'active' | 'draft' | 'archived';
+export type ProductLayoutTemplateMode = 'none' | 'all' | 'specific' | 'by-tags';
 export type LayoutTemplateType = 'photo_collage' | 'photo_book' | 'calendar' | 'card' | 'poster' | 'canvas' | 'custom';
 export type LayoutOrientation = 'portrait' | 'landscape' | 'square' | 'custom';
 export type LayoutElementType = 'photo_placeholder' | 'text_placeholder' | 'shape' | 'background' | 'clipart' | 'static_image';
@@ -238,7 +239,7 @@ export interface LayoutTemplate {
   accountId: string;
   merchantId?: string | null;
   scope: ProductScope;
-  categoryId: string;
+  categoryId?: string | null;
   name: string;
   slug: string;
   description: string;
@@ -262,8 +263,9 @@ export interface LayoutTemplate {
 
 export interface ProductLayoutSettings {
   enabled: boolean;
-  allowedTemplateCategoryIds: string[];
+  mode: ProductLayoutTemplateMode;
   allowedTemplateIds: string[];
+  allowedTemplateTags: string[];
   requireTemplateSelection: boolean;
 }
 export type PrecheckStatus = 'success' | 'warning' | 'info' | 'error';
@@ -451,36 +453,6 @@ export interface ExportRules {
   colorMode: ColorMode;
 }
 
-export type TemplateElementType = 'photo' | 'text';
-
-export interface TemplateElement {
-  _id: string;
-  clientId?: string;
-  name: string;
-  type: TemplateElementType;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  required: boolean;
-  locked: boolean;
-  editable: boolean;
-}
-
-export interface ProductTemplate {
-  _id: string;
-  clientId?: string;
-  productId: string;
-  name: string;
-  status: ProductStatus;
-  variantId: string;
-  surfaceId: string;
-  thumbnailUrl: string;
-  elements: TemplateElement[];
-  createdAt: string;
-  updatedAt: string;
-}
-
 export type RoomOrientation = 'square' | 'vertical' | 'horizontal' | 'pano-vertical' | 'pano-horizontal';
 
 export interface ProductRoomPreview {
@@ -599,7 +571,6 @@ export interface Product {
   editorProductSelection: EditorProductSelection;
   editorRules: EditorRules;
   exportRules: ExportRules;
-  templates: ProductTemplate[];
   layoutSettings: ProductLayoutSettings;
   variants: ProductVariant[];
   aiArt: AiArtConfig;

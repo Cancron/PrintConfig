@@ -1,6 +1,6 @@
 import type { PointerEvent } from "react";
 import type { LayoutElement, LayoutTemplatePage } from "../../types";
-import previewImage from "../../assets/img-preview.jpeg";
+import previewImage from "../../assets/img-preview.jpg";
 import { formatLabel, keyOf } from "./layoutTemplateUtils";
 
 interface LayoutPreviewProps {
@@ -176,6 +176,7 @@ export function LayoutPreview({
                 element.type === "shape" &&
                 element.shapeSettings.shapeType === "path" &&
                 Boolean(element.shapeSettings.svgPath);
+              const shapeElement = element.type === "shape";
               return (
                 <div
                   key={keyOf(element)}
@@ -187,7 +188,7 @@ export function LayoutPreview({
                   onClick={
                     pathShape ? undefined : () => onSelect(keyOf(element))
                   }
-                  className={`absolute overflow-hidden text-xs ${pathShape ? "" : "border"} ${previewMode ? "cursor-default" : element.locked ? "cursor-not-allowed" : "cursor-move"} ${pathShape ? "" : selected ? "border-slate-900 ring-2 ring-slate-900" : "border-dashed border-slate-500"}`}
+                  className={`absolute overflow-hidden text-xs ${pathShape || previewMode ? "" : "border"} ${previewMode ? "cursor-default" : element.locked ? "cursor-not-allowed" : "cursor-move"} ${pathShape || previewMode ? "" : selected ? "border-slate-900 ring-2 ring-slate-900" : "border-dashed border-slate-500"}`}
                   style={{
                     left: `${element.x}%`,
                     top: `${element.y}%`,
@@ -196,19 +197,22 @@ export function LayoutPreview({
                     transform: `rotate(${element.rotation}deg)`,
                     zIndex: element.zIndex,
                     background:
-                      element.type === "shape" &&
-                      element.shapeSettings.shapeType !== "path"
-                        ? element.shapeSettings.fillColor
-                        : element.type === "text_placeholder"
+                      element.type === "text_placeholder"
                           ? "rgba(255,255,255,0.78)"
-                          : element.type === "shape"
+                          : shapeElement
                             ? "transparent"
                             : "rgba(15,23,42,0.08)",
                     borderRadius:
                       element.type === "photo_placeholder" &&
                       element.photoSettings.maskShape === "circle"
                         ? "9999px"
-                        : element.shapeSettings.borderRadius || 4,
+                        : element.type === "photo_placeholder" &&
+                            element.photoSettings.maskShape ===
+                              "rounded_rectangle"
+                          ? "8%"
+                          : shapeElement
+                            ? 0
+                            : 4,
                     pointerEvents: pathShape ? "none" : undefined,
                   }}
                 >
@@ -252,7 +256,17 @@ function renderElement(
   if (element.type === "photo_placeholder")
     return (
       <div className="relative h-full w-full overflow-hidden">
-        <img src={previewImage} alt="" className="h-full w-full object-cover" />
+        <img
+          src={previewImage}
+          alt=""
+          className="h-full w-full"
+          style={{
+            objectFit:
+              element.photoSettings.fitMode === "stretch"
+                ? "fill"
+                : element.photoSettings.fitMode,
+          }}
+        />
         {/* <span className="absolute inset-0 flex items-center justify-center bg-slate-900/10 p-1 text-center text-[11px] font-semibold leading-tight text-white drop-shadow">
           {element.name}
         </span> */}
@@ -326,6 +340,48 @@ function renderElement(
           />
         )}
       </svg>
+    );
+  }
+  if (element.type === "shape") {
+    const settings = element.shapeSettings;
+    if (settings.shapeType === "line") {
+      return (
+        <svg className="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label={element.name}>
+          <line
+            x1="0"
+            y1="50"
+            x2="100"
+            y2="50"
+            stroke={settings.strokeColor || "none"}
+            strokeWidth={settings.strokeWidth || 0}
+          />
+        </svg>
+      );
+    }
+    if (settings.shapeType === "circle") {
+      return (
+        <svg className="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label={element.name}>
+          <ellipse
+            cx="50"
+            cy="50"
+            rx="50"
+            ry="50"
+            fill={settings.fillColor || "none"}
+            stroke={settings.strokeColor || "none"}
+            strokeWidth={settings.strokeWidth || 0}
+          />
+        </svg>
+      );
+    }
+    return (
+      <div
+        className="h-full w-full"
+        style={{
+          backgroundColor: settings.fillColor,
+          border: `${settings.strokeWidth || 0}px solid ${settings.strokeColor || "transparent"}`,
+          borderRadius: settings.borderRadius || 0,
+        }}
+      />
     );
   }
   return (

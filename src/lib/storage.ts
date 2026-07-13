@@ -199,8 +199,7 @@ export function normalizeProduct(product: Product): Product {
     editorProductSelection: normalizeEditorProductSelection(product.editorProductSelection),
     editorRules: { ...defaultEditorRules, ...(product.editorRules ?? {}) },
     exportRules: { ...defaultExportRules, ...(product.exportRules ?? {}) },
-    templates: (product.templates ?? []).map((template) => ({ ...template, surfaceId: surface?._id ?? template.surfaceId ?? '' })),
-    layoutSettings: { enabled: product.layoutSettings?.enabled === true, allowedTemplateCategoryIds: product.layoutSettings?.allowedTemplateCategoryIds ?? [], allowedTemplateIds: product.layoutSettings?.allowedTemplateIds ?? [], requireTemplateSelection: product.layoutSettings?.requireTemplateSelection === true },
+    layoutSettings: normalizeLayoutSettings(product.layoutSettings),
     roomPreviews: liftLegacyRoomPreviews({ ...product, variants, roomPreviews: sharedRooms }),
     variants: variants.map((variant) => ({ ...variant, roomPreviews: undefined })),
     aiArt: product.aiArt ?? createDefaultAiArtConfig(),
@@ -287,6 +286,25 @@ function normalizeBox(input: BleedSettings | SafeAreaSettings | undefined, fallb
 
 function normalizeCategoryStatus(status: ProductCategoryStatus) {
   return status === 'draft' || status === 'archived' ? status : 'active';
+}
+
+function normalizeLayoutSettings(input: Product['layoutSettings'] | undefined): Product['layoutSettings'] {
+  const raw = input as (Product['layoutSettings'] & { allowedTemplateCategoryIds?: string[] }) | undefined;
+  const legacyCategoryIds = raw?.allowedTemplateCategoryIds ?? [];
+  const allowedTemplateIds = raw?.allowedTemplateIds ?? [];
+  const allowedTemplateTags = raw?.allowedTemplateTags ?? [];
+  const mode = raw?.mode === 'all' || raw?.mode === 'specific' || raw?.mode === 'by-tags'
+    ? raw.mode
+    : raw?.enabled === true
+      ? allowedTemplateIds.length > 0 ? 'specific' : legacyCategoryIds.length > 0 ? 'by-tags' : 'all'
+      : 'none';
+  return {
+    enabled: raw?.enabled === true && mode !== 'none',
+    mode,
+    allowedTemplateIds,
+    allowedTemplateTags,
+    requireTemplateSelection: raw?.requireTemplateSelection === true,
+  };
 }
 
 function numberOr(value: unknown, fallback: number) {

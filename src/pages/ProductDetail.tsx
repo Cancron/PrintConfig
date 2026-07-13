@@ -16,9 +16,9 @@ import { SurfacesTab } from '../components/product/SurfacesTab';
 import { EditorRulesTab } from '../components/product/EditorRulesTab';
 import { ExportRulesTab } from '../components/product/ExportRulesTab';
 import { PreviewTab } from '../components/product/PreviewTab';
-import { TemplatesTab } from '../components/product/TemplatesTab';
 import { DesignGeneralTab } from '../components/product/DesignGeneralTab';
 import { AiArtTab } from '../components/product/AiArtTab';
+import { LayoutSettingsTab } from '../components/product/LayoutSettingsTab';
 
 export function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -101,7 +101,7 @@ export function ProductDetail() {
     { _id: 'surfaces', label: 'Surfaces', content: <SurfacesTab product={product} onSave={updateProduct} /> },
     { _id: 'editor-rules', label: 'Editor Rules', content: <EditorRulesTab product={product} onSave={updateProduct} /> },
     { _id: 'export-rules', label: 'Export Rules', content: <ExportRulesTab product={product} onSave={updateProduct} /> },
-    { _id: 'templates', label: 'Templates', content: <TemplatesTab product={product} onSave={updateProduct} /> },
+    { _id: 'layout-templates', label: 'Layout Templates', content: <LayoutSettingsTab product={product} onSave={updateProduct} /> },
     { _id: 'preview', label: 'Preview', content: <PreviewTab product={product} onSave={updateProduct} /> },
     { _id: 'ai-art', label: 'AI Art', content: <AiArtTab product={product} onSave={updateProduct} /> },
     { _id: 'json', label: 'JSON', content: <JsonPreviewTab product={product} /> },

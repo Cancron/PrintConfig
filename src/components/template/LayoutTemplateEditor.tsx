@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Download } from "lucide-react";
 import { PageHeader } from "../PageHeader";
 import { EmptyState } from "../ui/EmptyState";
@@ -15,13 +15,12 @@ import { PageSettings, TemplateSettings } from "./LayoutSettingsPanels";
 
 export function LayoutTemplateEditor() {
   const { id } = useParams();
-  const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { account, selectedMerchantId, categories, collages, allTemplates, templates, addTemplate, updateTemplate, deleteTemplate, loading } = useLayouts();
+  const { account, selectedMerchantId, collages, allTemplates, templates, addTemplate, updateTemplate, deleteTemplate, loading } = useLayouts();
   const { selectedMerchant } = useWorkspace();
   const isNew = id === "new";
   const source = isNew ? null : templates.find((template) => template._id === id);
-  const [template, setTemplate] = useState<LayoutTemplate>(() => source ?? createTemplate(account._id, selectedMerchantId, params.get("categoryId") || categories[0]?._id || ""));
+  const [template, setTemplate] = useState<LayoutTemplate>(() => source ?? createTemplate(account._id, selectedMerchantId));
   const [selectedPageId, setSelectedPageId] = useState(() => keyOf(template.pages[0]));
   const [message, setMessage] = useState<string | null>(null);
   const [openPanels, setOpenPanels] = useState({ template: true, page: true });
@@ -32,12 +31,6 @@ export function LayoutTemplateEditor() {
       setSelectedPageId(keyOf(source.pages[0]));
     }
   }, [isNew, source]);
-
-  useEffect(() => {
-    if (isNew && !template.categoryId && categories[0]) {
-      setTemplate((prev) => ({ ...prev, categoryId: params.get("categoryId") || categories[0]._id }));
-    }
-  }, [categories, isNew, params, template.categoryId]);
 
   const selectedPage = template.pages.find((page) => keyOf(page) === selectedPageId) ?? template.pages[0];
   const selectedCollage = selectedPage?.collageId ? collages.find((collage) => collage._id === selectedPage.collageId) : null;
@@ -93,7 +86,7 @@ export function LayoutTemplateEditor() {
     <div className="grid gap-6 xl:grid-cols-[240px_1fr_360px]">
       <aside className="space-y-4 rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200"><h2 className="text-sm font-semibold text-gray-900">Pages</h2><div className="space-y-2">{template.pages.map((page) => <button key={keyOf(page)} onClick={() => setSelectedPageId(keyOf(page))} className={`w-full rounded-md px-3 py-2 text-left text-sm ring-1 ${keyOf(page) === keyOf(selectedPage) ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-gray-700 ring-gray-200 hover:bg-gray-50"}`}>{page.pageNumber}. {page.name}</button>)}</div><div className="grid gap-2"><button onClick={addPage} className="rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50">Add Page</button><button onClick={duplicatePage} className="rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50">Duplicate Page</button><button onClick={deletePage} disabled={template.pages.length <= 1} className="rounded-md bg-white px-3 py-2 text-sm font-medium text-red-600 ring-1 ring-red-200 hover:bg-red-50 disabled:text-gray-300 disabled:ring-gray-200">Delete Page</button></div></aside>
       <main className="space-y-4">{selectedPage?.collageId && !selectedCollage && <Notice tone="warning">The selected collage is not available for this merchant.</Notice>}{!selectedPage?.collageId && selectedPage.elements.length > 0 && <Notice tone="info">Legacy embedded page elements are shown for compatibility. New template pages should select a reusable collage.</Notice>}<LayoutPreview page={previewPage} selectedElementId="" onSelect={() => undefined} onChange={() => undefined} previewMode /></main>
-      <aside className="space-y-1 rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200"><CollapsibleSection title="Template Settings" open={openPanels.template} onToggle={() => togglePanel("template")}><TemplateSettings template={template} categories={categories} selectedMerchantName={selectedMerchant?.name} errors={errors} onUpdate={update} /></CollapsibleSection>{selectedPage && <CollapsibleSection title="Page Settings" open={openPanels.page} onToggle={() => togglePanel("page")}><PageSettings page={selectedPage} collages={collages} onUpdate={(field, value) => updatePage(keyOf(selectedPage), (page) => ({ ...page, [field]: value }))} /></CollapsibleSection>}<pre className="max-h-72 overflow-auto rounded-lg bg-gray-950 p-4 text-xs text-gray-100">{JSON.stringify(template, null, 2)}</pre></aside>
+      <aside className="space-y-1 rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200"><CollapsibleSection title="Template Settings" open={openPanels.template} onToggle={() => togglePanel("template")}><TemplateSettings template={template} selectedMerchantName={selectedMerchant?.name} errors={errors} onUpdate={update} /></CollapsibleSection>{selectedPage && <CollapsibleSection title="Page Settings" open={openPanels.page} onToggle={() => togglePanel("page")}><PageSettings page={selectedPage} collages={collages} onUpdate={(field, value) => updatePage(keyOf(selectedPage), (page) => ({ ...page, [field]: value }))} /></CollapsibleSection>}<pre className="max-h-72 overflow-auto rounded-lg bg-gray-950 p-4 text-xs text-gray-100">{JSON.stringify(template, null, 2)}</pre></aside>
     </div>
   </div>;
 }
