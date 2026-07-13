@@ -13,7 +13,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 
 const allowedOrigins = new Set([
   'https://photo-book-prints.lovable.app',
-  'https://canadaprintstudio-admin.onrender.com/',
+  'https://canadaprintstudio-admin.onrender.com',
   'https://photo-book-studio.onrender.com',
 ]);
 
