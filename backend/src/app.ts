@@ -15,11 +15,31 @@ const allowedOrigins = new Set([
   'https://photo-book-prints.lovable.app',
   'https://canadaprintstudio-admin.onrender.com',
   'https://photo-book-studio.onrender.com',
+  'https://canvasprintscanada.com',
+  'https://www.canvasprintsvancouver.com',
+  'https://www.canadaprintstudio.com',
+  'https://www.metalprintscanada.com',
 ]);
 
+function normalizeHostname(value: string) {
+  return value.toLowerCase().replace(/^www\./, '');
+}
+
 function isAllowedOrigin(origin: string) {
-  if (allowedOrigins.has(origin.replace(/\/$/, ''))) return true;
-  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  const normalizedOrigin = origin.replace(/\/$/, '');
+  if (allowedOrigins.has(normalizedOrigin)) return true;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalizedOrigin)) return true;
+  let originHost = '';
+  try {
+    originHost = normalizeHostname(new URL(normalizedOrigin).hostname);
+  } catch {
+    return false;
+  }
+  for (const allowedOrigin of allowedOrigins) {
+    const allowedHost = normalizeHostname(new URL(allowedOrigin).hostname);
+    if (originHost === allowedHost || originHost.endsWith(`.${allowedHost}`)) return true;
+  }
+  return false;
 }
 
 const corsOptions: cors.CorsOptions = {
