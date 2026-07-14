@@ -747,7 +747,7 @@ export async function verifyPublicDesignToken(input: { authorization?: string; r
   if (expiresAt <= Math.floor(Date.now() / 1000)) throw new ApiError(401, 'Design authorization token has expired.');
 
   const [userKeyRaw, merchantId, productId] = identity.split(':');
-  if (!userKeyRaw || !merchantId || !productId || identity.split(':').length !== 3) throw new ApiError(401, 'Invalid design authorization token identity.');
+  if (!userKeyRaw || !merchantId || !productId || identity.split(':').length < 4) throw new ApiError(401, 'Invalid design authorization token identity.');
   if (!Types.ObjectId.isValid(merchantId)) throw new ApiError(401, 'Invalid design authorization merchant.');
   if (!Types.ObjectId.isValid(productId)) throw new ApiError(401, 'Invalid design authorization product.');
   if (String(productId) !== String(input.routeProductId)) throw new ApiError(403, 'Design authorization token does not match this product.');
