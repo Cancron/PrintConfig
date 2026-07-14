@@ -17,7 +17,10 @@ const designUpload = multer({
 });
 
 productRoutes.get('/', controller.list);
-productRoutes.post('/public/:productId/design-upload', designUpload.single('image'), controller.publicDesignUpload);
+productRoutes.post('/public/:productId/design-upload', designUpload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'pagePreviews', maxCount: 100 },
+]), controller.publicDesignUpload);
 productRoutes.get('/public/:productId/design', controller.publicDesign);
 productRoutes.get('/public/:id/config', controller.publicConfig);
 productRoutes.get('/editor', controller.editorList);

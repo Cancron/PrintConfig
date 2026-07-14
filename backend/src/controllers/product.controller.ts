@@ -112,13 +112,24 @@ export async function publicDesignUpload(
           merchantId: token.merchantId,
           userKey: token.userKey,
           designData: req.body.designData ?? req.body.design,
-          file: req.file,
+          file: getUploadedFile(req.files, 'image'),
+          pagePreviewFiles: getUploadedFiles(req.files, 'pagePreviews'),
+          pagePreviewMeta: req.body.pagePreviewMeta,
           origin: `${req.protocol}://${req.get("host")}`,
         }),
       );
   } catch (e) {
     next(e);
   }
+}
+
+function getUploadedFile(files: Request['files'], fieldName: string) {
+  return getUploadedFiles(files, fieldName)[0];
+}
+
+function getUploadedFiles(files: Request['files'], fieldName: string) {
+  if (!files || Array.isArray(files)) return [];
+  return files[fieldName] ?? [];
 }
 export async function publicDesign(
   req: Request,

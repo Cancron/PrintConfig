@@ -746,8 +746,9 @@ export async function verifyPublicDesignToken(input: { authorization?: string; r
   if (!Number.isInteger(expiresAt)) throw new ApiError(401, 'Invalid design authorization token expiry.');
   if (expiresAt <= Math.floor(Date.now() / 1000)) throw new ApiError(401, 'Design authorization token has expired.');
 
-  const [userKeyRaw, merchantId, productId] = identity.split(':');
-  if (!userKeyRaw || !merchantId || !productId || identity.split(':').length < 4) throw new ApiError(401, 'Invalid design authorization token identity.');
+  const identityParts = identity.split(':');
+  const [userKeyRaw, merchantId, productId] = identityParts;
+  if (!userKeyRaw || !merchantId || !productId || identityParts.length !== 3) throw new ApiError(401, 'Invalid design authorization token identity.');
   if (!Types.ObjectId.isValid(merchantId)) throw new ApiError(401, 'Invalid design authorization merchant.');
   if (!Types.ObjectId.isValid(productId)) throw new ApiError(401, 'Invalid design authorization product.');
   if (String(productId) !== String(input.routeProductId)) throw new ApiError(403, 'Design authorization token does not match this product.');
@@ -793,11 +794,18 @@ export async function savePublicDesignUpload(input: {
   userKey: string;
   designData?: unknown;
   file?: Express.Multer.File;
+  pagePreviewFiles?: Express.Multer.File[];
+  pagePreviewMeta?: unknown;
   origin: string;
 }) {
   const designData = parseDesignData(input.designData);
-  if (!input.file && designData === undefined) throw new ApiError(400, 'Image file or designData is required.');
+  const pagePreviewFiles = input.pagePreviewFiles ?? [];
+  const pagePreviewMeta = parsePagePreviewMeta(input.pagePreviewMeta, pagePreviewFiles.length);
+  if (!input.file && designData === undefined && pagePreviewFiles.length === 0) throw new ApiError(400, 'Image file, page previews, or designData is required.');
   if (input.file && !DESIGN_UPLOAD_MIME_EXTENSIONS[input.file.mimetype]) throw new ApiError(400, 'Only JPG, PNG, and WebP images are allowed.');
+  for (const file of pagePreviewFiles) {
+    if (!DESIGN_UPLOAD_MIME_EXTENSIONS[file.mimetype]) throw new ApiError(400, 'Only JPG, PNG, and WebP page previews are allowed.');
+  }
 
   const { merchant, product, userKey } = await resolvePublicDesignContext(input.productId, input.merchantId, input.userKey);
   const supabase = getSupabaseAdmin();
@@ -840,6 +848,35 @@ export async function savePublicDesignUpload(input: {
     if (designUploadError) throw new ApiError(502, `Supabase design save failed: ${designUploadError.message}`);
   }
 
+  const pagePreviews = [];
+  for (let index = 0; index < pagePreviewFiles.length; index += 1) {
+    const file = pagePreviewFiles[index];
+    const meta = pagePreviewMeta[index] ?? {};
+    const extension = DESIGN_UPLOAD_MIME_EXTENSIONS[file.mimetype];
+    const requestedFilename = sanitizeUploadFilename(String(meta.filename ?? file.originalname ?? `page-${index + 1}${extension}`), extension);
+    const filename = requestedFilename || `page-${index + 1}${extension}`;
+    const storagePath = `${prefix}/page-previews/${filename}`;
+    const { error: previewUploadError } = await supabase.storage.from(galleryBucket).upload(storagePath, file.buffer, {
+      contentType: file.mimetype,
+      upsert: true,
+      cacheControl: '0',
+    });
+    if (previewUploadError) throw new ApiError(502, `Supabase page preview upload failed: ${previewUploadError.message}`);
+    const { data } = supabase.storage.from(galleryBucket).getPublicUrl(storagePath);
+    pagePreviews.push({
+      ...meta,
+      url: data.publicUrl,
+      publicUrl: data.publicUrl,
+      storageProvider: 'supabase',
+      bucket: galleryBucket,
+      storagePath,
+      filename,
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+    });
+  }
+
   return {
     ...(image ?? {}),
     image,
@@ -847,6 +884,7 @@ export async function savePublicDesignUpload(input: {
     designSaved: designData !== undefined,
     designPublicBaseUrl: publicPathPrefix,
     designPublicUrl: designData !== undefined ? `${publicPathPrefix}design.json` : undefined,
+    pagePreviews,
     merchantId: String(merchant._id),
     productId: String(product._id),
     userKey,
@@ -909,6 +947,29 @@ function parseDesignData(value: unknown) {
   return value;
 }
 
+function parsePagePreviewMeta(value: unknown, fileCount: number) {
+  if (value === undefined || value === null || value === '') return [];
+  let parsed = value;
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      throw new ApiError(400, 'pagePreviewMeta must be valid JSON.');
+    }
+  }
+  if (!Array.isArray(parsed)) throw new ApiError(400, 'pagePreviewMeta must be an array.');
+  if (parsed.length > fileCount) throw new ApiError(400, 'pagePreviewMeta cannot include more entries than uploaded pagePreviews files.');
+  return parsed.map((entry, index) => {
+    if (!entry || typeof entry !== 'object') throw new ApiError(400, `pagePreviewMeta[${index}] must be an object.`);
+    const meta = entry as Record<string, unknown>;
+    return {
+      pageId: meta.pageId === undefined ? undefined : String(meta.pageId),
+      pageNumber: meta.pageNumber === undefined || meta.pageNumber === '' ? undefined : Number(meta.pageNumber),
+      filename: meta.filename === undefined ? undefined : String(meta.filename),
+    };
+  });
+}
+
 function designTempPrefix(merchantId: string, userKey: string, productId: string) {
   return `designs/tmp/${merchantId}/${userKey}/${productId}`;
 }
@@ -920,6 +981,18 @@ function isStorageNotFound(error: { message?: string; statusCode?: string | numb
 
 function sanitizeUploadSegment(value: string) {
   return value.trim().replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120);
+}
+
+function sanitizeUploadFilename(value: string, fallbackExtension: string) {
+  const raw = value.trim();
+  const dotIndex = raw.lastIndexOf('.');
+  const base = (dotIndex > 0 ? raw.slice(0, dotIndex) : raw)
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 120) || `preview-${Date.now()}`;
+  const extension = (dotIndex > 0 ? raw.slice(dotIndex).toLowerCase() : fallbackExtension).replace(/[^a-z0-9.]/g, '');
+  return `${base}${extension || fallbackExtension}`;
 }
 export async function calculatePrice(id: string, variantId: string, selectedOptions: Record<string, string>) {
   const product = await ProductModel.findById(id).lean();
