@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { Types } from 'mongoose';
 import { ProductModel } from '../models/Product.js';
 import { ProductCategoryModel } from '../models/ProductCategory.js';
@@ -718,6 +718,67 @@ export async function getEditorProductConfig(id: string, apiPrivateKey: string) 
   const merchant = await authenticateApiPrivateKey(apiPrivateKey);
   if (!merchant) throw new ApiError(401, 'A valid merchant API private key is required.');
   return getPublicProductConfig(id, String(merchant._id));
+}
+
+export interface PublicDesignTokenPayload {
+  userKey: string;
+  merchantId: string;
+  productId: string;
+  expiresAt: number;
+}
+
+export async function verifyPublicDesignToken(input: { authorization?: string; routeProductId: string }): Promise<PublicDesignTokenPayload> {
+  const token = parseBearerToken(input.authorization);
+  const [encodedData, signature = ''] = token.split('.');
+  if (!encodedData || !signature || token.split('.').length !== 2) throw new ApiError(401, 'Invalid design authorization token.');
+
+  let data = '';
+  try {
+    data = Buffer.from(encodedData, 'base64').toString('utf8');
+  } catch {
+    throw new ApiError(401, 'Invalid design authorization token data.');
+  }
+
+  const separatorIndex = data.lastIndexOf('|');
+  if (separatorIndex < 0) throw new ApiError(401, 'Invalid design authorization token payload.');
+  const identity = data.slice(0, separatorIndex);
+  const expiresAt = Number(data.slice(separatorIndex + 1));
+  if (!Number.isInteger(expiresAt)) throw new ApiError(401, 'Invalid design authorization token expiry.');
+  if (expiresAt <= Math.floor(Date.now() / 1000)) throw new ApiError(401, 'Design authorization token has expired.');
+
+  const [userKeyRaw, merchantId, productId] = identity.split(':');
+  if (!userKeyRaw || !merchantId || !productId || identity.split(':').length !== 3) throw new ApiError(401, 'Invalid design authorization token identity.');
+  if (!Types.ObjectId.isValid(merchantId)) throw new ApiError(401, 'Invalid design authorization merchant.');
+  if (!Types.ObjectId.isValid(productId)) throw new ApiError(401, 'Invalid design authorization product.');
+  if (String(productId) !== String(input.routeProductId)) throw new ApiError(403, 'Design authorization token does not match this product.');
+
+  const merchant = await MerchantModel.findOne({ _id: merchantId, status: 'active' }).select('+apiPrivateKeySecret').lean();
+  if (!merchant) throw new ApiError(401, 'Merchant authorization not found.');
+  if (!merchant.apiPrivateKeySecret) throw new ApiError(401, 'Merchant API key must be rotated before temporary design tokens can be verified.');
+
+  const expectedSignature = createHmac('sha256', String(merchant.apiPrivateKeySecret)).update(data).digest('hex');
+  if (!safeHexEqual(signature, expectedSignature)) throw new ApiError(401, 'Invalid design authorization signature.');
+
+  return {
+    userKey: userKeyRaw,
+    merchantId: String(merchant._id),
+    productId,
+    expiresAt,
+  };
+}
+
+function parseBearerToken(authorization?: string) {
+  const value = String(authorization ?? '').trim();
+  const match = /^Bearer\s+(.+)$/i.exec(value);
+  if (!match) throw new ApiError(401, 'Authorization Bearer token is required.');
+  return match[1].trim();
+}
+
+function safeHexEqual(actual: string, expected: string) {
+  if (!/^[a-f0-9]{64}$/i.test(actual)) return false;
+  const actualBuffer = Buffer.from(actual, 'hex');
+  const expectedBuffer = Buffer.from(expected, 'hex');
+  return actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer);
 }
 
 const DESIGN_UPLOAD_MIME_EXTENSIONS: Record<string, string> = {

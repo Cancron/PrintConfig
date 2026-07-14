@@ -43,6 +43,7 @@ export async function rotateApiPrivateKey(id: string) {
     id,
     {
       apiPrivateKeyHash: hashApiKey(apiPrivateKey),
+      apiPrivateKeySecret: apiPrivateKey,
       apiPrivateKeyLastFour: apiPrivateKey.slice(-4),
       apiPrivateKeyCreatedAt: new Date(),
     },

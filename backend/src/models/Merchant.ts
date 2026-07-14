@@ -14,6 +14,7 @@ const merchantSchema = new Schema(
     customCss: { type: String, default: '' },
     customJavascript: { type: String, default: '' },
     apiPrivateKeyHash: { type: String, select: false },
+    apiPrivateKeySecret: { type: String, select: false },
     apiPrivateKeyLastFour: { type: String, default: '' },
     apiPrivateKeyCreatedAt: { type: Date },
   },
