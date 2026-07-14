@@ -802,6 +802,8 @@ export async function savePublicDesignUpload(input: {
   const { merchant, product, userKey } = await resolvePublicDesignContext(input.productId, input.merchantId, input.userKey);
   const supabase = getSupabaseAdmin();
   const prefix = designTempPrefix(String(merchant._id), userKey, String(product._id));
+  const { data: prefixPublicData } = supabase.storage.from(galleryBucket).getPublicUrl(`${prefix}/`);
+  const publicPathPrefix = prefixPublicData.publicUrl;
 
   let image: Record<string, unknown> | null = null;
   if (input.file) {
@@ -843,7 +845,8 @@ export async function savePublicDesignUpload(input: {
     image,
     // designData,
     designSaved: designData !== undefined,
-    designStoragePath: designData !== undefined ? `${prefix}/design.json` : undefined,
+    designPublicBaseUrl: publicPathPrefix,
+    designPublicUrl: designData !== undefined ? `${publicPathPrefix}design.json` : undefined,
     merchantId: String(merchant._id),
     productId: String(product._id),
     userKey,
