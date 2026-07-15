@@ -1196,7 +1196,7 @@ export async function getPublicDesignWithProduct(input: { productId: string; mer
   let designExists = false;
   const { data, error } = await getSupabaseAdmin().storage.from(galleryBucket).download(designStoragePath);
   if (error) {
-    if (!isStorageNotFound(error)) throw new ApiError(502, `Supabase design read failed: ${error.message}`);
+    if (!isStorageNotFound(error)) throw new ApiError(502, `Supabase design read failed: ${error.message} ${designStoragePath}`);
   } else if (data) {
     designData = JSON.parse(await data.text());
     designExists = true;
