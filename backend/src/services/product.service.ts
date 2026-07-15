@@ -784,6 +784,54 @@ function safeHexEqual(actual: string, expected: string) {
   return actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer);
 }
 
+export async function listDesignCartItems(filters: Record<string, string | undefined>) {
+  const accountId = resolveAccountId(filters.accountId);
+  const query: Record<string, unknown> = { accountId };
+  if (filters.merchantId) {
+    if (!Types.ObjectId.isValid(filters.merchantId)) throw new ApiError(400, 'merchantId must be a valid MongoDB ObjectId.');
+    query.merchantId = filters.merchantId;
+  }
+  if (filters.status) query.status = filters.status;
+  if (filters.printGenerationStatus) query.printGenerationStatus = filters.printGenerationStatus;
+  const items = await DesignCartItemModel.find(query).sort({ updatedAt: -1 }).limit(Math.min(Number(filters.limit ?? 100) || 100, 500)).lean();
+  const productIds = [...new Set(items.map((item) => String(item.productId)))];
+  const jobIds = items.map((item) => String(item._id));
+  const [products, jobs] = await Promise.all([
+    ProductModel.find({ _id: { $in: productIds } }).select('name slug productType').lean(),
+    DesignProcessingJobModel.find({ cartItemId: { $in: jobIds } }).sort({ createdAt: -1 }).lean(),
+  ]);
+  const productMap = new Map(products.map((product: any) => [String(product._id), product]));
+  const latestJobMap = new Map<string, any>();
+  for (const job of jobs) {
+    const key = String(job.cartItemId);
+    if (!latestJobMap.has(key)) latestJobMap.set(key, job);
+  }
+  return items.map((item) => {
+    const product: any = productMap.get(String(item.productId));
+    return {
+      ...item,
+      _id: String(item._id),
+      accountId: String(item.accountId),
+      merchantId: String(item.merchantId),
+      productId: String(item.productId),
+      product: product ? { _id: String(product._id), name: product.name, slug: product.slug, productType: product.productType } : null,
+      latestJob: normalizeLeanJob(latestJobMap.get(String(item._id))),
+    };
+  });
+}
+
+function normalizeLeanJob(job: any) {
+  if (!job) return null;
+  return {
+    ...job,
+    _id: String(job._id),
+    cartItemId: String(job.cartItemId),
+    merchantId: String(job.merchantId),
+    productId: String(job.productId),
+    accountId: String(job.accountId),
+  };
+}
+
 const designProcessingJobs = new Map<string, Promise<void>>();
 const WORKER_ID = `api-${process.pid}-${randomBytes(4).toString('hex')}`;
 

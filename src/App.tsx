@@ -11,6 +11,7 @@ import { ImageLibrary } from './pages/ImageLibrary';
 import { LayoutCategories, LayoutCategoryDetail } from './pages/LayoutCategories';
 import { LayoutTemplates, LayoutTemplateEditor } from './pages/LayoutTemplates';
 import { Collages, CollageEditor } from './pages/Collages';
+import { Orders } from './pages/Orders';
 import { WorkspaceProvider } from './hooks/useWorkspace';
 
 function App() {
@@ -27,6 +28,7 @@ function App() {
             <Route path="/products/:id" element={<ProductDetail />} />
             <Route path="/merchant-settings" element={<MerchantSettings />} />
             <Route path="/image-library" element={<ImageLibrary />} />
+            <Route path="/orders" element={<Orders />} />
             <Route path="/layouts/categories" element={<LayoutCategories />} />
             <Route path="/layouts/categories/:id" element={<LayoutCategoryDetail />} />
             <Route path="/layouts/templates" element={<LayoutTemplates />} />

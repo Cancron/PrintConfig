@@ -79,6 +79,67 @@ export interface ImagePickerValue {
   altText?: string;
   storagePath: string;
 }
+
+export type DesignCartItemStatus = 'cart' | 'ordered' | 'abandoned';
+export type PrintGenerationStatus = 'not_ready' | 'pending' | 'processing' | 'complete' | 'failed';
+
+export interface DesignStorageFile {
+  url: string;
+  publicUrl: string;
+  storageProvider: 'supabase';
+  bucket: string;
+  storagePath: string;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+}
+
+export interface DesignProcessingJob {
+  _id: string;
+  cartItemId: string;
+  merchantId: string;
+  productId: string;
+  accountId: string;
+  type: 'final-print-generation';
+  status: 'pending' | 'processing' | 'complete' | 'failed' | 'cancelled';
+  attempts: number;
+  orderId: string;
+  sourcePrefix: string;
+  orderPrefix: string;
+  error: string;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface DesignCartItem {
+  _id: string;
+  accountId: string;
+  merchantId: string;
+  productId: string;
+  product?: { _id: string; name: string; slug: string; productType: string } | null;
+  userKey: string;
+  status: DesignCartItemStatus;
+  designStoragePath: string;
+  designPublicBaseUrl: string;
+  designPublicUrl: string;
+  tempStoragePrefix: string;
+  orderStoragePrefix: string;
+  orderId: string;
+  image?: DesignStorageFile;
+  pagePreviews: Array<DesignStorageFile & { pageId?: string; pageNumber?: number }>;
+  finalPrintFiles: DesignStorageFile[];
+  printGenerationStatus: PrintGenerationStatus;
+  printGenerationError: string;
+  latestJob?: DesignProcessingJob | null;
+  addedToCartAt: string;
+  orderedAt?: string;
+  lastActivityAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
 export interface Account {
   _id: string;
   name: string;

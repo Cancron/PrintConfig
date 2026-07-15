@@ -94,6 +94,13 @@ export async function calculatePrice(
     next(e);
   }
 }
+export async function listCartItems(req: Request, res: Response, next: NextFunction) {
+  try {
+    res.json(await service.listDesignCartItems(req.query as Record<string, string | undefined>));
+  } catch (e) {
+    next(e);
+  }
+}
 export async function processCartItem(
   req: Request,
   res: Response,

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Collage, ImageAsset, ImageFolder, LayoutCategory, LayoutElement, LayoutTemplate, LayoutTemplatePage, Merchant, Product, ProductCategory } from '../types';
+import type { Collage, DesignCartItem, ImageAsset, ImageFolder, LayoutCategory, LayoutElement, LayoutTemplate, LayoutTemplatePage, Merchant, Product, ProductCategory } from '../types';
 import { normalizeVariantOptionDefinitions } from './variantOptions';
 import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
 import { normalizeFrontendContent } from './frontendContent';
@@ -228,6 +228,14 @@ function galleryQuery(input: { accountId: string; merchantId?: string; folderId?
   if (input.search) params.set('search', input.search);
   return params.toString();
 }
+function cartItemsQuery(input: { accountId: string; merchantId?: string; status?: string; printGenerationStatus?: string; limit?: number }) {
+  const params = new URLSearchParams({ accountId: input.accountId });
+  if (input.merchantId) params.set('merchantId', input.merchantId);
+  if (input.status) params.set('status', input.status);
+  if (input.printGenerationStatus) params.set('printGenerationStatus', input.printGenerationStatus);
+  if (input.limit) params.set('limit', String(input.limit));
+  return params.toString();
+}
 function normalizeProduct(raw: any): Product {
   const productId = idOf(raw);
   const variants = (raw.variants ?? []).map((variant: any) => ({
@@ -322,6 +330,7 @@ export const api = {
   updateImageAsset: (asset: ImageAsset) => request<any>(`/image-assets/${asset._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(asset))) }).then(normalizeAsset),
   deleteImageAsset: (id: string) => request(`/image-assets/${id}`, { method: 'DELETE' }),
   moveImageAsset: (id: string, folderId?: string | null) => request<any>(`/image-assets/${id}/move`, { method: 'POST', body: JSON.stringify({ folderId: folderId || null }) }).then(normalizeAsset),
+  listDesignCartItems: (filters: { accountId: string; merchantId?: string; status?: string; printGenerationStatus?: string; limit?: number }) => request<DesignCartItem[]>(`/products/cart-items?${cartItemsQuery(filters)}`),
   listMerchants: (accountId: string) => request<any[]>(`/merchants?accountId=${encodeURIComponent(accountId)}`).then((items) => items.map(normalizeMerchant)),
   updateMerchant: (merchant: Merchant) => request<any>(`/merchants/${merchant._id}`, { method: 'PUT', body: JSON.stringify(merchantPayload(merchant)) }).then(normalizeMerchant),
   rotateMerchantApiKey: (merchantId: string) => request<any>(`/merchants/${merchantId}/api-key`, { method: 'POST' }).then((result) => ({ merchant: normalizeMerchant(result.merchant), apiPrivateKey: String(result.apiPrivateKey) })),
