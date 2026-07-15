@@ -47,6 +47,7 @@ const designCartItemSchema = new Schema(
     orderId: { type: String, default: '', index: true },
     image: { type: storageFileSchema },
     pagePreviews: { type: [pagePreviewSchema], default: [] },
+    finalPrintFiles: { type: [storageFileSchema], default: [] },
     printGenerationStatus: { type: String, enum: ['not_ready', 'pending', 'processing', 'complete', 'failed'], default: 'pending', index: true },
     printGenerationError: { type: String, default: '' },
     addedToCartAt: { type: Date, default: Date.now },

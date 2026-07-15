@@ -94,6 +94,24 @@ export async function calculatePrice(
     next(e);
   }
 }
+export async function processCartItem(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    res.status(202).json(
+      await service.processDesignCartItem({
+        cartItemId: String(req.params.cartItemId),
+        apiPrivateKey: String(req.header("x-api-key") ?? ""),
+        orderId: req.body?.orderId,
+        force: req.body?.force,
+      }),
+    );
+  } catch (e) {
+    next(e);
+  }
+}
 export async function publicDesignUpload(
   req: Request,
   res: Response,

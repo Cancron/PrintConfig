@@ -7,6 +7,7 @@ import { LayoutTemplateModel } from '../models/LayoutTemplate.js';
 import { CollageModel } from '../models/Collage.js';
 import { MerchantModel } from '../models/Merchant.js';
 import { DesignCartItemModel } from '../models/DesignCartItem.js';
+import { DesignProcessingJobModel } from '../models/DesignProcessingJob.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { applyModifier, getVariantConfiguredPrice } from '../utils/pricing.js';
 import { slugify } from '../utils/slug.js';
@@ -783,6 +784,174 @@ function safeHexEqual(actual: string, expected: string) {
   return actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer);
 }
 
+const designProcessingJobs = new Map<string, Promise<void>>();
+const WORKER_ID = `api-${process.pid}-${randomBytes(4).toString('hex')}`;
+
+export async function processDesignCartItem(input: { cartItemId: string; apiPrivateKey: string; orderId?: unknown; force?: unknown }) {
+  const merchant = await authenticateApiPrivateKey(input.apiPrivateKey);
+  if (!merchant) throw new ApiError(401, 'A valid merchant API private key is required.');
+  if (!Types.ObjectId.isValid(input.cartItemId)) throw new ApiError(400, 'cartItemId must be a valid MongoDB ObjectId.');
+
+  const cartItem = await DesignCartItemModel.findOne({ _id: input.cartItemId, merchantId: merchant._id });
+  if (!cartItem) throw new ApiError(404, 'Design cart item not found.');
+  const force = parseBoolean(input.force);
+  if (cartItem.printGenerationStatus === 'complete' && !force) {
+    return {
+      cartItem,
+      processed: false,
+      message: 'Design cart item has already been processed.',
+    };
+  }
+  const existingJob = await DesignProcessingJobModel.findOne({
+    cartItemId: cartItem._id,
+    status: { $in: ['pending', 'processing'] },
+  }).lean();
+  if ((existingJob || designProcessingJobs.has(String(cartItem._id))) && !force) {
+    return {
+      cartItem,
+      job: existingJob,
+      queued: true,
+      printGenerationStatus: 'processing',
+      message: 'Design cart item is already queued for processing.',
+    };
+  }
+
+  const orderId = sanitizeUploadSegment(String(input.orderId ?? cartItem.orderId ?? cartItem._id));
+  if (!orderId) throw new ApiError(400, 'orderId is required to process a design cart item.');
+  const orderPrefix = designOrderPrefix(String(cartItem.merchantId), orderId, String(cartItem.productId));
+  cartItem.status = 'ordered';
+  cartItem.orderId = orderId;
+  cartItem.orderStoragePrefix = orderPrefix;
+  cartItem.printGenerationStatus = 'processing';
+  cartItem.printGenerationError = '';
+  cartItem.lastActivityAt = new Date();
+  await cartItem.save();
+
+  const job = await DesignProcessingJobModel.create({
+    cartItemId: cartItem._id,
+    merchantId: cartItem.merchantId,
+    productId: cartItem.productId,
+    accountId: cartItem.accountId,
+    orderId,
+    sourcePrefix: cartItem.tempStoragePrefix,
+    orderPrefix,
+    status: 'pending',
+    availableAt: new Date(),
+  });
+
+  enqueueDesignCartItemProcessing(String(job._id), String(cartItem._id));
+  return {
+    cartItem,
+    job,
+    queued: true,
+    processed: false,
+    printGenerationStatus: 'processing',
+    message: 'Design cart item queued for final print image generation.',
+  };
+}
+
+function enqueueDesignCartItemProcessing(jobId: string, cartItemId: string) {
+  const job = runDesignCartItemProcessing(jobId)
+    .catch((error) => {
+      console.error(`Design cart item processing failed for ${cartItemId}:`, error);
+    })
+    .finally(() => {
+      designProcessingJobs.delete(cartItemId);
+    });
+  designProcessingJobs.set(cartItemId, job);
+}
+
+async function runDesignCartItemProcessing(jobId: string) {
+  const job = await claimDesignProcessingJob(jobId);
+  if (!job) return;
+  const cartItem = await DesignCartItemModel.findById(job.cartItemId);
+  if (!cartItem) return;
+  try {
+    cartItem.printGenerationStatus = 'processing';
+    cartItem.printGenerationError = '';
+    cartItem.lastActivityAt = new Date();
+    await cartItem.save();
+    const orderId = sanitizeUploadSegment(String(job.orderId || cartItem.orderId || cartItem._id));
+    const sourcePrefix = String(cartItem.tempStoragePrefix || '');
+    if (!sourcePrefix) throw new ApiError(400, 'Cart item is missing a temporary design storage prefix.');
+    const orderPrefix = String(job.orderPrefix || designOrderPrefix(String(cartItem.merchantId), orderId, String(cartItem.productId)));
+    const copiedFiles = await copyStoragePrefix(sourcePrefix, orderPrefix);
+    if (!copiedFiles.some((file) => file.destination === `${orderPrefix}/design.json`)) throw new ApiError(400, 'Cart item has no saved design.json to process.');
+
+    const { data: basePublicData } = getSupabaseAdmin().storage.from(galleryBucket).getPublicUrl(`${orderPrefix}/`);
+    const designPublicBaseUrl = basePublicData.publicUrl;
+    const designPublicUrl = `${designPublicBaseUrl}design.json`;
+    cartItem.status = 'ordered';
+    cartItem.orderId = orderId;
+    cartItem.orderStoragePrefix = orderPrefix;
+    cartItem.designStoragePath = `${orderPrefix}/design.json`;
+    cartItem.designPublicBaseUrl = designPublicBaseUrl;
+    cartItem.designPublicUrl = designPublicUrl;
+    cartItem.pagePreviews = (cartItem.pagePreviews ?? []).map((preview: any) => rewriteStoredFile(preview, sourcePrefix, orderPrefix)) as any;
+    if (cartItem.image) cartItem.image = rewriteStoredFile(cartItem.image as any, sourcePrefix, orderPrefix) as any;
+    cartItem.finalPrintFiles = await generateTemporaryFinalPrintImages(cartItem as any, orderPrefix) as any;
+    cartItem.printGenerationStatus = 'complete';
+    cartItem.printGenerationError = '';
+    cartItem.orderedAt = new Date();
+    cartItem.lastActivityAt = new Date();
+    await cartItem.save();
+    await DesignProcessingJobModel.findByIdAndUpdate(job._id, {
+      status: 'complete',
+      completedAt: new Date(),
+      result: {
+        orderPrefix,
+        designPublicUrl,
+        copiedFiles,
+        finalPrintFiles: cartItem.finalPrintFiles,
+      },
+      error: '',
+    });
+  } catch (error) {
+    cartItem.printGenerationStatus = 'failed';
+    cartItem.printGenerationError = error instanceof Error ? error.message : 'Unknown processing error';
+    cartItem.lastActivityAt = new Date();
+    await cartItem.save();
+    await DesignProcessingJobModel.findByIdAndUpdate(job._id, {
+      status: 'failed',
+      completedAt: new Date(),
+      error: error instanceof Error ? error.message : 'Unknown processing error',
+    });
+    throw error;
+  }
+}
+
+async function claimDesignProcessingJob(jobId: string) {
+  return DesignProcessingJobModel.findOneAndUpdate(
+    {
+      _id: jobId,
+      status: 'pending',
+      availableAt: { $lte: new Date() },
+    },
+    {
+      $set: {
+        status: 'processing',
+        lockedBy: WORKER_ID,
+        lockedAt: new Date(),
+        startedAt: new Date(),
+        error: '',
+      },
+      $inc: { attempts: 1 },
+    },
+    { new: true }
+  );
+}
+
+export async function processNextDesignProcessingJob() {
+  const job = await DesignProcessingJobModel.findOne({
+    status: 'pending',
+    availableAt: { $lte: new Date() },
+  }).sort({ priority: -1, createdAt: 1 }).lean();
+  if (!job) return { processed: false, message: 'No pending design processing jobs.' };
+  if (designProcessingJobs.has(String(job.cartItemId))) return { processed: false, job, message: 'Job is already running in this process.' };
+  enqueueDesignCartItemProcessing(String(job._id), String(job.cartItemId));
+  return { processed: true, job, message: 'Design processing job queued in this process.' };
+}
+
 const DESIGN_UPLOAD_MIME_EXTENSIONS: Record<string, string> = {
   'image/jpeg': '.jpg',
   'image/png': '.png',
@@ -1043,6 +1212,113 @@ async function saveDesignCartItem(input: {
 
 function designTempPrefix(merchantId: string, userKey: string, productId: string) {
   return `designs/tmp/${merchantId}/${userKey}/${productId}`;
+}
+
+function designOrderPrefix(merchantId: string, orderId: string, productId: string) {
+  return `designs/orders/${merchantId}/${orderId}/${productId}`;
+}
+
+async function copyStoragePrefix(sourcePrefix: string, destinationPrefix: string) {
+  const files = await listStorageFiles(sourcePrefix);
+  if (files.length === 0) throw new ApiError(400, 'No design files found to process.');
+  const supabase = getSupabaseAdmin();
+  const copiedFiles: Array<{ source: string; destination: string }> = [];
+  for (const source of files) {
+    const relativePath = source.slice(sourcePrefix.length).replace(/^\/+/, '');
+    const destination = `${destinationPrefix}/${relativePath}`;
+    await supabase.storage.from(galleryBucket).remove([destination]);
+    const { error } = await supabase.storage.from(galleryBucket).copy(source, destination);
+    if (error) throw new ApiError(502, `Supabase design file copy failed: ${error.message}`);
+    copiedFiles.push({ source, destination });
+  }
+  return copiedFiles;
+}
+
+async function listStorageFiles(prefix: string) {
+  const output: string[] = [];
+  await listStorageFilesRecursive(prefix.replace(/\/+$/, ''), output);
+  return output;
+}
+
+async function listStorageFilesRecursive(folder: string, output: string[]) {
+  const { data, error } = await getSupabaseAdmin().storage.from(galleryBucket).list(folder, { limit: 1000 });
+  if (error) throw new ApiError(502, `Supabase design file list failed: ${error.message}`);
+  for (const item of data ?? []) {
+    const fullPath = `${folder}/${item.name}`;
+    if ((item as any).id || (item as any).metadata) output.push(fullPath);
+    else await listStorageFilesRecursive(fullPath, output);
+  }
+}
+
+function rewriteStoredFile(file: Record<string, any>, sourcePrefix: string, destinationPrefix: string) {
+  const storagePath = String(file.storagePath ?? '');
+  if (!storagePath.startsWith(sourcePrefix)) return file;
+  const nextStoragePath = `${destinationPrefix}${storagePath.slice(sourcePrefix.length)}`;
+  const { data } = getSupabaseAdmin().storage.from(galleryBucket).getPublicUrl(nextStoragePath);
+  return {
+    ...file,
+    url: data.publicUrl,
+    publicUrl: data.publicUrl,
+    storagePath: nextStoragePath,
+  };
+}
+
+async function generateTemporaryFinalPrintImages(cartItem: Record<string, any>, orderPrefix: string) {
+  const previews = Array.isArray(cartItem.pagePreviews) && cartItem.pagePreviews.length > 0
+    ? cartItem.pagePreviews
+    : [{ pageNumber: 1, pageId: 'page-1' }];
+  const supabase = getSupabaseAdmin();
+  const output = [];
+  for (let index = 0; index < previews.length; index += 1) {
+    const preview = previews[index] ?? {};
+    const pageNumber = Number(preview.pageNumber ?? index + 1);
+    const filename = `final-page-${Number.isFinite(pageNumber) ? pageNumber : index + 1}.svg`;
+    const storagePath = `${orderPrefix}/final-prints/${filename}`;
+    const svg = temporaryFinalPrintSvg({
+      cartItemId: String(cartItem._id),
+      orderId: String(cartItem.orderId ?? ''),
+      pageNumber: Number.isFinite(pageNumber) ? pageNumber : index + 1,
+      previewUrl: String(preview.publicUrl ?? preview.url ?? ''),
+      designUrl: String(cartItem.designPublicUrl ?? ''),
+    });
+    await supabase.storage.from(galleryBucket).remove([storagePath]);
+    const { error } = await supabase.storage.from(galleryBucket).upload(storagePath, Buffer.from(svg, 'utf8'), {
+      contentType: 'image/svg+xml',
+      upsert: true,
+      cacheControl: '0',
+    });
+    if (error) throw new ApiError(502, `Temporary final print generation upload failed: ${error.message}`);
+    const { data } = supabase.storage.from(galleryBucket).getPublicUrl(storagePath);
+    output.push({
+      url: data.publicUrl,
+      publicUrl: data.publicUrl,
+      storageProvider: 'supabase',
+      bucket: galleryBucket,
+      storagePath,
+      filename,
+      originalName: filename,
+      mimeType: 'image/svg+xml',
+      size: Buffer.byteLength(svg, 'utf8'),
+    });
+  }
+  return output;
+}
+
+function temporaryFinalPrintSvg(input: { cartItemId: string; orderId: string; pageNumber: number; previewUrl: string; designUrl: string }) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
+  <rect width="1200" height="1200" fill="#ffffff"/>
+  <rect x="60" y="60" width="1080" height="1080" fill="#f8fafc" stroke="#0f172a" stroke-width="6"/>
+  <text x="600" y="470" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#0f172a">Temporary Final Print</text>
+  <text x="600" y="550" text-anchor="middle" font-family="Arial, sans-serif" font-size="40" fill="#334155">Page ${escapeXml(String(input.pageNumber))}</text>
+  <text x="600" y="625" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#475569">Order: ${escapeXml(input.orderId || 'pending')}</text>
+  <text x="600" y="680" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#64748b">Cart item: ${escapeXml(input.cartItemId)}</text>
+  <text x="600" y="750" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" fill="#64748b">Design: ${escapeXml(input.designUrl)}</text>
+  <text x="600" y="800" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" fill="#64748b">Preview: ${escapeXml(input.previewUrl)}</text>
+</svg>`;
+}
+
+function escapeXml(value: string) {
+  return value.replace(/[<>&'"]/g, (char) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[char] ?? char));
 }
 
 function isStorageNotFound(error: { message?: string; statusCode?: string | number; name?: string }) {

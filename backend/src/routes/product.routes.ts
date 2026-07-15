@@ -23,6 +23,7 @@ productRoutes.post('/public/:productId/design-upload', designUpload.fields([
 ]), controller.publicDesignUpload);
 productRoutes.get('/public/:productId/design', controller.publicDesign);
 productRoutes.get('/public/:id/config', controller.publicConfig);
+productRoutes.post('/cart-items/:cartItemId/process', controller.processCartItem);
 productRoutes.get('/editor', controller.editorList);
 productRoutes.get('/editor/:id/config', controller.editorConfig);
 productRoutes.get('/:id', controller.get);
