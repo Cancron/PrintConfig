@@ -9,7 +9,8 @@ import { EditorProductSelection } from './EditorProductSelection';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { useCategories } from '../../hooks/useCategories';
 import { validateProductBasicInfo } from '../../lib/validation';
-import type { EditorProductSelectionMode, Product, ProductScope, ProductType, ProductStatus } from '../../types';
+import { createDefaultPhotoBookConfig } from '../../lib/storage';
+import type { EditorProductSelectionMode, PhotoBookConfig, Product, ProductScope, ProductType, ProductStatus } from '../../types';
 
 interface Props {
   product: Product;
@@ -41,6 +42,25 @@ const scopeOptions = [
   { value: 'merchant', label: 'Only for selected merchant' },
 ];
 
+const yesNoOptions = [
+  { value: 'yes', label: 'Yes' },
+  { value: 'no', label: 'No' },
+];
+
+const coverTypeOptions = [
+  { value: 'softcover', label: 'Softcover' },
+  { value: 'hardcover', label: 'Hardcover' },
+  { value: 'layflat', label: 'Layflat' },
+  { value: 'custom', label: 'Custom' },
+];
+
+const bindingTypeOptions = [
+  { value: 'perfect', label: 'Perfect bound' },
+  { value: 'saddle_stitch', label: 'Saddle stitch' },
+  { value: 'spiral', label: 'Spiral' },
+  { value: 'layflat', label: 'Layflat' },
+];
+
 export function BasicInfoTab({ product, products, onSave }: Props) {
   const { selectedMerchant } = useWorkspace();
   const { categories } = useCategories();
@@ -57,12 +77,17 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
   const [saved, setSaved] = useState(false);
   const [selectionMode, setSelectionMode] = useState<EditorProductSelectionMode>(product.editorProductSelection.mode);
   const [specificProductIds, setSpecificProductIds] = useState([...product.editorProductSelection.specificProductIds]);
+  const [photoBook, setPhotoBook] = useState<PhotoBookConfig>(product.photoBook ?? createDefaultPhotoBookConfig(product.productType === 'Photo Book Print'));
 
   const errors = useMemo(
     () => validateProductBasicInfo({ name, slug, productType, basePrice, categoryId }),
     [basePrice, categoryId, name, productType, slug]
   );
   const isValid = Object.keys(errors).length === 0;
+
+  function updatePhotoBook<K extends keyof PhotoBookConfig>(key: K, value: PhotoBookConfig[K]) {
+    setPhotoBook((current) => ({ ...current, [key]: value }));
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -85,6 +110,10 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
         mode: selectionMode,
         specificProductIds: specificProductIds.filter((id) => id !== product._id),
       },
+      photoBook: {
+        ...photoBook,
+        enabled: productType === 'Photo Book Print',
+      },
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -96,6 +125,28 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
       <Input label="Slug" value={slug} onChange={(e) => setSlug(e.target.value)} error={errors.slug} placeholder="e.g. canvas-print" />
       <Select label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} options={categories.map((category) => ({ value: category._id, label: category.name }))} error={errors.categoryId} />
       <Select label="Product Type" value={productType} onChange={(e) => setProductType(e.target.value as ProductType)} options={productTypeOptions} error={errors.productType} />
+      {productType === 'Photo Book Print' && (
+        <section className="rounded-lg bg-white p-5 ring-1 ring-gray-200">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-gray-900">Photo Book Settings</h3>
+            <p className="mt-1 text-sm text-gray-500">Controls page limits, photo limits, and extra-page pricing for the customer editor.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Input label="Default Pages" type="number" min="1" value={photoBook.defaultPages} onChange={(e) => updatePhotoBook('defaultPages', Number(e.target.value))} />
+            <Input label="Maximum Pages" type="number" min="1" value={photoBook.maxPages} onChange={(e) => updatePhotoBook('maxPages', Number(e.target.value))} />
+            <Input label="Maximum Photo Count" type="number" min="0" value={photoBook.maxPhotoCount} onChange={(e) => updatePhotoBook('maxPhotoCount', Number(e.target.value))} />
+            <Input label="Pages Per Spread" type="number" min="1" value={photoBook.pagesPerSpread} onChange={(e) => updatePhotoBook('pagesPerSpread', Number(e.target.value))} />
+            <Input label="Price Per Extra Page" type="number" step="0.01" min="0" value={photoBook.pricePerExtraPage} onChange={(e) => updatePhotoBook('pricePerExtraPage', Number(e.target.value))} />
+            <Input label="Paper Type" value={photoBook.paperType} onChange={(e) => updatePhotoBook('paperType', e.target.value)} placeholder="e.g. lustre, matte" />
+            <Select label="Cover Type" value={photoBook.coverType} onChange={(e) => updatePhotoBook('coverType', e.target.value as PhotoBookConfig['coverType'])} options={coverTypeOptions} />
+            <Select label="Binding Type" value={photoBook.bindingType} onChange={(e) => updatePhotoBook('bindingType', e.target.value as PhotoBookConfig['bindingType'])} options={bindingTypeOptions} />
+            <Select label="Allow Page Reorder" value={photoBook.allowPageReorder ? 'yes' : 'no'} onChange={(e) => updatePhotoBook('allowPageReorder', e.target.value === 'yes')} options={yesNoOptions} />
+            <Select label="Allow Blank Pages" value={photoBook.allowBlankPages ? 'yes' : 'no'} onChange={(e) => updatePhotoBook('allowBlankPages', e.target.value === 'yes')} options={yesNoOptions} />
+            <Select label="Starts With Cover" value={photoBook.startsWithCover ? 'yes' : 'no'} onChange={(e) => updatePhotoBook('startsWithCover', e.target.value === 'yes')} options={yesNoOptions} />
+            <Select label="Has Back Cover" value={photoBook.hasBackCover ? 'yes' : 'no'} onChange={(e) => updatePhotoBook('hasBackCover', e.target.value === 'yes')} options={yesNoOptions} />
+          </div>
+        </section>
+      )}
       <Textarea label="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="Describe the product..." />
       <Select label="Product Scope" value={scope} onChange={(e) => setScope(e.target.value as ProductScope)} options={scopeOptions} />
       {scope === 'merchant' && selectedMerchant && <p className="rounded-md bg-purple-50 p-3 text-sm text-purple-700 ring-1 ring-inset ring-purple-200">This product will belong to {selectedMerchant.name}.</p>}

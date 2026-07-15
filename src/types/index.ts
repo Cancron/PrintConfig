@@ -32,6 +32,8 @@ export type LayoutShapeType = 'rectangle' | 'circle' | 'line' | 'path';
 export type ProductUnit = 'inch' | 'mm' | 'px';
 export type ProductOptionDisplayType = 'Dropdown' | 'Radio Buttons' | 'Color Swatches' | 'Image Swatches' | 'Text Buttons';
 export type PriceModifierType = 'none' | 'fixed' | 'variant-fixed' | 'variant-override' | 'percentage';
+export type PhotoBookCoverType = 'softcover' | 'hardcover' | 'layflat' | 'custom';
+export type PhotoBookBindingType = 'perfect' | 'saddle_stitch' | 'spiral' | 'layflat';
 
 export interface ImageFolder {
   _id: string;
@@ -609,6 +611,22 @@ export interface AiArtConfig {
   styles: AiArtStyle[];
 }
 
+export interface PhotoBookConfig {
+  enabled: boolean;
+  maxPages: number;
+  defaultPages: number;
+  maxPhotoCount: number;
+  pricePerExtraPage: number;
+  pagesPerSpread: number;
+  allowPageReorder: boolean;
+  allowBlankPages: boolean;
+  coverType: PhotoBookCoverType;
+  bindingType: PhotoBookBindingType;
+  paperType: string;
+  startsWithCover: boolean;
+  hasBackCover: boolean;
+}
+
 export interface Product {
   _id: string;
   accountId: string;
@@ -635,6 +653,7 @@ export interface Product {
   layoutSettings: ProductLayoutSettings;
   variants: ProductVariant[];
   aiArt: AiArtConfig;
+  photoBook: PhotoBookConfig;
   createdAt: string;
   updatedAt: string;
 }

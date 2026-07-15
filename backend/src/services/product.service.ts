@@ -183,6 +183,41 @@ function normalizeLayoutSettings(data: Record<string, any>) {
     requireTemplateSelection: input.requireTemplateSelection === true,
   };
 }
+
+function normalizePhotoBookSettings(data: Record<string, any>) {
+  const input = data.photoBook ?? {};
+  const isPhotoBook = data.productType === 'Photo Book Print';
+  data.photoBook = {
+    enabled: isPhotoBook,
+    maxPages: numberOr(input.maxPages, 120),
+    defaultPages: numberOr(input.defaultPages, 20),
+    maxPhotoCount: numberOr(input.maxPhotoCount, 300),
+    pricePerExtraPage: numberOr(input.pricePerExtraPage, 1.5),
+    pagesPerSpread: numberOr(input.pagesPerSpread, 2),
+    allowPageReorder: input.allowPageReorder !== false,
+    allowBlankPages: input.allowBlankPages === true,
+    coverType: ['softcover', 'hardcover', 'layflat', 'custom'].includes(input.coverType) ? input.coverType : 'hardcover',
+    bindingType: ['perfect', 'saddle_stitch', 'spiral', 'layflat'].includes(input.bindingType) ? input.bindingType : 'layflat',
+    paperType: typeof input.paperType === 'string' && input.paperType.trim() ? input.paperType.trim() : 'lustre',
+    startsWithCover: input.startsWithCover !== false,
+    hasBackCover: input.hasBackCover !== false,
+  };
+}
+
+function validatePhotoBookSettings(data: Record<string, any>) {
+  const settings = data.photoBook;
+  if (data.productType !== 'Photo Book Print' || !settings) return;
+  if (!(settings.maxPages > 0)) throw new ApiError(400, 'Photo book maximum pages must be greater than 0.');
+  if (settings.defaultPages < 1 || settings.defaultPages > settings.maxPages) throw new ApiError(400, 'Photo book default pages must be between 1 and maximum pages.');
+  if (settings.maxPhotoCount < 0) throw new ApiError(400, 'Photo book maximum photo count must be zero or greater.');
+  if (settings.pricePerExtraPage < 0) throw new ApiError(400, 'Photo book extra page price must be zero or greater.');
+  if (!(settings.pagesPerSpread > 0)) throw new ApiError(400, 'Photo book pages per spread must be greater than 0.');
+}
+
+function numberOr(value: unknown, fallback: number) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
 async function validateLayoutSettings(data: Record<string, any>) {
   const settings = data.layoutSettings ?? {};
   if (!settings.enabled || settings.mode === 'none') return;
@@ -207,6 +242,7 @@ function normalizeRoomOwnership(data: Record<string, any>) {
   data.variants = lifted.variants;
 }
 function validateProductShape(data: Record<string, any>) {
+  validatePhotoBookSettings(data);
   if (data.surface && !data.surface.code) throw new ApiError(400, 'Surface code is required.');
   const frontendContent = data.frontendContent ?? {};
   const rating = Number(frontendContent.reviewRating);
@@ -365,6 +401,7 @@ export async function createProduct(payload: Record<string, any>) {
   normalizeFrontendContent(payload);
   normalizeEditorProductSelection(payload);
   normalizeLayoutSettings(payload);
+  normalizePhotoBookSettings(payload);
   normalizeRoomOwnership(payload);
   validateProductShape(payload);
   await validateEditorProductSelection(payload);
@@ -380,6 +417,7 @@ export async function updateProduct(id: string, payload: Record<string, any>) {
   normalizeFrontendContent(payload);
   normalizeEditorProductSelection(payload);
   normalizeLayoutSettings(payload);
+  normalizePhotoBookSettings(payload);
   normalizeRoomOwnership(payload);
   validateProductShape(payload);
   await validateEditorProductSelection(payload, id);
@@ -647,8 +685,28 @@ export async function getPublicProductConfig(id: string, merchantId?: string) {
     layoutTemplates,
     editorRules: { ...(product.editorRules ?? {}), allowCustomSize: product.editorRules?.allowCustomSize ?? false },
     exportRules: product.exportRules,
+    photoBook: publicPhotoBookConfig(product.photoBook, product.productType),
     variants: activeVariants,
     aiArt: publicAiArtConfig(product.aiArt),
+  };
+}
+
+function publicPhotoBookConfig(photoBook: any, productType: string) {
+  const input = photoBook ?? {};
+  return {
+    enabled: productType === 'Photo Book Print',
+    maxPages: input.maxPages ?? 120,
+    defaultPages: input.defaultPages ?? 20,
+    maxPhotoCount: input.maxPhotoCount ?? 300,
+    pricePerExtraPage: input.pricePerExtraPage ?? 1.5,
+    pagesPerSpread: input.pagesPerSpread ?? 2,
+    allowPageReorder: input.allowPageReorder ?? true,
+    allowBlankPages: input.allowBlankPages ?? false,
+    coverType: input.coverType || 'hardcover',
+    bindingType: input.bindingType || 'layflat',
+    paperType: input.paperType || 'lustre',
+    startsWithCover: input.startsWithCover ?? true,
+    hasBackCover: input.hasBackCover ?? true,
   };
 }
 

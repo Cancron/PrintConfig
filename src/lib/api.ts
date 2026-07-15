@@ -4,6 +4,7 @@ import { normalizeVariantOptionDefinitions } from './variantOptions';
 import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
 import { normalizeFrontendContent } from './frontendContent';
 import { normalizeEditorProductSelection } from './productSelection';
+import { normalizePhotoBookConfig } from './storage';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api';
 
@@ -264,6 +265,7 @@ function normalizeProduct(raw: any): Product {
     editorRules: raw.editorRules ?? {},
     exportRules: raw.exportRules ?? {},
     layoutSettings: normalizeProductLayoutSettings(raw.layoutSettings),
+    photoBook: normalizePhotoBookConfig(raw.photoBook, raw.productType === 'Photo Book Print'),
     createdAt: raw.createdAt ?? new Date().toISOString(),
     updatedAt: raw.updatedAt ?? new Date().toISOString(),
   };

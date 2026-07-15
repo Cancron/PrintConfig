@@ -309,6 +309,25 @@ const aiArtSchema = new Schema(
   { _id: false }
 );
 
+const photoBookSchema = new Schema(
+  {
+    enabled: { type: Boolean, default: false },
+    maxPages: { type: Number, default: 120, min: 1 },
+    defaultPages: { type: Number, default: 20, min: 1 },
+    maxPhotoCount: { type: Number, default: 300, min: 0 },
+    pricePerExtraPage: { type: Number, default: 1.5, min: 0 },
+    pagesPerSpread: { type: Number, default: 2, min: 1 },
+    allowPageReorder: { type: Boolean, default: true },
+    allowBlankPages: { type: Boolean, default: false },
+    coverType: { type: String, enum: ['softcover', 'hardcover', 'layflat', 'custom'], default: 'hardcover' },
+    bindingType: { type: String, enum: ['perfect', 'saddle_stitch', 'spiral', 'layflat'], default: 'layflat' },
+    paperType: { type: String, default: 'lustre', trim: true },
+    startsWithCover: { type: Boolean, default: true },
+    hasBackCover: { type: Boolean, default: true },
+  },
+  { _id: false }
+);
+
 const productSchema = new Schema(
   {
     accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
@@ -334,6 +353,7 @@ const productSchema = new Schema(
     exportRules: { type: exportRulesSchema, default: () => ({}) },
     layoutSettings: { type: layoutSettingsSchema, default: () => ({}) },
     aiArt: { type: aiArtSchema, default: () => ({ enabled: false }) },
+    photoBook: { type: photoBookSchema, default: () => ({}) },
   },
   { timestamps: true }
 );

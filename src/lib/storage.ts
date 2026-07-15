@@ -10,6 +10,7 @@ import type {
   EditorRules,
   ExportRules,
   Merchant,
+  PhotoBookConfig,
   Product,
   ProductCategory,
   ProductCategoryStatus,
@@ -88,6 +89,42 @@ export const defaultAiArtConfig: AiArtConfig = {
 
 export function createDefaultAiArtConfig(): AiArtConfig {
   return { ...defaultAiArtConfig, styles: [] };
+}
+
+export const defaultPhotoBookConfig: PhotoBookConfig = {
+  enabled: false,
+  maxPages: 120,
+  defaultPages: 20,
+  maxPhotoCount: 300,
+  pricePerExtraPage: 1.5,
+  pagesPerSpread: 2,
+  allowPageReorder: true,
+  allowBlankPages: false,
+  coverType: 'hardcover',
+  bindingType: 'layflat',
+  paperType: 'lustre',
+  startsWithCover: true,
+  hasBackCover: true,
+};
+
+export function createDefaultPhotoBookConfig(enabled = false): PhotoBookConfig {
+  return { ...defaultPhotoBookConfig, enabled };
+}
+
+export function normalizePhotoBookConfig(input: Partial<PhotoBookConfig> | undefined | null, enabledFallback = false): PhotoBookConfig {
+  return {
+    ...defaultPhotoBookConfig,
+    ...(input ?? {}),
+    enabled: input?.enabled ?? enabledFallback,
+    maxPages: numberOr(input?.maxPages, defaultPhotoBookConfig.maxPages),
+    defaultPages: numberOr(input?.defaultPages, defaultPhotoBookConfig.defaultPages),
+    maxPhotoCount: numberOr(input?.maxPhotoCount, defaultPhotoBookConfig.maxPhotoCount),
+    pricePerExtraPage: numberOr(input?.pricePerExtraPage, defaultPhotoBookConfig.pricePerExtraPage),
+    pagesPerSpread: numberOr(input?.pagesPerSpread, defaultPhotoBookConfig.pagesPerSpread),
+    coverType: input?.coverType === 'softcover' || input?.coverType === 'hardcover' || input?.coverType === 'layflat' || input?.coverType === 'custom' ? input.coverType : defaultPhotoBookConfig.coverType,
+    bindingType: input?.bindingType === 'perfect' || input?.bindingType === 'saddle_stitch' || input?.bindingType === 'spiral' || input?.bindingType === 'layflat' ? input.bindingType : defaultPhotoBookConfig.bindingType,
+    paperType: typeof input?.paperType === 'string' ? input.paperType : defaultPhotoBookConfig.paperType,
+  };
 }
 
 export function loadAccount(): Account {
@@ -203,6 +240,7 @@ export function normalizeProduct(product: Product): Product {
     roomPreviews: liftLegacyRoomPreviews({ ...product, variants, roomPreviews: sharedRooms }),
     variants: variants.map((variant) => ({ ...variant, roomPreviews: undefined })),
     aiArt: product.aiArt ?? createDefaultAiArtConfig(),
+    photoBook: normalizePhotoBookConfig(product.photoBook, product.productType === 'Photo Book Print'),
   };
 }
 

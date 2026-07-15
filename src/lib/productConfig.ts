@@ -1,4 +1,4 @@
-import { createDefaultEditorRules, createDefaultExportRules } from './storage';
+import { createDefaultEditorRules, createDefaultExportRules, normalizePhotoBookConfig } from './storage';
 import { createDefaultVariantOptionDefinitions } from './variantOptions';
 import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
 import { normalizeFrontendContent } from './frontendContent';
@@ -111,6 +111,7 @@ function buildImportCandidate(input: Record<string, unknown>): Product {
     layoutSettings: normalizeLayoutSettings(isRecord(input.layoutSettings) ? input.layoutSettings : undefined),
     variants: variants.map((variant, index) => normalizeVariant(variant, id, now, index)),
     aiArt: normalizeAiArtConfig(isRecord(input.aiArt) ? input.aiArt : undefined, now),
+    photoBook: normalizePhotoBookConfig(isRecord(input.photoBook) ? input.photoBook : undefined, input.productType === 'Photo Book Print'),
     createdAt: now,
     updatedAt: now,
   };
