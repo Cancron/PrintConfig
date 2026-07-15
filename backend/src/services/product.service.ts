@@ -6,6 +6,7 @@ import { ProductCategoryModel } from '../models/ProductCategory.js';
 import { LayoutTemplateModel } from '../models/LayoutTemplate.js';
 import { CollageModel } from '../models/Collage.js';
 import { MerchantModel } from '../models/Merchant.js';
+import { DesignCartItemModel } from '../models/DesignCartItem.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { applyModifier, getVariantConfiguredPrice } from '../utils/pricing.js';
 import { slugify } from '../utils/slug.js';
@@ -748,7 +749,7 @@ export async function verifyPublicDesignToken(input: { authorization?: string; r
 
   const identityParts = identity.split(':');
   const [userKeyRaw, merchantId, productId] = identityParts;
-  if (!userKeyRaw || !merchantId || !productId || identityParts.length < 4) throw new ApiError(401, 'Invalid design authorization token identity.');
+  if (!userKeyRaw || !merchantId || !productId || identityParts.length !== 3) throw new ApiError(401, 'Invalid design authorization token identity.');
   if (!Types.ObjectId.isValid(merchantId)) throw new ApiError(401, 'Invalid design authorization merchant.');
   if (!Types.ObjectId.isValid(productId)) throw new ApiError(401, 'Invalid design authorization product.');
   if (String(productId) !== String(input.routeProductId)) throw new ApiError(403, 'Design authorization token does not match this product.');
@@ -796,11 +797,13 @@ export async function savePublicDesignUpload(input: {
   file?: Express.Multer.File;
   pagePreviewFiles?: Express.Multer.File[];
   pagePreviewMeta?: unknown;
+  addToCart?: unknown;
   origin: string;
 }) {
   const designData = parseDesignData(input.designData);
   const pagePreviewFiles = input.pagePreviewFiles ?? [];
   const pagePreviewMeta = parsePagePreviewMeta(input.pagePreviewMeta, pagePreviewFiles.length);
+  const addToCart = parseBoolean(input.addToCart);
   if (!input.file && designData === undefined && pagePreviewFiles.length === 0) throw new ApiError(400, 'Image file, page previews, or designData is required.');
   if (input.file && !DESIGN_UPLOAD_MIME_EXTENSIONS[input.file.mimetype]) throw new ApiError(400, 'Only JPG, PNG, and WebP images are allowed.');
   for (const file of pagePreviewFiles) {
@@ -877,14 +880,33 @@ export async function savePublicDesignUpload(input: {
     });
   }
 
+  const designStoragePath = `${prefix}/design.json`;
+  const designPublicUrl = `${publicPathPrefix}design.json`;
+  const cartItem = addToCart
+    ? await saveDesignCartItem({
+        accountId: String(product.accountId),
+        merchantId: String(merchant._id),
+        productId: String(product._id),
+        userKey,
+        tempStoragePrefix: prefix,
+        designStoragePath,
+        designPublicBaseUrl: publicPathPrefix,
+        designPublicUrl,
+        image,
+        pagePreviews,
+      })
+    : null;
+
   return {
     ...(image ?? {}),
     image,
     // designData,
     designSaved: designData !== undefined,
     designPublicBaseUrl: publicPathPrefix,
-    designPublicUrl: designData !== undefined ? `${publicPathPrefix}design.json` : undefined,
+    designPublicUrl: designData !== undefined || addToCart ? designPublicUrl : undefined,
     pagePreviews,
+    addToCart,
+    cartItem,
     merchantId: String(merchant._id),
     productId: String(product._id),
     userKey,
@@ -968,6 +990,55 @@ function parsePagePreviewMeta(value: unknown, fileCount: number) {
       filename: meta.filename === undefined ? undefined : String(meta.filename),
     };
   });
+}
+
+function parseBoolean(value: unknown) {
+  if (value === true) return true;
+  if (value === false || value === undefined || value === null || value === '') return false;
+  const normalized = String(value).trim().toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on';
+}
+
+async function saveDesignCartItem(input: {
+  accountId: string;
+  merchantId: string;
+  productId: string;
+  userKey: string;
+  tempStoragePrefix: string;
+  designStoragePath: string;
+  designPublicBaseUrl: string;
+  designPublicUrl: string;
+  image: Record<string, unknown> | null;
+  pagePreviews: Record<string, unknown>[];
+}) {
+  const now = new Date();
+  const payload = {
+    accountId: new Types.ObjectId(input.accountId),
+    merchantId: new Types.ObjectId(input.merchantId),
+    productId: new Types.ObjectId(input.productId),
+    userKey: input.userKey,
+    status: 'cart',
+    designStoragePath: input.designStoragePath,
+    designPublicBaseUrl: input.designPublicBaseUrl,
+    designPublicUrl: input.designPublicUrl,
+    tempStoragePrefix: input.tempStoragePrefix,
+    image: input.image ?? undefined,
+    pagePreviews: input.pagePreviews,
+    printGenerationStatus: 'pending',
+    printGenerationError: '',
+    addedToCartAt: now,
+    lastActivityAt: now,
+  };
+  return DesignCartItemModel.findOneAndUpdate(
+    {
+      merchantId: payload.merchantId,
+      productId: payload.productId,
+      userKey: input.userKey,
+      status: 'cart',
+    },
+    { $set: payload },
+    { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+  ).lean();
 }
 
 function designTempPrefix(merchantId: string, userKey: string, productId: string) {

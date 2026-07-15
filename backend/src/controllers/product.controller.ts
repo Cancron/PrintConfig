@@ -115,6 +115,7 @@ export async function publicDesignUpload(
           file: getUploadedFile(req.files, 'image'),
           pagePreviewFiles: getUploadedFiles(req.files, 'pagePreviews'),
           pagePreviewMeta: req.body.pagePreviewMeta,
+          addToCart: req.body.addToCart,
           origin: `${req.protocol}://${req.get("host")}`,
         }),
       );
