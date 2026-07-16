@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ExternalLink, Eye, Loader2, RefreshCw, X } from 'lucide-react';
+import { Download, ExternalLink, Eye, Loader2, RefreshCw, X } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Select } from '../components/ui/Select';
@@ -160,6 +160,17 @@ function getPrintProgress(item: DesignCartItem) {
 
 function OrderDetailModal({ item, processing, onClose, onGenerate }: { item: DesignCartItem; processing: boolean; onClose: () => void; onGenerate: () => void }) {
   const progress = getPrintProgress(item);
+  const [downloadingZip, setDownloadingZip] = useState(false);
+  async function downloadAllPrintImages() {
+    if (!item.finalPrintFiles?.length) return;
+    setDownloadingZip(true);
+    try {
+      const result = await api.createFinalPrintsDownloadToken(item._id);
+      window.location.href = result.url;
+    } finally {
+      setDownloadingZip(false);
+    }
+  }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="flex max-h-[90vh] w-full max-w-5xl flex-col rounded-lg bg-white shadow-xl ring-1 ring-gray-200">
@@ -192,6 +203,10 @@ function OrderDetailModal({ item, processing, onClose, onGenerate }: { item: Des
         </div>
         <div className="flex justify-end gap-3 border-t border-gray-200 px-5 py-4">
           <button type="button" onClick={onClose} className="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50">Close</button>
+          <button type="button" onClick={downloadAllPrintImages} disabled={!item.finalPrintFiles?.length || downloadingZip} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400">
+            {downloadingZip ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {downloadingZip ? 'Preparing ZIP...' : 'Download All Print Images'}
+          </button>
           <button type="button" onClick={onGenerate} disabled={processing || item.printGenerationStatus === 'processing'} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">
             {processing && <Loader2 className="h-4 w-4 animate-spin" />}
             {item.printGenerationStatus === 'complete' ? 'Regenerate Final Print Images' : 'Generate Final Print Images'}

@@ -138,6 +138,41 @@ export async function processCartItemAdmin(
     next(e);
   }
 }
+
+export async function createFinalPrintsDownloadToken(
+  req: AuthedRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    res.json(
+      await service.createFinalPrintsDownloadToken({
+        cartItemId: String(req.params.cartItemId),
+        accountId: req.user?.accountId,
+        userId: req.user?._id,
+        origin: `${String(req.get("x-forwarded-proto") ?? req.protocol).split(",")[0]}://${req.get("host")}`,
+      }),
+    );
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function downloadFinalPrintsZip(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    await service.streamFinalPrintsZip({
+      cartItemId: String(req.params.cartItemId),
+      downloadToken: String(req.query.downloadToken ?? ""),
+      response: res,
+    });
+  } catch (e) {
+    next(e);
+  }
+}
 export async function publicDesignUpload(
   req: Request,
   res: Response,

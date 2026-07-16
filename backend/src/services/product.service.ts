@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import type { Response } from 'express';
+import { ZipArchive, type ArchiverError } from 'archiver';
 import { Types } from 'mongoose';
 import { ProductModel } from '../models/Product.js';
 import { ProductCategoryModel } from '../models/ProductCategory.js';
@@ -16,6 +18,7 @@ import { normalizeFrontendContentPayload, publicFrontendContent } from '../utils
 import { visibleQuery } from './category.service.js';
 import { resolveAccountId } from './account.service.js';
 import { authenticateApiPrivateKey } from './merchant.service.js';
+import { signDownloadToken, verifyDownloadToken } from './auth.service.js';
 import { galleryBucket, getSupabaseAdmin } from '../config/supabase.js';
 
 export type DependencyCondition = 'equals' | 'not_equals' | 'in' | 'not_in';
@@ -925,6 +928,76 @@ export async function processDesignCartItemForAdmin(input: { cartItemId: string;
   return queueDesignCartItemProcessing(cartItem, input);
 }
 
+export async function createFinalPrintsDownloadToken(input: { cartItemId: string; accountId?: string; userId?: string; origin?: string }) {
+  const cartItem = await findDownloadableCartItem(input.cartItemId, input.accountId);
+  const token = signDownloadToken({
+    sub: input.userId || 'admin',
+    accountId: input.accountId ? String(input.accountId) : String(cartItem.accountId),
+    cartItemId: String(cartItem._id),
+    scope: 'final-prints-download',
+  });
+  const origin = String(input.origin ?? '').replace(/\/+$/, '');
+  return {
+    expiresInSeconds: 300,
+    url: `${origin}/api/products/cart-items/${cartItem._id}/final-prints.zip?downloadToken=${encodeURIComponent(token)}`,
+  };
+}
+
+export async function streamFinalPrintsZip(input: { cartItemId: string; downloadToken: string; response: Response }) {
+  if (!input.downloadToken) throw new ApiError(401, 'downloadToken is required.');
+  let payload: Record<string, unknown>;
+  try {
+    payload = verifyDownloadToken(input.downloadToken) as Record<string, unknown>;
+  } catch {
+    throw new ApiError(401, 'Download token is invalid or expired.');
+  }
+
+  if (payload.scope !== 'final-prints-download') throw new ApiError(401, 'Download token scope is invalid.');
+  if (String(payload.cartItemId ?? '') !== input.cartItemId) throw new ApiError(401, 'Download token does not match this cart item.');
+
+  const cartItem = await findDownloadableCartItem(input.cartItemId, typeof payload.accountId === 'string' ? payload.accountId : undefined);
+  const files = Array.isArray(cartItem.finalPrintFiles) ? cartItem.finalPrintFiles : [];
+  const filename = zipFilename(`final-prints-${cartItem.orderId || cartItem._id}.zip`);
+
+  input.response.setHeader('Content-Type', 'application/zip');
+  input.response.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  input.response.setHeader('Cache-Control', 'no-store');
+
+  const archive = new ZipArchive({ zlib: { level: 6 } });
+  archive.on('error', (error: ArchiverError) => {
+    input.response.destroy(error);
+  });
+  archive.pipe(input.response);
+
+  for (const [index, file] of files.entries()) {
+    const storagePath = String(file?.storagePath ?? '');
+    if (!storagePath) continue;
+    const { data, error } = await getSupabaseAdmin().storage.from(galleryBucket).download(storagePath);
+    if (error || !data) throw new ApiError(502, `Final print download failed: ${error?.message ?? storagePath}`);
+    const arrayBuffer = await data.arrayBuffer();
+    archive.append(Buffer.from(arrayBuffer), {
+      name: sanitizeZipEntryName(String(file?.filename ?? `final-print-${index + 1}.svg`)),
+    });
+  }
+
+  await archive.finalize();
+}
+
+async function findDownloadableCartItem(cartItemId: string, accountId?: string) {
+  if (!Types.ObjectId.isValid(cartItemId)) throw new ApiError(400, 'cartItemId must be a valid MongoDB ObjectId.');
+  const query: Record<string, unknown> = { _id: cartItemId };
+  if (accountId) {
+    if (!Types.ObjectId.isValid(accountId)) throw new ApiError(400, 'accountId must be a valid MongoDB ObjectId.');
+    query.accountId = accountId;
+  }
+  const cartItem = await DesignCartItemModel.findOne(query);
+  if (!cartItem) throw new ApiError(404, 'Design cart item not found.');
+  if (!Array.isArray(cartItem.finalPrintFiles) || cartItem.finalPrintFiles.length === 0) {
+    throw new ApiError(400, 'No final print images are available for download.');
+  }
+  return cartItem;
+}
+
 async function queueDesignCartItemProcessing(cartItem: any, input: { orderId?: unknown; force?: unknown }) {
   const force = parseBoolean(input.force);
   if (cartItem.printGenerationStatus === 'complete' && !force) {
@@ -1575,6 +1648,16 @@ function isStorageNotFound(error: { message?: string; statusCode?: string | numb
 
 function sanitizeUploadSegment(value: string) {
   return value.trim().replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120);
+}
+
+function zipFilename(value: string) {
+  const filename = value.trim().replace(/[^a-zA-Z0-9_.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 160);
+  return filename.toLowerCase().endsWith('.zip') ? filename : `${filename || 'final-prints'}.zip`;
+}
+
+function sanitizeZipEntryName(value: string) {
+  const filename = value.trim().replace(/[\\/]+/g, '-').replace(/[^a-zA-Z0-9_.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 160);
+  return filename || `final-print-${Date.now()}.svg`;
 }
 
 function sanitizeUploadFilename(value: string, fallbackExtension: string) {
