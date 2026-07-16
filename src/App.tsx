@@ -11,25 +11,11 @@ import { ImageLibrary } from './pages/ImageLibrary';
 import { LayoutCategories, LayoutCategoryDetail } from './pages/LayoutCategories';
 import { LayoutTemplates, LayoutTemplateEditor } from './pages/LayoutTemplates';
 import { Collages, CollageEditor } from './pages/Collages';
+import { Orders } from './pages/Orders';
 import { SignIn } from './pages/SignIn';
 import { SignUp } from './pages/SignUp';
 import { WorkspaceProvider } from './hooks/useWorkspace';
 import { AuthProvider, useAuth } from './hooks/useAuth';
-
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-sm text-gray-500">Loading...</div>
-      </div>
-    );
-  }
-  if (!user) {
-    return <Navigate to="/signin" replace />;
-  }
-  return <>{children}</>;
-}
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -64,6 +50,7 @@ function AppRoutes() {
           <Route path="/products/:id" element={<ProductDetail />} />
           <Route path="/merchant-settings" element={<MerchantSettings />} />
           <Route path="/image-library" element={<ImageLibrary />} />
+          <Route path="/orders" element={<Orders />} />
           <Route path="/layouts/categories" element={<LayoutCategories />} />
           <Route path="/layouts/categories/:id" element={<LayoutCategoryDetail />} />
           <Route path="/layouts/templates" element={<LayoutTemplates />} />
