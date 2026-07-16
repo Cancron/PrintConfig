@@ -87,7 +87,9 @@ export function Orders() {
               <TableHeader>Action</TableHeader>
             </TableHead>
             <TableBody>
-              {items.map((item) => (
+              {items.map((item) => {
+                const progress = getPrintProgress(item);
+                return (
                 <tr key={item._id}>
                   <TableCell>
                     <p className="font-medium text-gray-900">{item.orderId || 'No order yet'}</p>
@@ -101,11 +103,12 @@ export function Orders() {
                   <TableCell><Badge tone={item.status === 'ordered' ? 'green' : item.status === 'abandoned' ? 'red' : 'gray'}>{item.status}</Badge></TableCell>
                   <TableCell>
                     <Badge tone={item.printGenerationStatus === 'complete' ? 'green' : item.printGenerationStatus === 'failed' ? 'red' : item.printGenerationStatus === 'processing' ? 'blue' : 'gray'}>{item.printGenerationStatus}</Badge>
+                    {progress.total > 0 && <p className="mt-1 text-xs text-gray-500">{progress.completed}/{progress.total} pages</p>}
                     {item.latestJob && <p className="mt-1 text-xs text-gray-500">Attempts: {item.latestJob.attempts}</p>}
                     {item.printGenerationError && <p className="mt-1 max-w-56 text-xs text-red-600">{item.printGenerationError}</p>}
                   </TableCell>
                   <TableCell><PreviewSummary files={item.pagePreviews} /></TableCell>
-                  <TableCell><FileLinks files={item.finalPrintFiles} /></TableCell>
+                  <TableCell><PreviewSummary files={item.finalPrintFiles} emptyLabel="None" moreLabel="final prints" /></TableCell>
                   <TableCell className="text-sm text-gray-500">{new Date(item.updatedAt).toLocaleString()}</TableCell>
                   <TableCell>
                     <button type="button" onClick={() => setSelectedItem(item)} className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50">
@@ -113,7 +116,7 @@ export function Orders() {
                     </button>
                   </TableCell>
                 </tr>
-              ))}
+              );})}
             </TableBody>
           </Table>
         </div>
@@ -130,8 +133,8 @@ export function Orders() {
   );
 }
 
-function PreviewSummary({ files }: { files: Array<{ publicUrl?: string; url?: string; filename?: string }> }) {
-  if (!files || files.length === 0) return <span className="text-sm text-gray-400">None</span>;
+function PreviewSummary({ files, emptyLabel = 'None', moreLabel = 'previews' }: { files: Array<{ publicUrl?: string; url?: string; filename?: string }>; emptyLabel?: string; moreLabel?: string }) {
+  if (!files || files.length === 0) return <span className="text-sm text-gray-400">{emptyLabel}</span>;
   const first = files[0];
   const url = first.publicUrl || first.url || '';
   const remaining = files.length - 1;
@@ -142,29 +145,21 @@ function PreviewSummary({ files }: { files: Array<{ publicUrl?: string; url?: st
       </a>
       <div>
         <p className="max-w-40 truncate text-xs font-medium text-gray-700">{first.filename || 'Preview 1'}</p>
-        {remaining > 0 && <p className="mt-1 text-xs text-gray-500">+{remaining} previews</p>}
+        {remaining > 0 && <p className="mt-1 text-xs text-gray-500">+{remaining} {moreLabel}</p>}
       </div>
     </div>
   );
 }
 
-function FileLinks({ files }: { files: Array<{ publicUrl?: string; url?: string; filename?: string }> }) {
-  if (!files || files.length === 0) return <span className="text-sm text-gray-400">None</span>;
-  return (
-    <div className="flex max-w-64 flex-wrap gap-2">
-      {files.map((file, index) => {
-        const url = file.publicUrl || file.url || '';
-        return (
-          <a key={`${file.filename ?? index}-${url}`} href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100">
-            {file.filename || `File ${index + 1}`} <ExternalLink className="h-3 w-3" />
-          </a>
-        );
-      })}
-    </div>
-  );
+function getPrintProgress(item: DesignCartItem) {
+  const finalCount = item.finalPrintFiles?.length ?? 0;
+  const total = item.printGenerationTotalPages || (item.printGenerationStatus === 'complete' && finalCount > 0 ? finalCount : Math.max(finalCount, item.pagePreviews?.length ?? 0));
+  const completed = item.printGenerationCompletedPages || finalCount;
+  return { completed, total };
 }
 
 function OrderDetailModal({ item, processing, onClose, onGenerate }: { item: DesignCartItem; processing: boolean; onClose: () => void; onGenerate: () => void }) {
+  const progress = getPrintProgress(item);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="flex max-h-[90vh] w-full max-w-5xl flex-col rounded-lg bg-white shadow-xl ring-1 ring-gray-200">
@@ -183,6 +178,7 @@ function OrderDetailModal({ item, processing, onClose, onGenerate }: { item: Des
             <Info label="User Key" value={item.userKey} />
             <Info label="Status" value={item.status} />
             <Info label="Generation" value={item.printGenerationStatus} />
+            <Info label="Progress" value={progress.total > 0 ? `${progress.completed}/${progress.total} pages` : 'Not started'} />
           </div>
           {item.printGenerationError && <div className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700 ring-1 ring-red-200">{item.printGenerationError}</div>}
           <section className="mt-6">

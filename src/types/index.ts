@@ -135,6 +135,9 @@ export interface DesignCartItem {
   finalPrintFiles: DesignStorageFile[];
   printGenerationStatus: PrintGenerationStatus;
   printGenerationError: string;
+  printGenerationTotalPages: number;
+  printGenerationCompletedPages: number;
+  printGenerationCurrentPage: number;
   latestJob?: DesignProcessingJob | null;
   addedToCartAt: string;
   orderedAt?: string;
