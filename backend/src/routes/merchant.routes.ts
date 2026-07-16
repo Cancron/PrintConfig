@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import * as controller from '../controllers/merchant.controller.js';
+import { requireAuth } from '../middleware/auth.js';
 
 export const merchantRoutes = Router();
-merchantRoutes.get('/', controller.list);
+// Public endpoint
 merchantRoutes.get('/public-config', controller.getPublicConfig);
-merchantRoutes.get('/:id', controller.get);
-merchantRoutes.post('/', controller.create);
-merchantRoutes.put('/:id', controller.update);
-merchantRoutes.post('/:id/api-key', controller.rotateApiKey);
-merchantRoutes.delete('/:id', controller.remove);
+// Admin endpoints
+merchantRoutes.get('/', requireAuth, controller.list);
+merchantRoutes.get('/:id', requireAuth, controller.get);
+merchantRoutes.post('/', requireAuth, controller.create);
+merchantRoutes.put('/:id', requireAuth, controller.update);
+merchantRoutes.post('/:id/api-key', requireAuth, controller.rotateApiKey);
+merchantRoutes.delete('/:id', requireAuth, controller.remove);

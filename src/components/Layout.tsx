@@ -1,13 +1,13 @@
-import { Link, useLocation } from 'react-router-dom';
-import { Images, LayoutDashboard, Package, Settings, Menu, X, Store, FolderTree, LayoutTemplate, ShoppingCart } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Images, LayoutDashboard, Package, Settings, Menu, X, Store, FolderTree, LayoutTemplate, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { useWorkspace } from '../hooks/useWorkspace';
+import { useAuth } from '../hooks/useAuth';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/categories', label: 'Categories', icon: FolderTree },
   { path: '/products', label: 'Products', icon: Package },
-  { path: '/orders', label: 'Orders', icon: ShoppingCart },
   { path: '/image-library', label: 'Image Library', icon: Images },
   { path: '/layouts/categories', label: 'Layout Categories', icon: LayoutTemplate },
   { path: '/layouts/collages', label: 'Collages', icon: LayoutTemplate },
@@ -17,8 +17,15 @@ const navItems = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { merchants, selectedMerchantId, setSelectedMerchantId } = useWorkspace();
+  const { user, signOut } = useAuth();
+
+  function handleSignOut() {
+    signOut();
+    navigate('/signin');
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -85,8 +92,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </button>
           <div className="hidden lg:block" />
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500">Admin</span>
-            <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center text-sm font-medium text-slate-700">A</div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">{user?.name ?? 'Admin'}</span>
+              <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center text-sm font-medium text-slate-700">{(user?.name ?? 'A')[0].toUpperCase()}</div>
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+              title="Sign Out"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Sign Out</span>
+            </button>
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-4 lg:p-8">{children}</main>

@@ -9,37 +9,18 @@ import { imageAssetRoutes } from './routes/image-asset.routes.js';
 import { layoutCategoryRoutes } from './routes/layout-category.routes.js';
 import { layoutTemplateRoutes } from './routes/layout-template.routes.js';
 import { collageRoutes } from './routes/collage.routes.js';
+import { authRoutes } from './routes/auth.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const allowedOrigins = new Set([
   'https://photo-book-prints.lovable.app',
-  'https://canadaprintstudio-admin.onrender.com',
+  'https://photo-book-prints.onrender.com',
   'https://photo-book-studio.onrender.com',
-  'https://canvasprintscanada.com',
-  'https://www.canvasprintsvancouver.com',
-  'https://www.canadaprintstudio.com',
-  'https://www.metalprintscanada.com',
 ]);
 
-function normalizeHostname(value: string) {
-  return value.toLowerCase().replace(/^www\./, '');
-}
-
 function isAllowedOrigin(origin: string) {
-  const normalizedOrigin = origin.replace(/\/$/, '');
-  if (allowedOrigins.has(normalizedOrigin)) return true;
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalizedOrigin)) return true;
-  let originHost = '';
-  try {
-    originHost = normalizeHostname(new URL(normalizedOrigin).hostname);
-  } catch {
-    return false;
-  }
-  for (const allowedOrigin of allowedOrigins) {
-    const allowedHost = normalizeHostname(new URL(allowedOrigin).hostname);
-    if (originHost === allowedHost || originHost.endsWith(`.${allowedHost}`)) return true;
-  }
-  return false;
+  if (allowedOrigins.has(origin.replace(/\/$/, ''))) return true;
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }
 
 const corsOptions: cors.CorsOptions = {
@@ -61,6 +42,11 @@ app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '5mb' }));
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'product-config-api' }));
+
+// Auth routes (public)
+app.use('/api/auth', authRoutes);
+
+// Admin routes - each router applies requireAuth to protected endpoints internally
 app.use('/api/merchants', merchantRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);

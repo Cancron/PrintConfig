@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import * as controller from '../controllers/product.controller.js';
 import { ApiError } from '../middleware/errorHandler.js';
+import { requireAuth } from '../middleware/auth.js';
 
 export const productRoutes = Router();
 const designUpload = multer({
@@ -16,22 +17,20 @@ const designUpload = multer({
   },
 });
 
-productRoutes.get('/', controller.list);
-productRoutes.post('/public/:productId/design-upload', designUpload.fields([
-  { name: 'image', maxCount: 1 },
-  { name: 'pagePreviews', maxCount: 100 },
-]), controller.publicDesignUpload);
+// Public endpoints (no auth)
+productRoutes.get('/public/:productId/design-upload', designUpload.single('image'), controller.publicDesignUpload);
 productRoutes.get('/public/:productId/design', controller.publicDesign);
 productRoutes.get('/public/:id/config', controller.publicConfig);
-productRoutes.get('/cart-items', controller.listCartItems);
-productRoutes.post('/cart-items/:cartItemId/process', controller.processCartItem);
 productRoutes.get('/editor', controller.editorList);
 productRoutes.get('/editor/:id/config', controller.editorConfig);
-productRoutes.get('/:id', controller.get);
-productRoutes.post('/', controller.create);
-productRoutes.put('/:id', controller.update);
-productRoutes.delete('/:id', controller.remove);
-productRoutes.post('/:id/duplicate', controller.duplicate);
-productRoutes.get('/:id/export', controller.exportConfig);
-productRoutes.post('/import', controller.importConfig);
-productRoutes.post('/:id/calculate-price', controller.calculatePrice);
+
+// Admin endpoints (JWT protected)
+productRoutes.get('/', requireAuth, controller.list);
+productRoutes.get('/:id', requireAuth, controller.get);
+productRoutes.post('/', requireAuth, controller.create);
+productRoutes.put('/:id', requireAuth, controller.update);
+productRoutes.delete('/:id', requireAuth, controller.remove);
+productRoutes.post('/:id/duplicate', requireAuth, controller.duplicate);
+productRoutes.get('/:id/export', requireAuth, controller.exportConfig);
+productRoutes.post('/import', requireAuth, controller.importConfig);
+productRoutes.post('/:id/calculate-price', requireAuth, controller.calculatePrice);

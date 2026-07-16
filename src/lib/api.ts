@@ -1,17 +1,45 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Collage, DesignCartItem, ImageAsset, ImageFolder, LayoutCategory, LayoutElement, LayoutTemplate, LayoutTemplatePage, Merchant, Product, ProductCategory } from '../types';
+import type { Collage, ImageAsset, ImageFolder, LayoutCategory, LayoutElement, LayoutTemplate, LayoutTemplatePage, Merchant, Product, ProductCategory } from '../types';
 import { normalizeVariantOptionDefinitions } from './variantOptions';
 import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
 import { normalizeFrontendContent } from './frontendContent';
 import { normalizeEditorProductSelection } from './productSelection';
-import { normalizePhotoBookConfig } from './storage';
+
+export interface AuthUser {
+  _id: string;
+  email: string;
+  name: string;
+  role: string;
+  accountId?: string;
+}
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api';
 
+const AUTH_TOKEN_KEY = 'print-config-auth-token';
+
+export function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setAuthToken(token: string) {
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+export function clearAuthToken() {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(options.headers as Record<string, string> ?? {}) };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...(options.headers ?? {}) },
+    headers,
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -229,14 +257,6 @@ function galleryQuery(input: { accountId: string; merchantId?: string; folderId?
   if (input.search) params.set('search', input.search);
   return params.toString();
 }
-function cartItemsQuery(input: { accountId: string; merchantId?: string; status?: string; printGenerationStatus?: string; limit?: number }) {
-  const params = new URLSearchParams({ accountId: input.accountId });
-  if (input.merchantId) params.set('merchantId', input.merchantId);
-  if (input.status) params.set('status', input.status);
-  if (input.printGenerationStatus) params.set('printGenerationStatus', input.printGenerationStatus);
-  if (input.limit) params.set('limit', String(input.limit));
-  return params.toString();
-}
 function normalizeProduct(raw: any): Product {
   const productId = idOf(raw);
   const variants = (raw.variants ?? []).map((variant: any) => ({
@@ -265,7 +285,6 @@ function normalizeProduct(raw: any): Product {
     editorRules: raw.editorRules ?? {},
     exportRules: raw.exportRules ?? {},
     layoutSettings: normalizeProductLayoutSettings(raw.layoutSettings),
-    photoBook: normalizePhotoBookConfig(raw.photoBook, raw.productType === 'Photo Book Print'),
     createdAt: raw.createdAt ?? new Date().toISOString(),
     updatedAt: raw.updatedAt ?? new Date().toISOString(),
   };
@@ -332,7 +351,6 @@ export const api = {
   updateImageAsset: (asset: ImageAsset) => request<any>(`/image-assets/${asset._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(asset))) }).then(normalizeAsset),
   deleteImageAsset: (id: string) => request(`/image-assets/${id}`, { method: 'DELETE' }),
   moveImageAsset: (id: string, folderId?: string | null) => request<any>(`/image-assets/${id}/move`, { method: 'POST', body: JSON.stringify({ folderId: folderId || null }) }).then(normalizeAsset),
-  listDesignCartItems: (filters: { accountId: string; merchantId?: string; status?: string; printGenerationStatus?: string; limit?: number }) => request<DesignCartItem[]>(`/products/cart-items?${cartItemsQuery(filters)}`),
   listMerchants: (accountId: string) => request<any[]>(`/merchants?accountId=${encodeURIComponent(accountId)}`).then((items) => items.map(normalizeMerchant)),
   updateMerchant: (merchant: Merchant) => request<any>(`/merchants/${merchant._id}`, { method: 'PUT', body: JSON.stringify(merchantPayload(merchant)) }).then(normalizeMerchant),
   rotateMerchantApiKey: (merchantId: string) => request<any>(`/merchants/${merchantId}/api-key`, { method: 'POST' }).then((result) => ({ merchant: normalizeMerchant(result.merchant), apiPrivateKey: String(result.apiPrivateKey) })),
@@ -381,4 +399,7 @@ export const api = {
   duplicateProduct: (id: string, scope: string, merchantId: string | null) => request<any>(`/products/${id}/duplicate`, { method: 'POST', body: JSON.stringify({ scope, merchantId }) }).then(normalizeProduct),
   exportProduct: (id: string) => request<any>(`/products/${id}/export`).then(normalizeProduct),
   importProduct: (product: Product) => request<any>('/products/import', { method: 'POST', body: JSON.stringify(productPayload(product)) }).then(normalizeProduct),
+  signIn: (email: string, password: string) => request<{ user: AuthUser; token: string }>('/auth/signin', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  signUp: (email: string, password: string, name: string) => request<{ user: AuthUser; token: string }>('/auth/signup', { method: 'POST', body: JSON.stringify({ email, password, name }) }),
+  getMe: () => request<{ user: AuthUser }>('/auth/me'),
 };
