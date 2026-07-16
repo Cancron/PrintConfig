@@ -900,6 +900,19 @@ export async function processDesignCartItem(input: { cartItemId: string; apiPriv
 
   const cartItem = await DesignCartItemModel.findOne({ _id: input.cartItemId, merchantId: merchant._id });
   if (!cartItem) throw new ApiError(404, 'Design cart item not found.');
+  return queueDesignCartItemProcessing(cartItem, input);
+}
+
+export async function processDesignCartItemForAdmin(input: { cartItemId: string; accountId?: string; orderId?: unknown; force?: unknown }) {
+  if (!Types.ObjectId.isValid(input.cartItemId)) throw new ApiError(400, 'cartItemId must be a valid MongoDB ObjectId.');
+  const query: Record<string, unknown> = { _id: input.cartItemId };
+  if (input.accountId && Types.ObjectId.isValid(input.accountId)) query.accountId = input.accountId;
+  const cartItem = await DesignCartItemModel.findOne(query);
+  if (!cartItem) throw new ApiError(404, 'Design cart item not found.');
+  return queueDesignCartItemProcessing(cartItem, input);
+}
+
+async function queueDesignCartItemProcessing(cartItem: any, input: { orderId?: unknown; force?: unknown }) {
   const force = parseBoolean(input.force);
   if (cartItem.printGenerationStatus === 'complete' && !force) {
     return {

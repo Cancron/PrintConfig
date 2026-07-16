@@ -362,6 +362,7 @@ export const api = {
   deleteImageAsset: (id: string) => request(`/image-assets/${id}`, { method: 'DELETE' }),
   moveImageAsset: (id: string, folderId?: string | null) => request<any>(`/image-assets/${id}/move`, { method: 'POST', body: JSON.stringify({ folderId: folderId || null }) }).then(normalizeAsset),
   listDesignCartItems: (filters: { accountId: string; merchantId?: string; status?: string; printGenerationStatus?: string; limit?: number }) => request<DesignCartItem[]>(`/products/cart-items?${cartItemsQuery(filters)}`),
+  processDesignCartItem: (id: string, input: { orderId?: string; force?: boolean } = {}) => request<any>(`/products/cart-items/${id}/process-admin`, { method: 'POST', body: JSON.stringify(input) }),
   listMerchants: (accountId: string) => request<any[]>(`/merchants?accountId=${encodeURIComponent(accountId)}`).then((items) => items.map(normalizeMerchant)),
   updateMerchant: (merchant: Merchant) => request<any>(`/merchants/${merchant._id}`, { method: 'PUT', body: JSON.stringify(merchantPayload(merchant)) }).then(normalizeMerchant),
   rotateMerchantApiKey: (merchantId: string) => request<any>(`/merchants/${merchantId}/api-key`, { method: 'POST' }).then((result) => ({ merchant: normalizeMerchant(result.merchant), apiPrivateKey: String(result.apiPrivateKey) })),

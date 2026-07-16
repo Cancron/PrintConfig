@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import type { AuthedRequest } from "../middleware/auth.js";
 import * as service from "../services/product.service.js";
 
 export async function list(req: Request, res: Response, next: NextFunction) {
@@ -111,6 +112,24 @@ export async function processCartItem(
       await service.processDesignCartItem({
         cartItemId: String(req.params.cartItemId),
         apiPrivateKey: String(req.header("x-api-key") ?? ""),
+        orderId: req.body?.orderId,
+        force: req.body?.force,
+      }),
+    );
+  } catch (e) {
+    next(e);
+  }
+}
+export async function processCartItemAdmin(
+  req: AuthedRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    res.status(202).json(
+      await service.processDesignCartItemForAdmin({
+        cartItemId: String(req.params.cartItemId),
+        accountId: req.user?.accountId,
         orderId: req.body?.orderId,
         force: req.body?.force,
       }),
