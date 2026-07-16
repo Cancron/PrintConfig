@@ -12,6 +12,11 @@ import { collageRoutes } from './routes/collage.routes.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
+const configuredOrigins = (process.env.FRONTEND_URL ?? '')
+  .split(',')
+  .map((origin) => origin.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
 const allowedOrigins = new Set([
   'https://photo-book-prints.lovable.app',
   'https://canadaprintstudio-admin.onrender.com',
@@ -20,6 +25,7 @@ const allowedOrigins = new Set([
   'https://www.canvasprintsvancouver.com',
   'https://www.canadaprintstudio.com',
   'https://www.metalprintscanada.com',
+  ...configuredOrigins,
 ]);
 
 function normalizeHostname(value: string) {
@@ -37,7 +43,12 @@ function isAllowedOrigin(origin: string) {
     return false;
   }
   for (const allowedOrigin of allowedOrigins) {
-    const allowedHost = normalizeHostname(new URL(allowedOrigin).hostname);
+    let allowedHost = '';
+    try {
+      allowedHost = normalizeHostname(new URL(allowedOrigin).hostname);
+    } catch {
+      continue;
+    }
     if (originHost === allowedHost || originHost.endsWith(`.${allowedHost}`)) return true;
   }
   return false;
