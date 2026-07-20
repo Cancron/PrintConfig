@@ -38,6 +38,7 @@ const designCartItemSchema = new Schema(
     merchantId: { type: Schema.Types.ObjectId, ref: 'Merchant', required: true, index: true },
     productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
     userKey: { type: String, required: true, trim: true, index: true },
+    projectId: { type: String, default: '', trim: true, index: true },
     status: { type: String, enum: ['cart', 'ordered', 'abandoned'], default: 'cart', index: true },
     designStoragePath: { type: String, required: true },
     designPublicBaseUrl: { type: String, default: '' },
@@ -60,6 +61,6 @@ const designCartItemSchema = new Schema(
   { timestamps: true }
 );
 
-designCartItemSchema.index({ merchantId: 1, productId: 1, userKey: 1, status: 1 });
+designCartItemSchema.index({ merchantId: 1, productId: 1, userKey: 1, projectId: 1, status: 1 });
 
 export const DesignCartItemModel = model('DesignCartItem', designCartItemSchema);

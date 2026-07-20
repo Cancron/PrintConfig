@@ -190,6 +190,7 @@ export async function publicDesignUpload(
           productId: token.productId,
           merchantId: token.merchantId,
           userKey: token.userKey,
+          projectId: req.body.projectId,
           designData: req.body.designData ?? req.body.design,
           file: getUploadedFile(req.files, 'image'),
           pagePreviewFiles: getUploadedFiles(req.files, 'pagePreviews'),
@@ -226,6 +227,7 @@ export async function publicDesign(
         productId: token.productId,
         merchantId: token.merchantId,
         userKey: token.userKey,
+        projectId: req.query.projectId,
       }),
     );
   } catch (e) {

@@ -123,6 +123,7 @@ export interface DesignCartItem {
   productId: string;
   product?: { _id: string; name: string; slug: string; productType: string } | null;
   userKey: string;
+  projectId: string;
   status: DesignCartItemStatus;
   designStoragePath: string;
   designPublicBaseUrl: string;

@@ -10,6 +10,7 @@ import { CollageModel } from '../models/Collage.js';
 import { MerchantModel } from '../models/Merchant.js';
 import { DesignCartItemModel } from '../models/DesignCartItem.js';
 import { DesignProcessingJobModel } from '../models/DesignProcessingJob.js';
+import { DesignProjectModel } from '../models/DesignProject.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { applyModifier, getVariantConfiguredPrice } from '../utils/pricing.js';
 import { slugify } from '../utils/slug.js';
@@ -879,6 +880,7 @@ export async function listDesignCartItems(filters: Record<string, string | undef
       accountId: String(item.accountId),
       merchantId: String(item.merchantId),
       productId: String(item.productId),
+      projectId: String(item.projectId ?? ''),
       product: product ? { _id: String(product._id), name: product.name, slug: product.slug, productType: product.productType } : null,
       printGenerationTotalPages: totalPages,
       printGenerationCompletedPages: completedPages,
@@ -1109,6 +1111,19 @@ async function runDesignCartItemProcessing(jobId: string) {
     cartItem.orderedAt = new Date();
     cartItem.lastActivityAt = new Date();
     await cartItem.save();
+    if (cartItem.projectId) {
+      await DesignProjectModel.findOneAndUpdate(
+        { projectId: cartItem.projectId },
+        {
+          $set: {
+            cartItemId: cartItem._id,
+            status: 'ordered',
+            orderStoragePrefix: orderPrefix,
+            lastActivityAt: new Date(),
+          },
+        }
+      );
+    }
     await DesignProcessingJobModel.findByIdAndUpdate(job._id, {
       status: 'complete',
       completedAt: new Date(),
@@ -1176,6 +1191,7 @@ export async function savePublicDesignUpload(input: {
   productId: string;
   merchantId: string;
   userKey: string;
+  projectId?: unknown;
   designData?: unknown;
   file?: Express.Multer.File;
   pagePreviewFiles?: Express.Multer.File[];
@@ -1194,8 +1210,9 @@ export async function savePublicDesignUpload(input: {
   }
 
   const { merchant, product, userKey } = await resolvePublicDesignContext(input.productId, input.merchantId, input.userKey);
+  const project = await resolveDesignProject({ merchant, product, userKey, requestedProjectId: input.projectId });
   const supabase = getSupabaseAdmin();
-  const prefix = designTempPrefix(String(merchant._id), userKey, String(product._id));
+  const prefix = project.tempStoragePrefix;
   const { data: prefixPublicData } = supabase.storage.from(galleryBucket).getPublicUrl(`${prefix}/`);
   const publicPathPrefix = prefixPublicData.publicUrl;
 
@@ -1271,6 +1288,7 @@ export async function savePublicDesignUpload(input: {
         merchantId: String(merchant._id),
         productId: String(product._id),
         userKey,
+        projectId: project.projectId,
         tempStoragePrefix: prefix,
         designStoragePath,
         designPublicBaseUrl: publicPathPrefix,
@@ -1290,16 +1308,18 @@ export async function savePublicDesignUpload(input: {
     pagePreviews,
     addToCart,
     cartItem,
+    projectId: project.projectId,
     merchantId: String(merchant._id),
     productId: String(product._id),
     userKey,
   };
 }
 
-export async function getPublicDesignWithProduct(input: { productId: string; merchantId: string; userKey: string }) {
+export async function getPublicDesignWithProduct(input: { productId: string; merchantId: string; userKey: string; projectId?: unknown }) {
   const { product, merchant, userKey } = await resolvePublicDesignContext(input.productId, input.merchantId, input.userKey);
+  const project = await resolveDesignProject({ merchant, product, userKey, requestedProjectId: input.projectId });
   const productData = await getPublicProductConfig(String(product._id), String(merchant._id));
-  const designStoragePath = `${designTempPrefix(String(merchant._id), userKey, String(product._id))}/design.json`;
+  const designStoragePath = `${project.tempStoragePrefix}/design.json`;
   let designData: unknown = null;
   let designExists = false;
   const { data, error } = await getSupabaseAdmin().storage.from(galleryBucket).download(designStoragePath);
@@ -1314,6 +1334,7 @@ export async function getPublicDesignWithProduct(input: { productId: string; mer
     design: designData,
     designExists,
     designStoragePath: designExists ? designStoragePath : null,
+    projectId: project.projectId,
     merchantId: String(merchant._id),
     productId: String(product._id),
     userKey,
@@ -1382,11 +1403,50 @@ function parseBoolean(value: unknown) {
   return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on';
 }
 
+async function resolveDesignProject(input: { merchant: any; product: any; userKey: string; requestedProjectId?: unknown }) {
+  const requestedProjectId = sanitizeProjectId(input.requestedProjectId);
+  if (requestedProjectId) {
+    const existing = await DesignProjectModel.findOne({
+      projectId: requestedProjectId,
+      merchantId: input.merchant._id,
+      productId: input.product._id,
+      userKey: input.userKey,
+      status: { $ne: 'ordered' },
+    });
+    if (existing) {
+      existing.lastActivityAt = new Date();
+      await existing.save();
+      return existing;
+    }
+  }
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const projectId = `prj-${randomBytes(12).toString('hex')}`;
+    try {
+      return await DesignProjectModel.create({
+        accountId: input.product.accountId,
+        merchantId: input.merchant._id,
+        productId: input.product._id,
+        userKey: input.userKey,
+        projectId,
+        status: 'draft',
+        tempStoragePrefix: designTempPrefix(String(input.merchant._id), projectId),
+        lastActivityAt: new Date(),
+      });
+    } catch (error: any) {
+      if (error?.code !== 11000 || attempt === 4) throw error;
+    }
+  }
+
+  throw new ApiError(500, 'Could not create a design project.');
+}
+
 async function saveDesignCartItem(input: {
   accountId: string;
   merchantId: string;
   productId: string;
   userKey: string;
+  projectId: string;
   tempStoragePrefix: string;
   designStoragePath: string;
   designPublicBaseUrl: string;
@@ -1400,6 +1460,7 @@ async function saveDesignCartItem(input: {
     merchantId: new Types.ObjectId(input.merchantId),
     productId: new Types.ObjectId(input.productId),
     userKey: input.userKey,
+    projectId: input.projectId,
     status: 'cart',
     designStoragePath: input.designStoragePath,
     designPublicBaseUrl: input.designPublicBaseUrl,
@@ -1417,15 +1478,28 @@ async function saveDesignCartItem(input: {
       merchantId: payload.merchantId,
       productId: payload.productId,
       userKey: input.userKey,
+      projectId: input.projectId,
       status: 'cart',
     },
     { $set: payload },
     { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-  ).lean();
+  ).lean().then(async (cartItem) => {
+    await DesignProjectModel.findOneAndUpdate(
+      { projectId: input.projectId },
+      {
+        $set: {
+          cartItemId: cartItem._id,
+          status: 'cart',
+          lastActivityAt: new Date(),
+        },
+      }
+    );
+    return cartItem;
+  });
 }
 
-function designTempPrefix(merchantId: string, userKey: string, productId: string) {
-  return `designs/tmp/${merchantId}/${userKey}/${productId}`;
+function designTempPrefix(merchantId: string, projectId: string) {
+  return `designs/tmp/${merchantId}/${projectId}`;
 }
 
 function designOrderPrefix(merchantId: string, orderId: string, productId: string) {
@@ -1643,6 +1717,12 @@ function isStorageNotFound(error: { message?: string; statusCode?: string | numb
 
 function sanitizeUploadSegment(value: string) {
   return value.trim().replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120);
+}
+
+function sanitizeProjectId(value: unknown) {
+  const projectId = String(value ?? '').trim();
+  if (!/^[a-zA-Z0-9_-]{8,120}$/.test(projectId)) return '';
+  return projectId;
 }
 
 function zipFilename(value: string) {
