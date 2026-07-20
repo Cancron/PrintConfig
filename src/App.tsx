@@ -11,7 +11,7 @@ import { ImageLibrary } from './pages/ImageLibrary';
 import { LayoutCategories, LayoutCategoryDetail } from './pages/LayoutCategories';
 import { LayoutTemplates, LayoutTemplateEditor } from './pages/LayoutTemplates';
 import { Collages, CollageEditor } from './pages/Collages';
-import { Orders } from './pages/Orders';
+import { OrderDetailPage, Orders } from './pages/Orders';
 import { SignIn } from './pages/SignIn';
 import { SignUp } from './pages/SignUp';
 import { WorkspaceProvider } from './hooks/useWorkspace';
@@ -54,6 +54,7 @@ function AppRoutes() {
           <Route path="/merchant-settings" element={<MerchantSettings />} />
           <Route path="/image-library" element={<ImageLibrary />} />
           <Route path="/orders" element={<Orders />} />
+          <Route path="/orders/:id" element={<OrderDetailPage />} />
           <Route path="/layouts/categories" element={<LayoutCategories />} />
           <Route path="/layouts/categories/:id" element={<LayoutCategoryDetail />} />
           <Route path="/layouts/templates" element={<LayoutTemplates />} />

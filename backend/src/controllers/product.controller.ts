@@ -102,6 +102,18 @@ export async function listCartItems(req: Request, res: Response, next: NextFunct
     next(e);
   }
 }
+
+export async function getCartItem(req: AuthedRequest, res: Response, next: NextFunction) {
+  try {
+    res.json(await service.getDesignCartItem({
+      cartItemId: String(req.params.cartItemId),
+      accountId: req.user?.accountId,
+    }));
+  } catch (e) {
+    next(e);
+  }
+}
+
 export async function processCartItem(
   req: Request,
   res: Response,

@@ -890,6 +890,34 @@ export async function listDesignCartItems(filters: Record<string, string | undef
   });
 }
 
+export async function getDesignCartItem(input: { cartItemId: string; accountId?: string }) {
+  if (!Types.ObjectId.isValid(input.cartItemId)) throw new ApiError(400, 'cartItemId must be a valid MongoDB ObjectId.');
+  const query: Record<string, unknown> = { _id: input.cartItemId };
+  if (input.accountId && Types.ObjectId.isValid(input.accountId)) query.accountId = input.accountId;
+  const item = await DesignCartItemModel.findOne(query).lean();
+  if (!item) throw new ApiError(404, 'Design cart item not found.');
+  const [product, latestJob] = await Promise.all([
+    ProductModel.findById(item.productId).select('name slug productType').lean(),
+    DesignProcessingJobModel.findOne({ cartItemId: item._id }).sort({ createdAt: -1 }).lean(),
+  ]);
+  const finalPrintCount = Array.isArray(item.finalPrintFiles) ? item.finalPrintFiles.length : 0;
+  const totalPages = Number(item.printGenerationTotalPages ?? 0) > 0 ? Number(item.printGenerationTotalPages) : inferFinalPrintTotalPages(item);
+  const completedPages = Number(item.printGenerationCompletedPages ?? 0) > 0 ? Number(item.printGenerationCompletedPages) : finalPrintCount;
+  return {
+    ...item,
+    _id: String(item._id),
+    accountId: String(item.accountId),
+    merchantId: String(item.merchantId),
+    productId: String(item.productId),
+    projectId: String(item.projectId ?? ''),
+    product: product ? { _id: String(product._id), name: product.name, slug: product.slug, productType: product.productType } : null,
+    printGenerationTotalPages: totalPages,
+    printGenerationCompletedPages: completedPages,
+    printGenerationCurrentPage: Number(item.printGenerationCurrentPage ?? 0),
+    latestJob: normalizeLeanJob(latestJob),
+  };
+}
+
 function inferFinalPrintTotalPages(item: Record<string, any>) {
   const finalPrintCount = Array.isArray(item.finalPrintFiles) ? item.finalPrintFiles.length : 0;
   if (item.printGenerationStatus === 'complete' && finalPrintCount > 0) return finalPrintCount;

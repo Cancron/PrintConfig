@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Download, ExternalLink, Eye, Loader2, RefreshCw, X } from 'lucide-react';
+import { ArrowLeft, Download, ExternalLink, Eye, Loader2, RefreshCw } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Select } from '../components/ui/Select';
@@ -30,8 +31,6 @@ export function Orders() {
   const [printStatus, setPrintStatus] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [selectedItem, setSelectedItem] = useState<DesignCartItem | null>(null);
-  const [processingId, setProcessingId] = useState('');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -43,23 +42,6 @@ export function Orders() {
   }, [account._id, printStatus, selectedMerchantId, status]);
 
   useEffect(() => { load(); }, [load]);
-
-  async function generateFinalPrints(item: DesignCartItem) {
-    setProcessingId(item._id);
-    setError('');
-    try {
-      await api.processDesignCartItem(item._id, {
-        orderId: item.orderId || item._id,
-        force: item.printGenerationStatus === 'complete',
-      });
-      await load();
-      setSelectedItem((current) => current ? { ...current, printGenerationStatus: 'processing' } : current);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not start final print generation.');
-    } finally {
-      setProcessingId('');
-    }
-  }
 
   return (
     <div>
@@ -111,9 +93,9 @@ export function Orders() {
                   <TableCell><PreviewSummary files={item.finalPrintFiles} emptyLabel="None" moreLabel="final prints" /></TableCell>
                   <TableCell className="text-sm text-gray-500">{new Date(item.updatedAt).toLocaleString()}</TableCell>
                   <TableCell>
-                    <button type="button" onClick={() => setSelectedItem(item)} className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50">
+                    <Link to={`/orders/${item._id}`} className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50">
                       <Eye className="h-4 w-4" /> View
-                    </button>
+                    </Link>
                   </TableCell>
                 </tr>
               );})}
@@ -121,14 +103,77 @@ export function Orders() {
           </Table>
         </div>
       )}
-      {selectedItem && (
-        <OrderDetailModal
-          item={selectedItem}
-          processing={processingId === selectedItem._id}
-          onClose={() => setSelectedItem(null)}
-          onGenerate={() => generateFinalPrints(selectedItem)}
-        />
-      )}
+    </div>
+  );
+}
+
+export function OrderDetailPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [item, setItem] = useState<DesignCartItem | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(() => {
+    if (!id) return;
+    setLoading(true);
+    setError('');
+    api.getDesignCartItem(id)
+      .then(setItem)
+      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Could not load order detail.'))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function generateFinalPrints() {
+    if (!item) return;
+    setProcessing(true);
+    setError('');
+    try {
+      await api.processDesignCartItem(item._id, {
+        orderId: item.orderId || item._id,
+        force: item.printGenerationStatus === 'complete',
+      });
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not start final print generation.');
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  if (loading && !item) {
+    return (
+      <div>
+        <PageHeader title="Order Detail" description="Loading order detail..." />
+        <div className="rounded-lg bg-white p-6 text-sm text-gray-500 shadow-sm ring-1 ring-gray-200">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error && !item) {
+    return (
+      <div>
+        <button type="button" onClick={() => navigate('/orders')} className="mb-4 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900"><ArrowLeft className="h-4 w-4" />Back to Orders</button>
+        <EmptyState title="Order not found" description={error} />
+      </div>
+    );
+  }
+
+  if (!item) return null;
+
+  return (
+    <div>
+      <button type="button" onClick={() => navigate('/orders')} className="mb-4 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900"><ArrowLeft className="h-4 w-4" />Back to Orders</button>
+      <PageHeader
+        title="Order Detail"
+        description={`${item.orderId || 'No order yet'} - ${item.product?.name ?? item.productId}`}
+        action={<button type="button" onClick={load} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh</button>}
+      />
+      {error && <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700 ring-1 ring-red-200">{error}</div>}
+      <OrderDetailContent item={item} processing={processing} onGenerate={generateFinalPrints} />
     </div>
   );
 }
@@ -158,7 +203,7 @@ function getPrintProgress(item: DesignCartItem) {
   return { completed, total };
 }
 
-function OrderDetailModal({ item, processing, onClose, onGenerate }: { item: DesignCartItem; processing: boolean; onClose: () => void; onGenerate: () => void }) {
+function OrderDetailContent({ item, processing, onGenerate }: { item: DesignCartItem; processing: boolean; onGenerate: () => void }) {
   const progress = getPrintProgress(item);
   const [downloadingZip, setDownloadingZip] = useState(false);
   async function downloadAllPrintImages() {
@@ -172,20 +217,11 @@ function OrderDetailModal({ item, processing, onClose, onGenerate }: { item: Des
     }
   }
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-5xl flex-col rounded-lg bg-white shadow-xl ring-1 ring-gray-200">
-        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">Order Detail</h2>
-            <p className="mt-1 text-sm text-gray-500">{item.orderId || 'No order yet'} - {item.product?.name ?? item.productId}</p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-auto p-5">
+      <div className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200">
+        <div className="p-5">
           <div className="grid gap-4 md:grid-cols-4">
             <Info label="Cart Item" value={item._id} />
+            <Info label="Project" value={item.projectId} />
             <Info label="User Key" value={item.userKey} />
             <Info label="Status" value={item.status} />
             <Info label="Generation" value={item.printGenerationStatus} />
@@ -202,7 +238,6 @@ function OrderDetailModal({ item, processing, onClose, onGenerate }: { item: Des
           </section>
         </div>
         <div className="flex justify-end gap-3 border-t border-gray-200 px-5 py-4">
-          <button type="button" onClick={onClose} className="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50">Close</button>
           <button type="button" onClick={downloadAllPrintImages} disabled={!item.finalPrintFiles?.length || downloadingZip} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400">
             {downloadingZip ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             {downloadingZip ? 'Preparing ZIP...' : 'Download All Print Images'}
@@ -213,7 +248,6 @@ function OrderDetailModal({ item, processing, onClose, onGenerate }: { item: Des
           </button>
         </div>
       </div>
-    </div>
   );
 }
 
