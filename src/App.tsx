@@ -35,7 +35,7 @@ function AppRoutes() {
     return (
       <Routes>
         <Route path="/signin" element={<SignIn />} />
-        <Route path="/signup" element={<SignUp />} />
+        <Route path="/signup" element={<Navigate to="/signin" state={{ from: authPath ? '/' : intendedPath }} replace />} />
         <Route path="*" element={<Navigate to="/signin" state={{ from: authPath ? '/' : intendedPath }} replace />} />
       </Routes>
     );
