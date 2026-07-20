@@ -15,6 +15,7 @@ import { applyModifier, getVariantConfiguredPrice } from '../utils/pricing.js';
 import { slugify } from '../utils/slug.js';
 import { getVariantRoomOrientation, liftLegacyProductRooms, ROOM_ORIENTATIONS } from '../utils/roomPreview.js';
 import { normalizeFrontendContentPayload, publicFrontendContent } from '../utils/frontendContent.js';
+import { renderDesignPageToPngBuffer } from '../utils/designRenderer.js';
 import { visibleQuery } from './category.service.js';
 import { resolveAccountId } from './account.service.js';
 import { authenticateApiPrivateKey } from './merchant.service.js';
@@ -1492,23 +1493,16 @@ async function generateFinalPrintImages(cartItem: Record<string, any>, orderPref
     const page = pages[index];
     const filename = page.filename;
     const storagePath = `${orderPrefix}/final-prints/${filename}`;
-    const svg = finalPrintSvg({
-      cartItemId: String(cartItem._id),
-      orderId: String(cartItem.orderId ?? ''),
-      pageNumber: page.pageNumber,
-      printPageNumber: page.printPageNumber,
-      pageRole: page.pageRole,
-      pageId: page.pageId,
-      previewUrl: page.previewUrl,
-      designUrl: String(cartItem.designPublicUrl ?? ''),
+    const buffer = await renderDesignPageToPngBuffer({
+      design,
+      page,
+      cartItem,
       widthPx: page.widthPx,
       heightPx: page.heightPx,
-      dpi: page.dpi,
-      backgroundColor: page.backgroundColor,
     });
     await supabase.storage.from(galleryBucket).remove([storagePath]);
-    const { error } = await supabase.storage.from(galleryBucket).upload(storagePath, Buffer.from(svg, 'utf8'), {
-      contentType: 'image/svg+xml',
+    const { error } = await supabase.storage.from(galleryBucket).upload(storagePath, buffer, {
+      contentType: 'image/png',
       upsert: true,
       cacheControl: '0',
     });
@@ -1522,8 +1516,8 @@ async function generateFinalPrintImages(cartItem: Record<string, any>, orderPref
       storagePath,
       filename,
       originalName: filename,
-      mimeType: 'image/svg+xml',
-      size: Buffer.byteLength(svg, 'utf8'),
+      mimeType: 'image/png',
+      size: buffer.length,
     };
     output.push(file);
     cartItem.finalPrintFiles = output as any;
@@ -1566,6 +1560,7 @@ function resolveFinalPrintPages(design: unknown, cartItem: Record<string, any>, 
     const previewUrl = String(preview?.publicUrl ?? preview?.url ?? '');
     const dimensions = finalPrintDimensions(page, designRecord, dpi);
     pages.push({
+      ...page,
       pageNumber,
       printPageNumber,
       pageRole,
@@ -1587,9 +1582,9 @@ function getPhotoBookPageRole(index: number, totalPages: number) {
 }
 
 function finalPrintFilename(pageRole: string, printPageNumber: number, sourcePageNumber: number) {
-  if (pageRole === 'front-cover') return 'final-cover-front.svg';
-  if (pageRole === 'back-cover') return 'final-cover-back.svg';
-  return `final-page-${positiveInteger(printPageNumber, sourcePageNumber)}.svg`;
+  if (pageRole === 'front-cover') return 'final-cover-front.png';
+  if (pageRole === 'back-cover') return 'final-cover-back.png';
+  return `final-page-${positiveInteger(printPageNumber, sourcePageNumber)}.png`;
 }
 
 function getDesignPages(design: Record<string, unknown>) {
