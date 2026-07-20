@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { ProductCategories } from './pages/ProductCategories';
@@ -19,6 +19,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 
 function AppRoutes() {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -29,11 +30,13 @@ function AppRoutes() {
   }
 
   if (!user) {
+    const intendedPath = `${location.pathname}${location.search}${location.hash}`;
+    const authPath = location.pathname === '/signin' || location.pathname === '/signup';
     return (
       <Routes>
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
-        <Route path="*" element={<Navigate to="/signin" replace />} />
+        <Route path="*" element={<Navigate to="/signin" state={{ from: authPath ? '/' : intendedPath }} replace />} />
       </Routes>
     );
   }
