@@ -1710,9 +1710,18 @@ function escapeXml(value: string) {
   return value.replace(/[<>&'"]/g, (char) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[char] ?? char));
 }
 
-function isStorageNotFound(error: { message?: string; statusCode?: string | number; name?: string }) {
+function isStorageNotFound(error: { message?: string; statusCode?: string | number; name?: string; error?: string }) {
   const message = String(error.message ?? '').toLowerCase();
-  return error.statusCode === 404 || error.statusCode === '404' || message.includes('not found') || message.includes('object not found');
+  const name = String(error.name ?? '').toLowerCase();
+  const errorCode = String(error.error ?? '').toLowerCase();
+  const hasNoDetails = !error.message && !error.statusCode && !error.name && !error.error;
+  return hasNoDetails
+    || error.statusCode === 404
+    || error.statusCode === '404'
+    || message.includes('not found')
+    || message.includes('object not found')
+    || name.includes('not found')
+    || errorCode.includes('not_found');
 }
 
 function sanitizeUploadSegment(value: string) {
