@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import type { AuthedRequest } from "../middleware/auth.js";
 import * as service from "../services/product.service.js";
 
 export async function list(req: Request, res: Response, next: NextFunction) {
@@ -101,6 +102,18 @@ export async function listCartItems(req: Request, res: Response, next: NextFunct
     next(e);
   }
 }
+
+export async function getCartItem(req: AuthedRequest, res: Response, next: NextFunction) {
+  try {
+    res.json(await service.getDesignCartItem({
+      cartItemId: String(req.params.cartItemId),
+      accountId: req.user?.accountId,
+    }));
+  } catch (e) {
+    next(e);
+  }
+}
+
 export async function processCartItem(
   req: Request,
   res: Response,
@@ -115,6 +128,59 @@ export async function processCartItem(
         force: req.body?.force,
       }),
     );
+  } catch (e) {
+    next(e);
+  }
+}
+export async function processCartItemAdmin(
+  req: AuthedRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    res.status(202).json(
+      await service.processDesignCartItemForAdmin({
+        cartItemId: String(req.params.cartItemId),
+        accountId: req.user?.accountId,
+        orderId: req.body?.orderId,
+        force: req.body?.force,
+      }),
+    );
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function createFinalPrintsDownloadToken(
+  req: AuthedRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    res.json(
+      await service.createFinalPrintsDownloadToken({
+        cartItemId: String(req.params.cartItemId),
+        accountId: req.user?.accountId,
+        userId: req.user?._id,
+        origin: `${String(req.get("x-forwarded-proto") ?? req.protocol).split(",")[0]}://${req.get("host")}`,
+      }),
+    );
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function downloadFinalPrintsZip(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    await service.streamFinalPrintsZip({
+      cartItemId: String(req.params.cartItemId),
+      downloadToken: String(req.query.downloadToken ?? ""),
+      response: res,
+    });
   } catch (e) {
     next(e);
   }
@@ -136,6 +202,7 @@ export async function publicDesignUpload(
           productId: token.productId,
           merchantId: token.merchantId,
           userKey: token.userKey,
+          projectId: req.body.projectId,
           designData: req.body.designData ?? req.body.design,
           file: getUploadedFile(req.files, 'image'),
           pagePreviewFiles: getUploadedFiles(req.files, 'pagePreviews'),
@@ -172,6 +239,7 @@ export async function publicDesign(
         productId: token.productId,
         merchantId: token.merchantId,
         userKey: token.userKey,
+        projectId: req.query.projectId,
       }),
     );
   } catch (e) {

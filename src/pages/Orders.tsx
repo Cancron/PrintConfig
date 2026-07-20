@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ExternalLink, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Download, ExternalLink, Eye, Loader2, RefreshCw } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Select } from '../components/ui/Select';
@@ -65,9 +66,12 @@ export function Orders() {
               <TableHeader>Previews</TableHeader>
               <TableHeader>Final Prints</TableHeader>
               <TableHeader>Updated</TableHeader>
+              <TableHeader>Action</TableHeader>
             </TableHead>
             <TableBody>
-              {items.map((item) => (
+              {items.map((item) => {
+                const progress = getPrintProgress(item);
+                return (
                 <tr key={item._id}>
                   <TableCell>
                     <p className="font-medium text-gray-900">{item.orderId || 'No order yet'}</p>
@@ -81,14 +85,20 @@ export function Orders() {
                   <TableCell><Badge tone={item.status === 'ordered' ? 'green' : item.status === 'abandoned' ? 'red' : 'gray'}>{item.status}</Badge></TableCell>
                   <TableCell>
                     <Badge tone={item.printGenerationStatus === 'complete' ? 'green' : item.printGenerationStatus === 'failed' ? 'red' : item.printGenerationStatus === 'processing' ? 'blue' : 'gray'}>{item.printGenerationStatus}</Badge>
+                    {progress.total > 0 && <p className="mt-1 text-xs text-gray-500">{progress.completed}/{progress.total} pages</p>}
                     {item.latestJob && <p className="mt-1 text-xs text-gray-500">Attempts: {item.latestJob.attempts}</p>}
                     {item.printGenerationError && <p className="mt-1 max-w-56 text-xs text-red-600">{item.printGenerationError}</p>}
                   </TableCell>
-                  <TableCell><FileLinks files={item.pagePreviews} /></TableCell>
-                  <TableCell><FileLinks files={item.finalPrintFiles} /></TableCell>
+                  <TableCell><PreviewSummary files={item.pagePreviews} /></TableCell>
+                  <TableCell><PreviewSummary files={item.finalPrintFiles} emptyLabel="None" moreLabel="final prints" /></TableCell>
                   <TableCell className="text-sm text-gray-500">{new Date(item.updatedAt).toLocaleString()}</TableCell>
+                  <TableCell>
+                    <Link to={`/orders/${item._id}`} className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50">
+                      <Eye className="h-4 w-4" /> View
+                    </Link>
+                  </TableCell>
                 </tr>
-              ))}
+              );})}
             </TableBody>
           </Table>
         </div>
@@ -97,15 +107,174 @@ export function Orders() {
   );
 }
 
-function FileLinks({ files }: { files: Array<{ publicUrl?: string; url?: string; filename?: string }> }) {
-  if (!files || files.length === 0) return <span className="text-sm text-gray-400">None</span>;
+export function OrderDetailPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [item, setItem] = useState<DesignCartItem | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(() => {
+    if (!id) return;
+    setLoading(true);
+    setError('');
+    api.getDesignCartItem(id)
+      .then(setItem)
+      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Could not load order detail.'))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function generateFinalPrints() {
+    if (!item) return;
+    setProcessing(true);
+    setError('');
+    try {
+      await api.processDesignCartItem(item._id, {
+        orderId: item.orderId || item._id,
+        force: item.printGenerationStatus === 'complete',
+      });
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not start final print generation.');
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  if (loading && !item) {
+    return (
+      <div>
+        <PageHeader title="Order Detail" description="Loading order detail..." />
+        <div className="rounded-lg bg-white p-6 text-sm text-gray-500 shadow-sm ring-1 ring-gray-200">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error && !item) {
+    return (
+      <div>
+        <button type="button" onClick={() => navigate('/orders')} className="mb-4 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900"><ArrowLeft className="h-4 w-4" />Back to Orders</button>
+        <EmptyState title="Order not found" description={error} />
+      </div>
+    );
+  }
+
+  if (!item) return null;
+
   return (
-    <div className="flex max-w-64 flex-wrap gap-2">
+    <div>
+      <button type="button" onClick={() => navigate('/orders')} className="mb-4 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900"><ArrowLeft className="h-4 w-4" />Back to Orders</button>
+      <PageHeader
+        title="Order Detail"
+        description={`${item.orderId || 'No order yet'} - ${item.product?.name ?? item.productId}`}
+        action={<button type="button" onClick={load} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh</button>}
+      />
+      {error && <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700 ring-1 ring-red-200">{error}</div>}
+      <OrderDetailContent item={item} processing={processing} onGenerate={generateFinalPrints} />
+    </div>
+  );
+}
+
+function PreviewSummary({ files, emptyLabel = 'None', moreLabel = 'previews' }: { files: Array<{ publicUrl?: string; url?: string; filename?: string }>; emptyLabel?: string; moreLabel?: string }) {
+  if (!files || files.length === 0) return <span className="text-sm text-gray-400">{emptyLabel}</span>;
+  const first = files[0];
+  const url = first.publicUrl || first.url || '';
+  const remaining = files.length - 1;
+  return (
+    <div className="flex items-center gap-3">
+      <a href={url} target="_blank" rel="noreferrer" className="block h-16 w-16 overflow-hidden rounded-md bg-gray-100 ring-1 ring-gray-200">
+        <img src={url} alt={first.filename || 'Preview'} className="h-full w-full object-cover" />
+      </a>
+      <div>
+        <p className="max-w-40 truncate text-xs font-medium text-gray-700">{first.filename || 'Preview 1'}</p>
+        {remaining > 0 && <p className="mt-1 text-xs text-gray-500">+{remaining} {moreLabel}</p>}
+      </div>
+    </div>
+  );
+}
+
+function getPrintProgress(item: DesignCartItem) {
+  const finalCount = item.finalPrintFiles?.length ?? 0;
+  const total = item.printGenerationTotalPages || (item.printGenerationStatus === 'complete' && finalCount > 0 ? finalCount : Math.max(finalCount, item.pagePreviews?.length ?? 0));
+  const completed = item.printGenerationCompletedPages || finalCount;
+  return { completed, total };
+}
+
+function OrderDetailContent({ item, processing, onGenerate }: { item: DesignCartItem; processing: boolean; onGenerate: () => void }) {
+  const progress = getPrintProgress(item);
+  const [downloadingZip, setDownloadingZip] = useState(false);
+  async function downloadAllPrintImages() {
+    if (!item.finalPrintFiles?.length) return;
+    setDownloadingZip(true);
+    try {
+      const result = await api.createFinalPrintsDownloadToken(item._id);
+      window.location.href = result.url;
+    } finally {
+      setDownloadingZip(false);
+    }
+  }
+  return (
+      <div className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200">
+        <div className="p-5">
+          <div className="grid gap-4 md:grid-cols-4">
+            <Info label="Cart Item" value={item._id} />
+            <Info label="Project" value={item.projectId} />
+            <Info label="User Key" value={item.userKey} />
+            <Info label="Status" value={item.status} />
+            <Info label="Generation" value={item.printGenerationStatus} />
+            <Info label="Progress" value={progress.total > 0 ? `${progress.completed}/${progress.total} pages` : 'Not started'} />
+          </div>
+          {item.printGenerationError && <div className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700 ring-1 ring-red-200">{item.printGenerationError}</div>}
+          <section className="mt-6">
+            <h3 className="text-sm font-semibold text-gray-900">Page Previews</h3>
+            <ImageGrid files={item.pagePreviews} />
+          </section>
+          <section className="mt-6">
+            <h3 className="text-sm font-semibold text-gray-900">Final Print Images</h3>
+            <ImageGrid files={item.finalPrintFiles} />
+          </section>
+        </div>
+        <div className="flex justify-end gap-3 border-t border-gray-200 px-5 py-4">
+          <button type="button" onClick={downloadAllPrintImages} disabled={!item.finalPrintFiles?.length || downloadingZip} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400">
+            {downloadingZip ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {downloadingZip ? 'Preparing ZIP...' : 'Download All Print Images'}
+          </button>
+          <button type="button" onClick={onGenerate} disabled={processing || item.printGenerationStatus === 'processing'} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">
+            {processing && <Loader2 className="h-4 w-4 animate-spin" />}
+            {item.printGenerationStatus === 'complete' ? 'Regenerate Final Print Images' : 'Generate Final Print Images'}
+          </button>
+        </div>
+      </div>
+  );
+}
+
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-gray-50 p-3 ring-1 ring-gray-200">
+      <p className="text-xs font-medium uppercase text-gray-500">{label}</p>
+      <p className="mt-1 truncate text-sm text-gray-900">{value || '-'}</p>
+    </div>
+  );
+}
+
+function ImageGrid({ files }: { files: Array<{ publicUrl?: string; url?: string; filename?: string }> }) {
+  if (!files || files.length === 0) return <p className="mt-3 text-sm text-gray-400">None</p>;
+  return (
+    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {files.map((file, index) => {
         const url = file.publicUrl || file.url || '';
         return (
-          <a key={`${file.filename ?? index}-${url}`} href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100">
-            {file.filename || `File ${index + 1}`} <ExternalLink className="h-3 w-3" />
+          <a key={`${file.filename ?? index}-${url}`} href={url} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-md bg-gray-50 ring-1 ring-gray-200 hover:ring-slate-400">
+            <div className="aspect-square bg-gray-100">
+              <img src={url} alt={file.filename || `File ${index + 1}`} className="h-full w-full object-cover" />
+            </div>
+            <div className="flex items-center gap-1 px-2 py-2 text-xs font-medium text-gray-700">
+              <span className="min-w-0 flex-1 truncate">{file.filename || `File ${index + 1}`}</span>
+              <ExternalLink className="h-3 w-3 shrink-0 text-gray-400 group-hover:text-gray-700" />
+            </div>
           </a>
         );
       })}

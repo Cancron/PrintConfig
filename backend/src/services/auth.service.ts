@@ -5,6 +5,7 @@ import { ApiError } from '../middleware/errorHandler.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 const JWT_EXPIRES_IN = '7d';
+const DOWNLOAD_TOKEN_EXPIRES_IN = '5m';
 
 export interface AuthUser {
   _id: string;
@@ -23,6 +24,18 @@ export function signToken(user: { _id: string; email: string; name: string; role
 }
 
 export function verifyToken(token: string): jwt.JwtPayload {
+  return jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+}
+
+export function signDownloadToken(input: { sub: string; accountId?: string; cartItemId: string; scope: 'final-prints-download' }): string {
+  return jwt.sign(
+    { sub: input.sub, accountId: input.accountId, cartItemId: input.cartItemId, scope: input.scope },
+    JWT_SECRET,
+    { expiresIn: DOWNLOAD_TOKEN_EXPIRES_IN }
+  );
+}
+
+export function verifyDownloadToken(token: string): jwt.JwtPayload {
   return jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
 }
 

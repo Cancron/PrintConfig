@@ -26,7 +26,11 @@ productRoutes.post('/public/:productId/design-upload', designUpload.fields([
 productRoutes.get('/public/:productId/design', controller.publicDesign);
 productRoutes.get('/public/:id/config', controller.publicConfig);
 productRoutes.get('/cart-items', controller.listCartItems);
+productRoutes.get('/cart-items/:cartItemId', requireAuth, controller.getCartItem);
 productRoutes.post('/cart-items/:cartItemId/process', controller.processCartItem);
+productRoutes.post('/cart-items/:cartItemId/process-admin', requireAuth, controller.processCartItemAdmin);
+productRoutes.post('/cart-items/:cartItemId/final-prints-download-token', requireAuth, controller.createFinalPrintsDownloadToken);
+productRoutes.get('/cart-items/:cartItemId/final-prints.zip', controller.downloadFinalPrintsZip);
 productRoutes.get('/editor', controller.editorList);
 productRoutes.get('/editor/:id/config', controller.editorConfig);
 

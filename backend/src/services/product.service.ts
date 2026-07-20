@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import type { Response } from 'express';
+import { ZipArchive, type ArchiverError } from 'archiver';
 import { Types } from 'mongoose';
 import { ProductModel } from '../models/Product.js';
 import { ProductCategoryModel } from '../models/ProductCategory.js';
@@ -8,14 +10,17 @@ import { CollageModel } from '../models/Collage.js';
 import { MerchantModel } from '../models/Merchant.js';
 import { DesignCartItemModel } from '../models/DesignCartItem.js';
 import { DesignProcessingJobModel } from '../models/DesignProcessingJob.js';
+import { DesignProjectModel } from '../models/DesignProject.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { applyModifier, getVariantConfiguredPrice } from '../utils/pricing.js';
 import { slugify } from '../utils/slug.js';
 import { getVariantRoomOrientation, liftLegacyProductRooms, ROOM_ORIENTATIONS } from '../utils/roomPreview.js';
 import { normalizeFrontendContentPayload, publicFrontendContent } from '../utils/frontendContent.js';
+import { renderDesignPageToPngBuffer } from '../utils/designRenderer.js';
 import { visibleQuery } from './category.service.js';
 import { resolveAccountId } from './account.service.js';
 import { authenticateApiPrivateKey } from './merchant.service.js';
+import { signDownloadToken, verifyDownloadToken } from './auth.service.js';
 import { galleryBucket, getSupabaseAdmin } from '../config/supabase.js';
 
 export type DependencyCondition = 'equals' | 'not_equals' | 'in' | 'not_in';
@@ -866,16 +871,58 @@ export async function listDesignCartItems(filters: Record<string, string | undef
   }
   return items.map((item) => {
     const product: any = productMap.get(String(item.productId));
+    const finalPrintCount = Array.isArray(item.finalPrintFiles) ? item.finalPrintFiles.length : 0;
+    const totalPages = Number(item.printGenerationTotalPages ?? 0) > 0 ? Number(item.printGenerationTotalPages) : inferFinalPrintTotalPages(item);
+    const completedPages = Number(item.printGenerationCompletedPages ?? 0) > 0 ? Number(item.printGenerationCompletedPages) : finalPrintCount;
     return {
       ...item,
       _id: String(item._id),
       accountId: String(item.accountId),
       merchantId: String(item.merchantId),
       productId: String(item.productId),
+      projectId: String(item.projectId ?? ''),
       product: product ? { _id: String(product._id), name: product.name, slug: product.slug, productType: product.productType } : null,
+      printGenerationTotalPages: totalPages,
+      printGenerationCompletedPages: completedPages,
+      printGenerationCurrentPage: Number(item.printGenerationCurrentPage ?? 0),
       latestJob: normalizeLeanJob(latestJobMap.get(String(item._id))),
     };
   });
+}
+
+export async function getDesignCartItem(input: { cartItemId: string; accountId?: string }) {
+  if (!Types.ObjectId.isValid(input.cartItemId)) throw new ApiError(400, 'cartItemId must be a valid MongoDB ObjectId.');
+  const query: Record<string, unknown> = { _id: input.cartItemId };
+  if (input.accountId && Types.ObjectId.isValid(input.accountId)) query.accountId = input.accountId;
+  const item = await DesignCartItemModel.findOne(query).lean();
+  if (!item) throw new ApiError(404, 'Design cart item not found.');
+  const [product, latestJob] = await Promise.all([
+    ProductModel.findById(item.productId).select('name slug productType').lean(),
+    DesignProcessingJobModel.findOne({ cartItemId: item._id }).sort({ createdAt: -1 }).lean(),
+  ]);
+  const finalPrintCount = Array.isArray(item.finalPrintFiles) ? item.finalPrintFiles.length : 0;
+  const totalPages = Number(item.printGenerationTotalPages ?? 0) > 0 ? Number(item.printGenerationTotalPages) : inferFinalPrintTotalPages(item);
+  const completedPages = Number(item.printGenerationCompletedPages ?? 0) > 0 ? Number(item.printGenerationCompletedPages) : finalPrintCount;
+  return {
+    ...item,
+    _id: String(item._id),
+    accountId: String(item.accountId),
+    merchantId: String(item.merchantId),
+    productId: String(item.productId),
+    projectId: String(item.projectId ?? ''),
+    product: product ? { _id: String(product._id), name: product.name, slug: product.slug, productType: product.productType } : null,
+    printGenerationTotalPages: totalPages,
+    printGenerationCompletedPages: completedPages,
+    printGenerationCurrentPage: Number(item.printGenerationCurrentPage ?? 0),
+    latestJob: normalizeLeanJob(latestJob),
+  };
+}
+
+function inferFinalPrintTotalPages(item: Record<string, any>) {
+  const finalPrintCount = Array.isArray(item.finalPrintFiles) ? item.finalPrintFiles.length : 0;
+  if (item.printGenerationStatus === 'complete' && finalPrintCount > 0) return finalPrintCount;
+  const previewCount = Array.isArray(item.pagePreviews) ? item.pagePreviews.length : 0;
+  return Math.max(finalPrintCount, previewCount);
 }
 
 function normalizeLeanJob(job: any) {
@@ -900,6 +947,89 @@ export async function processDesignCartItem(input: { cartItemId: string; apiPriv
 
   const cartItem = await DesignCartItemModel.findOne({ _id: input.cartItemId, merchantId: merchant._id });
   if (!cartItem) throw new ApiError(404, 'Design cart item not found.');
+  return queueDesignCartItemProcessing(cartItem, input);
+}
+
+export async function processDesignCartItemForAdmin(input: { cartItemId: string; accountId?: string; orderId?: unknown; force?: unknown }) {
+  if (!Types.ObjectId.isValid(input.cartItemId)) throw new ApiError(400, 'cartItemId must be a valid MongoDB ObjectId.');
+  const query: Record<string, unknown> = { _id: input.cartItemId };
+  if (input.accountId && Types.ObjectId.isValid(input.accountId)) query.accountId = input.accountId;
+  const cartItem = await DesignCartItemModel.findOne(query);
+  if (!cartItem) throw new ApiError(404, 'Design cart item not found.');
+  return queueDesignCartItemProcessing(cartItem, input);
+}
+
+export async function createFinalPrintsDownloadToken(input: { cartItemId: string; accountId?: string; userId?: string; origin?: string }) {
+  const cartItem = await findDownloadableCartItem(input.cartItemId, input.accountId);
+  const token = signDownloadToken({
+    sub: input.userId || 'admin',
+    accountId: input.accountId ? String(input.accountId) : String(cartItem.accountId),
+    cartItemId: String(cartItem._id),
+    scope: 'final-prints-download',
+  });
+  const origin = String(input.origin ?? '').replace(/\/+$/, '');
+  return {
+    expiresInSeconds: 300,
+    url: `${origin}/api/products/cart-items/${cartItem._id}/final-prints.zip?downloadToken=${encodeURIComponent(token)}`,
+  };
+}
+
+export async function streamFinalPrintsZip(input: { cartItemId: string; downloadToken: string; response: Response }) {
+  if (!input.downloadToken) throw new ApiError(401, 'downloadToken is required.');
+  let payload: Record<string, unknown>;
+  try {
+    payload = verifyDownloadToken(input.downloadToken) as Record<string, unknown>;
+  } catch {
+    throw new ApiError(401, 'Download token is invalid or expired.');
+  }
+
+  if (payload.scope !== 'final-prints-download') throw new ApiError(401, 'Download token scope is invalid.');
+  if (String(payload.cartItemId ?? '') !== input.cartItemId) throw new ApiError(401, 'Download token does not match this cart item.');
+
+  const cartItem = await findDownloadableCartItem(input.cartItemId, typeof payload.accountId === 'string' ? payload.accountId : undefined);
+  const files = Array.isArray(cartItem.finalPrintFiles) ? cartItem.finalPrintFiles : [];
+  const filename = zipFilename(`final-prints-${cartItem.orderId || cartItem._id}.zip`);
+
+  input.response.setHeader('Content-Type', 'application/zip');
+  input.response.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  input.response.setHeader('Cache-Control', 'no-store');
+
+  const archive = new ZipArchive({ zlib: { level: 6 } });
+  archive.on('error', (error: ArchiverError) => {
+    input.response.destroy(error);
+  });
+  archive.pipe(input.response);
+
+  for (const [index, file] of files.entries()) {
+    const storagePath = String(file?.storagePath ?? '');
+    if (!storagePath) continue;
+    const { data, error } = await getSupabaseAdmin().storage.from(galleryBucket).download(storagePath);
+    if (error || !data) throw new ApiError(502, `Final print download failed: ${error?.message ?? storagePath}`);
+    const arrayBuffer = await data.arrayBuffer();
+    archive.append(Buffer.from(arrayBuffer), {
+      name: sanitizeZipEntryName(String(file?.filename ?? `final-print-${index + 1}.svg`)),
+    });
+  }
+
+  await archive.finalize();
+}
+
+async function findDownloadableCartItem(cartItemId: string, accountId?: string) {
+  if (!Types.ObjectId.isValid(cartItemId)) throw new ApiError(400, 'cartItemId must be a valid MongoDB ObjectId.');
+  const query: Record<string, unknown> = { _id: cartItemId };
+  if (accountId) {
+    if (!Types.ObjectId.isValid(accountId)) throw new ApiError(400, 'accountId must be a valid MongoDB ObjectId.');
+    query.accountId = accountId;
+  }
+  const cartItem = await DesignCartItemModel.findOne(query);
+  if (!cartItem) throw new ApiError(404, 'Design cart item not found.');
+  if (!Array.isArray(cartItem.finalPrintFiles) || cartItem.finalPrintFiles.length === 0) {
+    throw new ApiError(400, 'No final print images are available for download.');
+  }
+  return cartItem;
+}
+
+async function queueDesignCartItemProcessing(cartItem: any, input: { orderId?: unknown; force?: unknown }) {
   const force = parseBoolean(input.force);
   if (cartItem.printGenerationStatus === 'complete' && !force) {
     return {
@@ -930,6 +1060,9 @@ export async function processDesignCartItem(input: { cartItemId: string; apiPriv
   cartItem.orderStoragePrefix = orderPrefix;
   cartItem.printGenerationStatus = 'processing';
   cartItem.printGenerationError = '';
+  cartItem.printGenerationTotalPages = 0;
+  cartItem.printGenerationCompletedPages = 0;
+  cartItem.printGenerationCurrentPage = 0;
   cartItem.lastActivityAt = new Date();
   await cartItem.save();
 
@@ -995,12 +1128,30 @@ async function runDesignCartItemProcessing(jobId: string) {
     cartItem.designPublicUrl = designPublicUrl;
     cartItem.pagePreviews = (cartItem.pagePreviews ?? []).map((preview: any) => rewriteStoredFile(preview, sourcePrefix, orderPrefix)) as any;
     if (cartItem.image) cartItem.image = rewriteStoredFile(cartItem.image as any, sourcePrefix, orderPrefix) as any;
-    cartItem.finalPrintFiles = await generateTemporaryFinalPrintImages(cartItem as any, orderPrefix) as any;
+    cartItem.finalPrintFiles = [] as any;
+    cartItem.printGenerationCompletedPages = 0;
+    cartItem.printGenerationCurrentPage = 0;
+    await cartItem.save();
+    cartItem.finalPrintFiles = await generateFinalPrintImages(cartItem as any, orderPrefix) as any;
     cartItem.printGenerationStatus = 'complete';
     cartItem.printGenerationError = '';
+    cartItem.printGenerationCurrentPage = 0;
     cartItem.orderedAt = new Date();
     cartItem.lastActivityAt = new Date();
     await cartItem.save();
+    if (cartItem.projectId) {
+      await DesignProjectModel.findOneAndUpdate(
+        { projectId: cartItem.projectId },
+        {
+          $set: {
+            cartItemId: cartItem._id,
+            status: 'ordered',
+            orderStoragePrefix: orderPrefix,
+            lastActivityAt: new Date(),
+          },
+        }
+      );
+    }
     await DesignProcessingJobModel.findByIdAndUpdate(job._id, {
       status: 'complete',
       completedAt: new Date(),
@@ -1068,6 +1219,7 @@ export async function savePublicDesignUpload(input: {
   productId: string;
   merchantId: string;
   userKey: string;
+  projectId?: unknown;
   designData?: unknown;
   file?: Express.Multer.File;
   pagePreviewFiles?: Express.Multer.File[];
@@ -1086,8 +1238,9 @@ export async function savePublicDesignUpload(input: {
   }
 
   const { merchant, product, userKey } = await resolvePublicDesignContext(input.productId, input.merchantId, input.userKey);
+  const project = await resolveDesignProject({ merchant, product, userKey, requestedProjectId: input.projectId });
   const supabase = getSupabaseAdmin();
-  const prefix = designTempPrefix(String(merchant._id), userKey, String(product._id));
+  const prefix = project.tempStoragePrefix;
   const { data: prefixPublicData } = supabase.storage.from(galleryBucket).getPublicUrl(`${prefix}/`);
   const publicPathPrefix = prefixPublicData.publicUrl;
 
@@ -1163,6 +1316,7 @@ export async function savePublicDesignUpload(input: {
         merchantId: String(merchant._id),
         productId: String(product._id),
         userKey,
+        projectId: project.projectId,
         tempStoragePrefix: prefix,
         designStoragePath,
         designPublicBaseUrl: publicPathPrefix,
@@ -1182,30 +1336,44 @@ export async function savePublicDesignUpload(input: {
     pagePreviews,
     addToCart,
     cartItem,
+    projectId: project.projectId,
     merchantId: String(merchant._id),
     productId: String(product._id),
     userKey,
   };
 }
 
-export async function getPublicDesignWithProduct(input: { productId: string; merchantId: string; userKey: string }) {
+export async function getPublicDesignWithProduct(input: { productId: string; merchantId: string; userKey: string; projectId?: unknown }) {
   const { product, merchant, userKey } = await resolvePublicDesignContext(input.productId, input.merchantId, input.userKey);
+  let project = await resolveDesignProject({ merchant, product, userKey, requestedProjectId: input.projectId });
   const productData = await getPublicProductConfig(String(product._id), String(merchant._id));
-  const designStoragePath = `${designTempPrefix(String(merchant._id), userKey, String(product._id))}/design.json`;
+  let designStoragePath = `${project.tempStoragePrefix}/design.json`;
   let designData: unknown = null;
   let designExists = false;
   const { data, error } = await getSupabaseAdmin().storage.from(galleryBucket).download(designStoragePath);
   if (error) {
-    if (!isStorageNotFound(error)) throw new ApiError(502, `Supabase design read failed: ${error.message} ${designStoragePath}`);
+    const exists = await storageObjectExists(designStoragePath);
+    if (exists) {
+      project = await resolveDesignProject({ merchant, product, userKey });
+      designStoragePath = `${project.tempStoragePrefix}/design.json`;
+    }
   } else if (data) {
-    designData = JSON.parse(await data.text());
-    designExists = true;
+    try {
+      designData = JSON.parse(await data.text());
+      designExists = true;
+    } catch {
+      project = await resolveDesignProject({ merchant, product, userKey });
+      designStoragePath = `${project.tempStoragePrefix}/design.json`;
+      designData = null;
+      designExists = false;
+    }
   }
   return {
     product: productData,
     design: designData,
     designExists,
     designStoragePath: designExists ? designStoragePath : null,
+    projectId: project.projectId,
     merchantId: String(merchant._id),
     productId: String(product._id),
     userKey,
@@ -1274,11 +1442,50 @@ function parseBoolean(value: unknown) {
   return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on';
 }
 
+async function resolveDesignProject(input: { merchant: any; product: any; userKey: string; requestedProjectId?: unknown }) {
+  const requestedProjectId = sanitizeProjectId(input.requestedProjectId);
+  if (requestedProjectId) {
+    const existing = await DesignProjectModel.findOne({
+      projectId: requestedProjectId,
+      merchantId: input.merchant._id,
+      productId: input.product._id,
+      userKey: input.userKey,
+      status: { $ne: 'ordered' },
+    });
+    if (existing) {
+      existing.lastActivityAt = new Date();
+      await existing.save();
+      return existing;
+    }
+  }
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const projectId = `prj-${randomBytes(12).toString('hex')}`;
+    try {
+      return await DesignProjectModel.create({
+        accountId: input.product.accountId,
+        merchantId: input.merchant._id,
+        productId: input.product._id,
+        userKey: input.userKey,
+        projectId,
+        status: 'draft',
+        tempStoragePrefix: designTempPrefix(String(input.merchant._id), projectId),
+        lastActivityAt: new Date(),
+      });
+    } catch (error: any) {
+      if (error?.code !== 11000 || attempt === 4) throw error;
+    }
+  }
+
+  throw new ApiError(500, 'Could not create a design project.');
+}
+
 async function saveDesignCartItem(input: {
   accountId: string;
   merchantId: string;
   productId: string;
   userKey: string;
+  projectId: string;
   tempStoragePrefix: string;
   designStoragePath: string;
   designPublicBaseUrl: string;
@@ -1292,6 +1499,7 @@ async function saveDesignCartItem(input: {
     merchantId: new Types.ObjectId(input.merchantId),
     productId: new Types.ObjectId(input.productId),
     userKey: input.userKey,
+    projectId: input.projectId,
     status: 'cart',
     designStoragePath: input.designStoragePath,
     designPublicBaseUrl: input.designPublicBaseUrl,
@@ -1309,15 +1517,28 @@ async function saveDesignCartItem(input: {
       merchantId: payload.merchantId,
       productId: payload.productId,
       userKey: input.userKey,
+      projectId: input.projectId,
       status: 'cart',
     },
     { $set: payload },
     { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-  ).lean();
+  ).lean().then(async (cartItem) => {
+    await DesignProjectModel.findOneAndUpdate(
+      { projectId: input.projectId },
+      {
+        $set: {
+          cartItemId: cartItem._id,
+          status: 'cart',
+          lastActivityAt: new Date(),
+        },
+      }
+    );
+    return cartItem;
+  });
 }
 
-function designTempPrefix(merchantId: string, userKey: string, productId: string) {
-  return `designs/tmp/${merchantId}/${userKey}/${productId}`;
+function designTempPrefix(merchantId: string, projectId: string) {
+  return `designs/tmp/${merchantId}/${projectId}`;
 }
 
 function designOrderPrefix(merchantId: string, orderId: string, productId: string) {
@@ -1356,6 +1577,17 @@ async function listStorageFilesRecursive(folder: string, output: string[]) {
   }
 }
 
+async function storageObjectExists(storagePath: string) {
+  const cleanPath = storagePath.replace(/^\/+|\/+$/g, '');
+  const slashIndex = cleanPath.lastIndexOf('/');
+  const folder = slashIndex >= 0 ? cleanPath.slice(0, slashIndex) : '';
+  const filename = slashIndex >= 0 ? cleanPath.slice(slashIndex + 1) : cleanPath;
+  if (!filename) return false;
+  const { data, error } = await getSupabaseAdmin().storage.from(galleryBucket).list(folder, { limit: 1000 });
+  if (error) return false;
+  return (data ?? []).some((item) => item.name === filename);
+}
+
 function rewriteStoredFile(file: Record<string, any>, sourcePrefix: string, destinationPrefix: string) {
   const storagePath = String(file.storagePath ?? '');
   if (!storagePath.startsWith(sourcePrefix)) return file;
@@ -1369,33 +1601,38 @@ function rewriteStoredFile(file: Record<string, any>, sourcePrefix: string, dest
   };
 }
 
-async function generateTemporaryFinalPrintImages(cartItem: Record<string, any>, orderPrefix: string) {
-  const previews = Array.isArray(cartItem.pagePreviews) && cartItem.pagePreviews.length > 0
-    ? cartItem.pagePreviews
-    : [{ pageNumber: 1, pageId: 'page-1' }];
+async function generateFinalPrintImages(cartItem: Record<string, any>, orderPrefix: string) {
+  const design = await readDesignJsonFromStorage(String(cartItem.designStoragePath));
+  const product = await ProductModel.findById(cartItem.productId).lean();
+  const pages = resolveFinalPrintPages(design, cartItem, product);
+  if (pages.length === 0) throw new ApiError(400, 'No pages are available for final print generation.');
   const supabase = getSupabaseAdmin();
   const output = [];
-  for (let index = 0; index < previews.length; index += 1) {
-    const preview = previews[index] ?? {};
-    const pageNumber = Number(preview.pageNumber ?? index + 1);
-    const filename = `final-page-${Number.isFinite(pageNumber) ? pageNumber : index + 1}.svg`;
+  cartItem.printGenerationTotalPages = pages.length;
+  cartItem.printGenerationCompletedPages = 0;
+  cartItem.printGenerationCurrentPage = 0;
+  await cartItem.save();
+
+  for (let index = 0; index < pages.length; index += 1) {
+    const page = pages[index];
+    const filename = page.filename;
     const storagePath = `${orderPrefix}/final-prints/${filename}`;
-    const svg = temporaryFinalPrintSvg({
-      cartItemId: String(cartItem._id),
-      orderId: String(cartItem.orderId ?? ''),
-      pageNumber: Number.isFinite(pageNumber) ? pageNumber : index + 1,
-      previewUrl: String(preview.publicUrl ?? preview.url ?? ''),
-      designUrl: String(cartItem.designPublicUrl ?? ''),
+    const buffer = await renderDesignPageToPngBuffer({
+      design,
+      page,
+      cartItem,
+      widthPx: page.widthPx,
+      heightPx: page.heightPx,
     });
     await supabase.storage.from(galleryBucket).remove([storagePath]);
-    const { error } = await supabase.storage.from(galleryBucket).upload(storagePath, Buffer.from(svg, 'utf8'), {
-      contentType: 'image/svg+xml',
+    const { error } = await supabase.storage.from(galleryBucket).upload(storagePath, buffer, {
+      contentType: 'image/png',
       upsert: true,
       cacheControl: '0',
     });
-    if (error) throw new ApiError(502, `Temporary final print generation upload failed: ${error.message}`);
+    if (error) throw new ApiError(502, `Final print generation upload failed: ${error.message}`);
     const { data } = supabase.storage.from(galleryBucket).getPublicUrl(storagePath);
-    output.push({
+    const file = {
       url: data.publicUrl,
       publicUrl: data.publicUrl,
       storageProvider: 'supabase',
@@ -1403,37 +1640,131 @@ async function generateTemporaryFinalPrintImages(cartItem: Record<string, any>, 
       storagePath,
       filename,
       originalName: filename,
-      mimeType: 'image/svg+xml',
-      size: Buffer.byteLength(svg, 'utf8'),
-    });
+      mimeType: 'image/png',
+      size: buffer.length,
+    };
+    output.push(file);
+    cartItem.finalPrintFiles = output as any;
+    cartItem.printGenerationStatus = 'processing';
+    cartItem.printGenerationCurrentPage = page.pageNumber;
+    cartItem.printGenerationCompletedPages = output.length;
+    cartItem.lastActivityAt = new Date();
+    await cartItem.save();
   }
   return output;
 }
 
-function temporaryFinalPrintSvg(input: { cartItemId: string; orderId: string; pageNumber: number; previewUrl: string; designUrl: string }) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
-  <rect width="1200" height="1200" fill="#ffffff"/>
-  <rect x="60" y="60" width="1080" height="1080" fill="#f8fafc" stroke="#0f172a" stroke-width="6"/>
-  <text x="600" y="470" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#0f172a">Temporary Final Print</text>
-  <text x="600" y="550" text-anchor="middle" font-family="Arial, sans-serif" font-size="40" fill="#334155">Page ${escapeXml(String(input.pageNumber))}</text>
-  <text x="600" y="625" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#475569">Order: ${escapeXml(input.orderId || 'pending')}</text>
-  <text x="600" y="680" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#64748b">Cart item: ${escapeXml(input.cartItemId)}</text>
-  <text x="600" y="750" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" fill="#64748b">Design: ${escapeXml(input.designUrl)}</text>
-  <text x="600" y="800" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" fill="#64748b">Preview: ${escapeXml(input.previewUrl)}</text>
-</svg>`;
+async function readDesignJsonFromStorage(storagePath: string) {
+  const { data, error } = await getSupabaseAdmin().storage.from(galleryBucket).download(storagePath);
+  if (error) throw new ApiError(502, `Supabase design read failed: ${error.message} ${storagePath}`);
+  if (!data) throw new ApiError(400, 'Saved design file is empty.');
+  try {
+    return JSON.parse(await data.text());
+  } catch {
+    throw new ApiError(400, 'Saved design JSON is invalid.');
+  }
 }
+
+function resolveFinalPrintPages(design: unknown, cartItem: Record<string, any>, product: any) {
+  const designRecord = isRecordLike(design) ? design : {};
+  const designPages = getDesignPages(designRecord);
+  const previews = Array.isArray(cartItem.pagePreviews) ? [...cartItem.pagePreviews] : [];
+  previews.sort((a, b) => Number(a.pageNumber ?? 0) - Number(b.pageNumber ?? 0));
+  const dpi = positiveNumber((designRecord as any).exportRules?.dpi, positiveNumber(product?.exportRules?.dpi, 300));
+  const sourcePages: Record<string, any>[] = designPages.length > 0 ? designPages : previews.map((preview, index) => ({ pageNumber: Number(preview.pageNumber ?? index + 1), pageId: preview.pageId }));
+  const pages = [];
+  for (let index = 0; index < sourcePages.length; index += 1) {
+    const page = sourcePages[index];
+    const pageNumber = positiveInteger(page.pageNumber, index + 1);
+    const pageRole = getPhotoBookPageRole(index, sourcePages.length);
+    if (pageRole !== 'interior') continue;
+    const printPageNumber = index;
+    const pageId = String(page.pageId ?? page._id ?? page.id ?? `page-${pageNumber}`);
+    const preview = previews.find((item) => String(item.pageId ?? '') === pageId) ?? previews.find((item) => Number(item.pageNumber) === printPageNumber) ?? previews[printPageNumber - 1];
+    const previewUrl = String(preview?.publicUrl ?? preview?.url ?? '');
+    const dimensions = finalPrintDimensions(page, designRecord, dpi);
+    pages.push({
+      ...page,
+      pageNumber,
+      printPageNumber,
+      pageRole,
+      filename: finalPrintFilename(pageRole, printPageNumber, pageNumber),
+      pageId,
+      previewUrl,
+      dpi,
+      backgroundColor: typeof page.backgroundColor === 'string' ? page.backgroundColor : typeof (designRecord as any).backgroundColor === 'string' ? (designRecord as any).backgroundColor : '#ffffff',
+      ...dimensions,
+    });
+  }
+  return pages;
+}
+
+function getPhotoBookPageRole(index: number, totalPages: number) {
+  if (index === 0) return 'front-cover';
+  if (totalPages > 1 && index === totalPages - 1) return 'back-cover';
+  return 'interior';
+}
+
+function finalPrintFilename(pageRole: string, printPageNumber: number, sourcePageNumber: number) {
+  if (pageRole === 'front-cover') return 'final-cover-front.png';
+  if (pageRole === 'back-cover') return 'final-cover-back.png';
+  return `final-page-${positiveInteger(printPageNumber, sourcePageNumber)}.png`;
+}
+
+function getDesignPages(design: Record<string, unknown>) {
+  if (Array.isArray(design.pages)) return design.pages.filter(isRecordLike);
+  if (isRecordLike(design.design) && Array.isArray(design.design.pages)) return design.design.pages.filter(isRecordLike);
+  if (isRecordLike(design.book) && Array.isArray(design.book.pages)) return design.book.pages.filter(isRecordLike);
+  return [];
+}
+
+function finalPrintDimensions(page: Record<string, unknown>, design: Record<string, unknown>, dpi: number) {
+  const unit = String(page.unit ?? design.unit ?? 'inch');
+  const width = positiveNumber(page.width, positiveNumber(page.canvasWidth, positiveNumber(design.pageWidth, positiveNumber(design.canvasWidth, 12))));
+  const height = positiveNumber(page.height, positiveNumber(page.canvasHeight, positiveNumber(design.pageHeight, positiveNumber(design.canvasHeight, 12))));
+  if (unit === 'px') return { widthPx: Math.round(width), heightPx: Math.round(height) };
+  if (unit === 'mm') return { widthPx: Math.round((width / 25.4) * dpi), heightPx: Math.round((height / 25.4) * dpi) };
+  return { widthPx: Math.round(width * dpi), heightPx: Math.round(height * dpi) };
+}
+
+function positiveNumber(value: unknown, fallback: number) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
+}
+
+function positiveInteger(value: unknown, fallback: number) {
+  const numeric = Math.round(Number(value));
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
+}
+
+function isRecordLike(value: unknown): value is Record<string, any> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 
 function escapeXml(value: string) {
   return value.replace(/[<>&'"]/g, (char) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[char] ?? char));
 }
 
-function isStorageNotFound(error: { message?: string; statusCode?: string | number; name?: string }) {
-  const message = String(error.message ?? '').toLowerCase();
-  return error.statusCode === 404 || error.statusCode === '404' || message.includes('not found') || message.includes('object not found');
-}
 
 function sanitizeUploadSegment(value: string) {
   return value.trim().replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120);
+}
+
+function sanitizeProjectId(value: unknown) {
+  const projectId = String(value ?? '').trim();
+  if (!/^[a-zA-Z0-9_-]{8,120}$/.test(projectId)) return '';
+  return projectId;
+}
+
+function zipFilename(value: string) {
+  const filename = value.trim().replace(/[^a-zA-Z0-9_.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 160);
+  return filename.toLowerCase().endsWith('.zip') ? filename : `${filename || 'final-prints'}.zip`;
+}
+
+function sanitizeZipEntryName(value: string) {
+  const filename = value.trim().replace(/[\\/]+/g, '-').replace(/[^a-zA-Z0-9_.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 160);
+  return filename || `final-print-${Date.now()}.svg`;
 }
 
 function sanitizeUploadFilename(value: string, fallbackExtension: string) {

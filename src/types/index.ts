@@ -123,6 +123,7 @@ export interface DesignCartItem {
   productId: string;
   product?: { _id: string; name: string; slug: string; productType: string } | null;
   userKey: string;
+  projectId: string;
   status: DesignCartItemStatus;
   designStoragePath: string;
   designPublicBaseUrl: string;
@@ -135,6 +136,9 @@ export interface DesignCartItem {
   finalPrintFiles: DesignStorageFile[];
   printGenerationStatus: PrintGenerationStatus;
   printGenerationError: string;
+  printGenerationTotalPages: number;
+  printGenerationCompletedPages: number;
+  printGenerationCurrentPage: number;
   latestJob?: DesignProcessingJob | null;
   addedToCartAt: string;
   orderedAt?: string;

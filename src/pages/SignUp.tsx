@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { UserPlus, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export function SignUp() {
   const { signUp } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,7 +31,7 @@ export function SignUp() {
     setLoading(true);
     try {
       await signUp(email, password, name);
-      navigate('/');
+      navigate(getAuthRedirectPath(location.state), { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign up failed.');
     } finally {
@@ -129,7 +130,7 @@ export function SignUp() {
 
           <p className="mt-6 text-center text-sm text-gray-500">
             Already have an account?{' '}
-            <Link to="/signin" className="font-semibold text-slate-900 hover:underline">
+            <Link to="/signin" state={location.state} className="font-semibold text-slate-900 hover:underline">
               Sign in
             </Link>
           </p>
@@ -137,4 +138,10 @@ export function SignUp() {
       </div>
     </div>
   );
+}
+
+function getAuthRedirectPath(state: unknown) {
+  if (!state || typeof state !== 'object' || !('from' in state)) return '/';
+  const from = String((state as { from?: unknown }).from ?? '/');
+  return from.startsWith('/') && !from.startsWith('//') && from !== '/signin' && from !== '/signup' ? from : '/';
 }
