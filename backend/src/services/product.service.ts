@@ -1317,17 +1317,28 @@ export async function savePublicDesignUpload(input: {
 
 export async function getPublicDesignWithProduct(input: { productId: string; merchantId: string; userKey: string; projectId?: unknown }) {
   const { product, merchant, userKey } = await resolvePublicDesignContext(input.productId, input.merchantId, input.userKey);
-  const project = await resolveDesignProject({ merchant, product, userKey, requestedProjectId: input.projectId });
+  let project = await resolveDesignProject({ merchant, product, userKey, requestedProjectId: input.projectId });
   const productData = await getPublicProductConfig(String(product._id), String(merchant._id));
-  const designStoragePath = `${project.tempStoragePrefix}/design.json`;
+  let designStoragePath = `${project.tempStoragePrefix}/design.json`;
   let designData: unknown = null;
   let designExists = false;
   const { data, error } = await getSupabaseAdmin().storage.from(galleryBucket).download(designStoragePath);
   if (error) {
-    if (!isStorageNotFound(error)) throw new ApiError(502, `Supabase design read failed: ${error.message} ${designStoragePath}`);
+    const exists = await storageObjectExists(designStoragePath);
+    if (exists) {
+      project = await resolveDesignProject({ merchant, product, userKey });
+      designStoragePath = `${project.tempStoragePrefix}/design.json`;
+    }
   } else if (data) {
-    designData = JSON.parse(await data.text());
-    designExists = true;
+    try {
+      designData = JSON.parse(await data.text());
+      designExists = true;
+    } catch {
+      project = await resolveDesignProject({ merchant, product, userKey });
+      designStoragePath = `${project.tempStoragePrefix}/design.json`;
+      designData = null;
+      designExists = false;
+    }
   }
   return {
     product: productData,
@@ -1538,6 +1549,17 @@ async function listStorageFilesRecursive(folder: string, output: string[]) {
   }
 }
 
+async function storageObjectExists(storagePath: string) {
+  const cleanPath = storagePath.replace(/^\/+|\/+$/g, '');
+  const slashIndex = cleanPath.lastIndexOf('/');
+  const folder = slashIndex >= 0 ? cleanPath.slice(0, slashIndex) : '';
+  const filename = slashIndex >= 0 ? cleanPath.slice(slashIndex + 1) : cleanPath;
+  if (!filename) return false;
+  const { data, error } = await getSupabaseAdmin().storage.from(galleryBucket).list(folder, { limit: 1000 });
+  if (error) return false;
+  return (data ?? []).some((item) => item.name === filename);
+}
+
 function rewriteStoredFile(file: Record<string, any>, sourcePrefix: string, destinationPrefix: string) {
   const storagePath = String(file.storagePath ?? '');
   if (!storagePath.startsWith(sourcePrefix)) return file;
@@ -1691,38 +1713,11 @@ function isRecordLike(value: unknown): value is Record<string, any> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
-function finalPrintSvg(input: { cartItemId: string; orderId: string; pageNumber: number; printPageNumber: number; pageRole: string; pageId: string; previewUrl: string; designUrl: string; widthPx: number; heightPx: number; dpi: number; backgroundColor: string }) {
-  const label = input.pageRole === 'front-cover'
-    ? 'Front cover'
-    : input.pageRole === 'back-cover'
-      ? 'Back cover'
-      : `Page ${input.printPageNumber}`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${input.widthPx}" height="${input.heightPx}" viewBox="0 0 ${input.widthPx} ${input.heightPx}">
-  <title>Final print ${escapeXml(label)}</title>
-  <desc>Generated from saved design ${escapeXml(input.designUrl)} for cart item ${escapeXml(input.cartItemId)}.</desc>
-  <rect width="100%" height="100%" fill="${escapeXml(input.backgroundColor || '#ffffff')}"/>
-  ${input.previewUrl ? `<image href="${escapeXml(input.previewUrl)}" x="0" y="0" width="${input.widthPx}" height="${input.heightPx}" preserveAspectRatio="xMidYMid meet"/>` : ''}
-  <metadata>${escapeXml(JSON.stringify({ orderId: input.orderId, cartItemId: input.cartItemId, sourcePageNumber: input.pageNumber, printPageNumber: input.printPageNumber || null, pageRole: input.pageRole, pageId: input.pageId, dpi: input.dpi, designUrl: input.designUrl }))}</metadata>
-</svg>`;
-}
 
 function escapeXml(value: string) {
   return value.replace(/[<>&'"]/g, (char) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[char] ?? char));
 }
 
-function isStorageNotFound(error: { message?: string; statusCode?: string | number; name?: string; error?: string }) {
-  const message = String(error.message ?? '').toLowerCase();
-  const name = String(error.name ?? '').toLowerCase();
-  const errorCode = String(error.error ?? '').toLowerCase();
-  const hasNoDetails = !error.message && !error.statusCode && !error.name && !error.error;
-  return hasNoDetails
-    || error.statusCode === 404
-    || error.statusCode === '404'
-    || message.includes('not found')
-    || message.includes('object not found')
-    || name.includes('not found')
-    || errorCode.includes('not_found');
-}
 
 function sanitizeUploadSegment(value: string) {
   return value.trim().replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120);
