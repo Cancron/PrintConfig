@@ -122,6 +122,7 @@ export interface DesignCartItem {
   accountId: string;
   merchantId: string;
   productId: string;
+  productType: ProductType;
   product?: { _id: string; name: string; slug: string; productType: string } | null;
   userKey: string;
   projectId: string;

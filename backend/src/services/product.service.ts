@@ -880,6 +880,7 @@ export async function listDesignCartItems(filters: Record<string, string | undef
       accountId: String(item.accountId),
       merchantId: String(item.merchantId),
       productId: String(item.productId),
+      productType: normalizeDesignProductType(item.productType, product?.productType),
       projectId: String(item.projectId ?? ''),
       product: product ? { _id: String(product._id), name: product.name, slug: product.slug, productType: product.productType } : null,
       printGenerationTotalPages: totalPages,
@@ -909,6 +910,7 @@ export async function getDesignCartItem(input: { cartItemId: string; accountId?:
     accountId: String(item.accountId),
     merchantId: String(item.merchantId),
     productId: String(item.productId),
+    productType: normalizeDesignProductType(item.productType, product?.productType),
     projectId: String(item.projectId ?? ''),
     product: product ? { _id: String(product._id), name: product.name, slug: product.slug, productType: product.productType } : null,
     printGenerationTotalPages: totalPages,
@@ -1220,6 +1222,7 @@ export async function savePublicDesignUpload(input: {
   merchantId: string;
   userKey: string;
   projectId?: unknown;
+  productType?: unknown;
   designData?: unknown;
   file?: Express.Multer.File;
   pagePreviewFiles?: Express.Multer.File[];
@@ -1238,6 +1241,7 @@ export async function savePublicDesignUpload(input: {
   }
 
   const { merchant, product, userKey } = await resolvePublicDesignContext(input.productId, input.merchantId, input.userKey);
+  const productType = normalizeDesignProductType(input.productType, product.productType);
   const project = await resolveDesignProject({ merchant, product, userKey, requestedProjectId: input.projectId });
   const supabase = getSupabaseAdmin();
   const prefix = project.tempStoragePrefix;
@@ -1315,6 +1319,7 @@ export async function savePublicDesignUpload(input: {
         accountId: String(product.accountId),
         merchantId: String(merchant._id),
         productId: String(product._id),
+        productType,
         userKey,
         projectId: project.projectId,
         tempStoragePrefix: prefix,
@@ -1339,6 +1344,7 @@ export async function savePublicDesignUpload(input: {
     projectId: project.projectId,
     merchantId: String(merchant._id),
     productId: String(product._id),
+    productType,
     userKey,
   };
 }
@@ -1442,6 +1448,11 @@ function parseBoolean(value: unknown) {
   return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on';
 }
 
+function normalizeDesignProductType(value: unknown, fallback: unknown = 'Photo Book Print') {
+  const raw = String(value ?? fallback ?? '').trim();
+  return raw === 'Photo Collage Print' ? 'Photo Collage Print' : 'Photo Book Print';
+}
+
 async function resolveDesignProject(input: { merchant: any; product: any; userKey: string; requestedProjectId?: unknown }) {
   const requestedProjectId = sanitizeProjectId(input.requestedProjectId);
   if (requestedProjectId) {
@@ -1484,6 +1495,7 @@ async function saveDesignCartItem(input: {
   accountId: string;
   merchantId: string;
   productId: string;
+  productType: string;
   userKey: string;
   projectId: string;
   tempStoragePrefix: string;
@@ -1498,6 +1510,7 @@ async function saveDesignCartItem(input: {
     accountId: new Types.ObjectId(input.accountId),
     merchantId: new Types.ObjectId(input.merchantId),
     productId: new Types.ObjectId(input.productId),
+    productType: normalizeDesignProductType(input.productType),
     userKey: input.userKey,
     projectId: input.projectId,
     status: 'cart',
@@ -1672,6 +1685,27 @@ function resolveFinalPrintPages(design: unknown, cartItem: Record<string, any>, 
   previews.sort((a, b) => Number(a.pageNumber ?? 0) - Number(b.pageNumber ?? 0));
   const dpi = positiveNumber((designRecord as any).exportRules?.dpi, positiveNumber(product?.exportRules?.dpi, 300));
   const sourcePages: Record<string, any>[] = designPages.length > 0 ? designPages : previews.map((preview, index) => ({ pageNumber: Number(preview.pageNumber ?? index + 1), pageId: preview.pageId }));
+  const productType = normalizeDesignProductType(cartItem.productType, product?.productType);
+  if (productType === 'Photo Collage Print') {
+    const page = sourcePages[0] ?? {};
+    const pageNumber = positiveInteger(page.pageNumber, 1);
+    const pageId = String(page.pageId ?? page._id ?? page.id ?? `page-${pageNumber}`);
+    const preview = previews.find((item) => String(item.pageId ?? '') === pageId) ?? previews[0];
+    const previewUrl = String(preview?.publicUrl ?? preview?.url ?? '');
+    const dimensions = finalPrintDimensions(page, designRecord, dpi);
+    return [{
+      ...page,
+      pageNumber,
+      printPageNumber: 1,
+      pageRole: 'collage',
+      filename: finalPrintFilename('collage', 1, pageNumber),
+      pageId,
+      previewUrl,
+      dpi,
+      backgroundColor: typeof page.backgroundColor === 'string' ? page.backgroundColor : typeof (designRecord as any).backgroundColor === 'string' ? (designRecord as any).backgroundColor : '#ffffff',
+      ...dimensions,
+    }];
+  }
   const pages = [];
   for (let index = 0; index < sourcePages.length; index += 1) {
     const page = sourcePages[index];
@@ -1706,6 +1740,7 @@ function getPhotoBookPageRole(index: number, totalPages: number) {
 }
 
 function finalPrintFilename(pageRole: string, printPageNumber: number, sourcePageNumber: number) {
+  if (pageRole === 'collage') return 'final-collage.png';
   if (pageRole === 'front-cover') return 'final-cover-front.png';
   if (pageRole === 'back-cover') return 'final-cover-back.png';
   return `final-page-${positiveInteger(printPageNumber, sourcePageNumber)}.png`;

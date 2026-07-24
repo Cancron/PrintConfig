@@ -203,6 +203,7 @@ export async function publicDesignUpload(
           merchantId: token.merchantId,
           userKey: token.userKey,
           projectId: req.body.projectId,
+          productType: req.body.productType,
           designData: req.body.designData ?? req.body.design,
           file: getUploadedFile(req.files, 'image'),
           pagePreviewFiles: getUploadedFiles(req.files, 'pagePreviews'),
