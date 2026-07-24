@@ -3,6 +3,7 @@ export type ProductType =
   | 'Framed Print'
   | 'Metal Print'
   | 'Photo Print'
+  | 'Photo Collage Print'
   | 'Photo Book Print'
   | 'AI Art Generation'
   | 'Art Print'

@@ -9,6 +9,7 @@ const PRODUCT_TYPES: ProductType[] = [
   'Metal Print',
   'Framed Print',
   'Photo Print',
+  'Photo Collage Print',
   'Photo Book Print',
   'AI Art Generation',
   'Art Print',

@@ -15,6 +15,7 @@ const productTypes: ProductType[] = [
   'Metal Print',
   'Framed Print',
   'Photo Print',
+  'Photo Collage Print',
   'Photo Book Print',
   'AI Art Generation',
   'Art Print',
@@ -76,4 +77,3 @@ export function Products() {
 function ScopeBadge({ scope }: { scope: ProductScope }) {
   return <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 ring-inset ${scope === 'shared' ? 'bg-blue-50 text-blue-700 ring-blue-600/20' : 'bg-purple-50 text-purple-700 ring-purple-600/20'}`}>{scope === 'shared' ? 'Shared' : 'Merchant Custom'}</span>;
 }
-

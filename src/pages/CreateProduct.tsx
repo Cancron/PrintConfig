@@ -21,6 +21,7 @@ const productTypeOptions: { value: ProductType; label: ProductType }[] = [
   { value: 'Metal Print', label: 'Metal Print' },
   { value: 'Framed Print', label: 'Framed Print' },
   { value: 'Photo Print', label: 'Photo Print' },
+  { value: 'Photo Collage Print', label: 'Photo Collage Print' },
   { value: 'Photo Book Print', label: 'Photo Book Print' },
   { value: 'AI Art Generation', label: 'AI Art Generation' },
   { value: 'Art Print', label: 'Art Print' },
