@@ -27,7 +27,7 @@ const printStatusOptions = [
 export function Orders() {
   const { account, selectedMerchantId } = useWorkspace();
   const [items, setItems] = useState<DesignCartItem[]>([]);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState('ordered');
   const [printStatus, setPrintStatus] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
