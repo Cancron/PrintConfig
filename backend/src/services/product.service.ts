@@ -880,7 +880,7 @@ export async function listDesignCartItems(filters: Record<string, string | undef
       accountId: String(item.accountId),
       merchantId: String(item.merchantId),
       productId: String(item.productId),
-      productType: normalizeDesignProductType(item.productType, product?.productType),
+      productType: normalizeDesignProductType(product?.productType, item.productType),
       projectId: String(item.projectId ?? ''),
       product: product ? { _id: String(product._id), name: product.name, slug: product.slug, productType: product.productType } : null,
       printGenerationTotalPages: totalPages,
@@ -910,7 +910,7 @@ export async function getDesignCartItem(input: { cartItemId: string; accountId?:
     accountId: String(item.accountId),
     merchantId: String(item.merchantId),
     productId: String(item.productId),
-    productType: normalizeDesignProductType(item.productType, product?.productType),
+    productType: normalizeDesignProductType(product?.productType, item.productType),
     projectId: String(item.projectId ?? ''),
     product: product ? { _id: String(product._id), name: product.name, slug: product.slug, productType: product.productType } : null,
     printGenerationTotalPages: totalPages,
@@ -1342,6 +1342,9 @@ export async function savePublicDesignUpload(input: {
     addToCart,
     cartItem,
     projectId: project.projectId,
+    sourceProjectId: (project as any).sourceProjectId,
+    projectLocked: Boolean((project as any).requestedProjectLocked),
+    projectResolutionReason: (project as any).projectResolutionReason,
     merchantId: String(merchant._id),
     productId: String(product._id),
     productType,
@@ -1380,6 +1383,9 @@ export async function getPublicDesignWithProduct(input: { productId: string; mer
     designExists,
     designStoragePath: designExists ? designStoragePath : null,
     projectId: project.projectId,
+    sourceProjectId: (project as any).sourceProjectId,
+    projectLocked: Boolean((project as any).requestedProjectLocked),
+    projectResolutionReason: (project as any).projectResolutionReason,
     merchantId: String(merchant._id),
     productId: String(product._id),
     userKey,
@@ -1449,8 +1455,13 @@ function parseBoolean(value: unknown) {
 }
 
 function normalizeDesignProductType(value: unknown, fallback: unknown = 'Photo Book Print') {
-  const raw = String(value ?? fallback ?? '').trim();
-  return raw === 'Photo Collage Print' ? 'Photo Collage Print' : 'Photo Book Print';
+  for (const candidate of [value, fallback]) {
+    const raw = String(candidate ?? '').trim().toLowerCase();
+    if (!raw) continue;
+    if (raw.includes('collage')) return 'Photo Collage Print';
+    if (raw.includes('book')) return 'Photo Book Print';
+  }
+  return 'Photo Book Print';
 }
 
 async function resolveDesignProject(input: { merchant: any; product: any; userKey: string; requestedProjectId?: unknown }) {
@@ -1461,19 +1472,47 @@ async function resolveDesignProject(input: { merchant: any; product: any; userKe
       merchantId: input.merchant._id,
       productId: input.product._id,
       userKey: input.userKey,
-      status: { $ne: 'ordered' },
     });
     if (existing) {
+      const orderedCartItem = await DesignCartItemModel.exists({
+        projectId: requestedProjectId,
+        merchantId: input.merchant._id,
+        productId: input.product._id,
+        userKey: input.userKey,
+        status: 'ordered',
+      });
+      if (existing.status === 'ordered' || orderedCartItem) {
+        return createDesignProject(input, {
+          sourceProjectId: requestedProjectId,
+          requestedProjectLocked: true,
+          projectResolutionReason: 'ordered_project_locked',
+        });
+      }
       existing.lastActivityAt = new Date();
       await existing.save();
-      return existing;
+      return withDesignProjectResolution(existing, {
+        sourceProjectId: requestedProjectId,
+        requestedProjectLocked: false,
+        projectResolutionReason: 'requested_project_loaded',
+      });
     }
   }
 
+  return createDesignProject(input, requestedProjectId ? {
+    sourceProjectId: requestedProjectId,
+    requestedProjectLocked: false,
+    projectResolutionReason: 'requested_project_not_found',
+  } : undefined);
+}
+
+async function createDesignProject(
+  input: { merchant: any; product: any; userKey: string },
+  resolution?: { sourceProjectId?: string; requestedProjectLocked?: boolean; projectResolutionReason?: string }
+) {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const projectId = `prj-${randomBytes(12).toString('hex')}`;
     try {
-      return await DesignProjectModel.create({
+      const project = await DesignProjectModel.create({
         accountId: input.product.accountId,
         merchantId: input.merchant._id,
         productId: input.product._id,
@@ -1483,12 +1522,23 @@ async function resolveDesignProject(input: { merchant: any; product: any; userKe
         tempStoragePrefix: designTempPrefix(String(input.merchant._id), projectId),
         lastActivityAt: new Date(),
       });
+      return withDesignProjectResolution(project, resolution);
     } catch (error: any) {
       if (error?.code !== 11000 || attempt === 4) throw error;
     }
   }
 
   throw new ApiError(500, 'Could not create a design project.');
+}
+
+function withDesignProjectResolution(
+  project: any,
+  resolution?: { sourceProjectId?: string; requestedProjectLocked?: boolean; projectResolutionReason?: string }
+) {
+  project.sourceProjectId = resolution?.sourceProjectId;
+  project.requestedProjectLocked = Boolean(resolution?.requestedProjectLocked);
+  project.projectResolutionReason = resolution?.projectResolutionReason;
+  return project;
 }
 
 async function saveDesignCartItem(input: {
@@ -1685,7 +1735,7 @@ function resolveFinalPrintPages(design: unknown, cartItem: Record<string, any>, 
   previews.sort((a, b) => Number(a.pageNumber ?? 0) - Number(b.pageNumber ?? 0));
   const dpi = positiveNumber((designRecord as any).exportRules?.dpi, positiveNumber(product?.exportRules?.dpi, 300));
   const sourcePages: Record<string, any>[] = designPages.length > 0 ? designPages : previews.map((preview, index) => ({ pageNumber: Number(preview.pageNumber ?? index + 1), pageId: preview.pageId }));
-  const productType = normalizeDesignProductType(cartItem.productType, product?.productType);
+  const productType = normalizeDesignProductType(product?.productType, cartItem.productType);
   if (productType === 'Photo Collage Print') {
     const page = sourcePages[0] ?? {};
     const pageNumber = positiveInteger(page.pageNumber, 1);
