@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, Download, ExternalLink, Eye, Loader2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Download, ExternalLink, Eye, Loader2, RefreshCw } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -113,6 +113,7 @@ export function OrderDetailPage() {
   const [item, setItem] = useState<DesignCartItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [markingOrdered, setMarkingOrdered] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(() => {
@@ -141,6 +142,22 @@ export function OrderDetailPage() {
       setError(reason instanceof Error ? reason.message : 'Could not start final print generation.');
     } finally {
       setProcessing(false);
+    }
+  }
+
+  async function markAsOrdered() {
+    if (!item) return;
+    setMarkingOrdered(true);
+    setError('');
+    try {
+      await api.markDesignCartItemOrdered(item._id, {
+        orderId: item.orderId || item._id,
+      });
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not mark cart item as ordered.');
+    } finally {
+      setMarkingOrdered(false);
     }
   }
 
@@ -173,7 +190,7 @@ export function OrderDetailPage() {
         action={<button type="button" onClick={load} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh</button>}
       />
       {error && <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700 ring-1 ring-red-200">{error}</div>}
-      <OrderDetailContent item={item} processing={processing} onGenerate={generateFinalPrints} />
+      <OrderDetailContent item={item} processing={processing} markingOrdered={markingOrdered} onGenerate={generateFinalPrints} onMarkOrdered={markAsOrdered} />
     </div>
   );
 }
@@ -203,7 +220,7 @@ function getPrintProgress(item: DesignCartItem) {
   return { completed, total };
 }
 
-function OrderDetailContent({ item, processing, onGenerate }: { item: DesignCartItem; processing: boolean; onGenerate: () => void }) {
+function OrderDetailContent({ item, processing, markingOrdered, onGenerate, onMarkOrdered }: { item: DesignCartItem; processing: boolean; markingOrdered: boolean; onGenerate: () => void; onMarkOrdered: () => void }) {
   const progress = getPrintProgress(item);
   const [downloadingZip, setDownloadingZip] = useState(false);
   async function downloadAllPrintImages() {
@@ -238,6 +255,12 @@ function OrderDetailContent({ item, processing, onGenerate }: { item: DesignCart
           </section>
         </div>
         <div className="flex justify-end gap-3 border-t border-gray-200 px-5 py-4">
+          {item.status !== 'ordered' && (
+            <button type="button" onClick={onMarkOrdered} disabled={markingOrdered} className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300">
+              {markingOrdered ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+              Mark As Ordered
+            </button>
+          )}
           <button type="button" onClick={downloadAllPrintImages} disabled={!item.finalPrintFiles?.length || downloadingZip} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400">
             {downloadingZip ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             {downloadingZip ? 'Preparing ZIP...' : 'Download All Print Images'}

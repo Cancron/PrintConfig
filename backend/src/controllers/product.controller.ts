@@ -151,6 +151,25 @@ export async function processCartItemAdmin(
   }
 }
 
+export async function markCartItemOrderedAdmin(
+  req: AuthedRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    res.status(202).json(
+      await service.markDesignCartItemOrderedForAdmin({
+        cartItemId: String(req.params.cartItemId),
+        accountId: req.user?.accountId,
+        orderId: req.body?.orderId,
+        force: req.body?.force,
+      }),
+    );
+  } catch (e) {
+    next(e);
+  }
+}
+
 export async function createFinalPrintsDownloadToken(
   req: AuthedRequest,
   res: Response,

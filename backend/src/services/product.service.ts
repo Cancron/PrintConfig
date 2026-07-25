@@ -949,7 +949,7 @@ export async function processDesignCartItem(input: { cartItemId: string; apiPriv
 
   const cartItem = await DesignCartItemModel.findOne({ _id: input.cartItemId, merchantId: merchant._id });
   if (!cartItem) throw new ApiError(404, 'Design cart item not found.');
-  return queueDesignCartItemProcessing(cartItem, input);
+  return queueDesignCartItemProcessing(cartItem, { ...input, markOrdered: true });
 }
 
 export async function processDesignCartItemForAdmin(input: { cartItemId: string; accountId?: string; orderId?: unknown; force?: unknown }) {
@@ -958,7 +958,29 @@ export async function processDesignCartItemForAdmin(input: { cartItemId: string;
   if (input.accountId && Types.ObjectId.isValid(input.accountId)) query.accountId = input.accountId;
   const cartItem = await DesignCartItemModel.findOne(query);
   if (!cartItem) throw new ApiError(404, 'Design cart item not found.');
-  return queueDesignCartItemProcessing(cartItem, input);
+  return queueDesignCartItemProcessing(cartItem, { ...input, markOrdered: false });
+}
+
+export async function markDesignCartItemOrderedForAdmin(input: { cartItemId: string; accountId?: string; orderId?: unknown; force?: unknown }) {
+  if (!Types.ObjectId.isValid(input.cartItemId)) throw new ApiError(400, 'cartItemId must be a valid MongoDB ObjectId.');
+  const query: Record<string, unknown> = { _id: input.cartItemId };
+  if (input.accountId && Types.ObjectId.isValid(input.accountId)) query.accountId = input.accountId;
+  const cartItem = await DesignCartItemModel.findOne(query);
+  if (!cartItem) throw new ApiError(404, 'Design cart item not found.');
+
+  const orderId = await markCartItemAndProjectOrdered(cartItem, input.orderId);
+  const force = parseBoolean(input.force);
+  if (cartItem.printGenerationStatus !== 'complete' || force) {
+    return queueDesignCartItemProcessing(cartItem, { ...input, orderId, markOrdered: true });
+  }
+
+  return {
+    cartItem,
+    queued: false,
+    processed: false,
+    printGenerationStatus: cartItem.printGenerationStatus,
+    message: 'Design cart item marked as ordered.',
+  };
 }
 
 export async function createFinalPrintsDownloadToken(input: { cartItemId: string; accountId?: string; userId?: string; origin?: string }) {
@@ -1031,8 +1053,39 @@ async function findDownloadableCartItem(cartItemId: string, accountId?: string) 
   return cartItem;
 }
 
-async function queueDesignCartItemProcessing(cartItem: any, input: { orderId?: unknown; force?: unknown }) {
+async function markCartItemAndProjectOrdered(cartItem: any, requestedOrderId?: unknown) {
+  const orderId = sanitizeUploadSegment(String(requestedOrderId ?? cartItem.orderId ?? cartItem._id));
+  if (!orderId) throw new ApiError(400, 'orderId is required to mark a design cart item as ordered.');
+  const orderPrefix = designOrderPrefix(String(cartItem.merchantId), orderId, String(cartItem.productId));
+  const now = new Date();
+  cartItem.status = 'ordered';
+  cartItem.orderId = orderId;
+  cartItem.orderStoragePrefix = cartItem.orderStoragePrefix || orderPrefix;
+  cartItem.orderedAt = cartItem.orderedAt || now;
+  cartItem.lastActivityAt = now;
+  await cartItem.save();
+  await markProjectOrdered(cartItem, cartItem.orderStoragePrefix || orderPrefix);
+  return orderId;
+}
+
+async function markProjectOrdered(cartItem: any, orderPrefix: string) {
+  if (!cartItem.projectId) return;
+  await DesignProjectModel.findOneAndUpdate(
+    { projectId: cartItem.projectId },
+    {
+      $set: {
+        cartItemId: cartItem._id,
+        status: 'ordered',
+        orderStoragePrefix: orderPrefix,
+        lastActivityAt: new Date(),
+      },
+    }
+  );
+}
+
+async function queueDesignCartItemProcessing(cartItem: any, input: { orderId?: unknown; force?: unknown; markOrdered?: boolean }) {
   const force = parseBoolean(input.force);
+  const markedOrderId = input.markOrdered ? await markCartItemAndProjectOrdered(cartItem, input.orderId) : undefined;
   if (cartItem.printGenerationStatus === 'complete' && !force) {
     return {
       cartItem,
@@ -1054,10 +1107,10 @@ async function queueDesignCartItemProcessing(cartItem: any, input: { orderId?: u
     };
   }
 
-  const orderId = sanitizeUploadSegment(String(input.orderId ?? cartItem.orderId ?? cartItem._id));
+  const orderId = sanitizeUploadSegment(String(markedOrderId ?? input.orderId ?? cartItem.orderId ?? cartItem._id));
   if (!orderId) throw new ApiError(400, 'orderId is required to process a design cart item.');
   const orderPrefix = designOrderPrefix(String(cartItem.merchantId), orderId, String(cartItem.productId));
-  cartItem.status = 'ordered';
+  if (input.markOrdered) cartItem.status = 'ordered';
   cartItem.orderId = orderId;
   cartItem.orderStoragePrefix = orderPrefix;
   cartItem.printGenerationStatus = 'processing';
@@ -1073,6 +1126,7 @@ async function queueDesignCartItemProcessing(cartItem: any, input: { orderId?: u
     merchantId: cartItem.merchantId,
     productId: cartItem.productId,
     accountId: cartItem.accountId,
+    markOrdered: Boolean(input.markOrdered),
     orderId,
     sourcePrefix: cartItem.tempStoragePrefix,
     orderPrefix,
@@ -1122,7 +1176,8 @@ async function runDesignCartItemProcessing(jobId: string) {
     const { data: basePublicData } = getSupabaseAdmin().storage.from(galleryBucket).getPublicUrl(`${orderPrefix}/`);
     const designPublicBaseUrl = basePublicData.publicUrl;
     const designPublicUrl = `${designPublicBaseUrl}design.json`;
-    cartItem.status = 'ordered';
+    const shouldMarkOrdered = Boolean((job as any).markOrdered);
+    if (shouldMarkOrdered) cartItem.status = 'ordered';
     cartItem.orderId = orderId;
     cartItem.orderStoragePrefix = orderPrefix;
     cartItem.designStoragePath = `${orderPrefix}/design.json`;
@@ -1138,22 +1193,10 @@ async function runDesignCartItemProcessing(jobId: string) {
     cartItem.printGenerationStatus = 'complete';
     cartItem.printGenerationError = '';
     cartItem.printGenerationCurrentPage = 0;
-    cartItem.orderedAt = new Date();
+    if (shouldMarkOrdered) cartItem.orderedAt = new Date();
     cartItem.lastActivityAt = new Date();
     await cartItem.save();
-    if (cartItem.projectId) {
-      await DesignProjectModel.findOneAndUpdate(
-        { projectId: cartItem.projectId },
-        {
-          $set: {
-            cartItemId: cartItem._id,
-            status: 'ordered',
-            orderStoragePrefix: orderPrefix,
-            lastActivityAt: new Date(),
-          },
-        }
-      );
-    }
+    if (shouldMarkOrdered) await markProjectOrdered(cartItem, orderPrefix);
     await DesignProcessingJobModel.findByIdAndUpdate(job._id, {
       status: 'complete',
       completedAt: new Date(),

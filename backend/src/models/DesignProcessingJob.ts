@@ -11,6 +11,7 @@ const designProcessingJobSchema = new Schema(
     priority: { type: Number, default: 0, index: true },
     attempts: { type: Number, default: 0 },
     maxAttempts: { type: Number, default: 3 },
+    markOrdered: { type: Boolean, default: false, index: true },
     orderId: { type: String, default: '', index: true },
     sourcePrefix: { type: String, default: '' },
     orderPrefix: { type: String, default: '' },
