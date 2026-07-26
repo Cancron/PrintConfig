@@ -18,13 +18,10 @@ const configuredOrigins = (process.env.FRONTEND_URL ?? '')
   .filter(Boolean);
 
 const allowedOrigins = new Set([
-  'https://photo-book-prints.lovable.app',
-  'https://canadaprintstudio-admin.onrender.com',
-  'https://photo-book-studio.onrender.com',
   'https://canvasprintscanada.com',
-  'https://www.canvasprintsvancouver.com',
-  'https://www.canadaprintstudio.com',
-  'https://www.metalprintscanada.com',
+  'https://canvasprintsvancouver.com',
+  'https://canadaprintstudio.com',
+  'https://metalprintscanada.com',
   ...configuredOrigins,
 ]);
 
