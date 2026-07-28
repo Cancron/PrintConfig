@@ -13,6 +13,77 @@ const CLIPART: Array<{ id: string; path: string; viewBox?: string }> = [
   { id: 'sparkle', path: 'M50 8 L56 40 L88 46 L56 52 L50 84 L44 52 L12 46 L44 40 Z' },
   { id: 'camera', path: 'M15 30 H35 L40 22 H60 L65 30 H85 V78 H15 Z M50 55 m-14 0 a14 14 0 1 0 28 0 a14 14 0 1 0 -28 0' },
 ];
+type SvgMaskElement =
+  | { type: 'rect'; x: number; y: number; width: number; height: number; rx?: number }
+  | { type: 'circle'; cx: number; cy: number; r: number }
+  | { type: 'ellipse'; cx: number; cy: number; rx: number; ry: number }
+  | { type: 'polygon'; points: string }
+  | { type: 'path'; d: string };
+
+interface ImageMaskDefinition {
+  id: string;
+  label: string;
+  viewBox: string;
+  aspectRatio?: number;
+  elements: SvgMaskElement[];
+}
+
+const IMAGE_MASKS: ImageMaskDefinition[] = [
+  {
+    id: 'rect',
+    label: 'Rectangle',
+    viewBox: '0 0 100 100',
+    elements: [{ type: 'rect', x: 0, y: 0, width: 100, height: 100 }],
+  },
+  {
+    id: 'circle',
+    label: 'Circle',
+    viewBox: '0 0 100 100',
+    aspectRatio: 1,
+    elements: [{ type: 'circle', cx: 50, cy: 50, r: 50 }],
+  },
+  {
+    id: 'ellipse',
+    label: 'Ellipse',
+    viewBox: '0 0 100 68',
+    aspectRatio: 100 / 68,
+    elements: [{ type: 'ellipse', cx: 50, cy: 34, rx: 50, ry: 34 }],
+  },
+  {
+    id: 'triangle',
+    label: 'Triangle',
+    viewBox: '0 0 100 100',
+    aspectRatio: 1,
+    elements: [{ type: 'polygon', points: '50,0 100,100 0,100' }],
+  },
+  {
+    id: 'diamond',
+    label: 'Diamond',
+    viewBox: '0 0 100 100',
+    aspectRatio: 1,
+    elements: [{ type: 'polygon', points: '50,0 100,50 50,100 0,50' }],
+  },
+  {
+    id: 'heart',
+    label: 'Heart',
+    viewBox: '0 0 1000 1330',
+    aspectRatio: 1000 / 1330,
+    elements: [
+      {
+        type: 'path',
+        d: 'M510.69,673.08h370c28.08-51.11,44.06-103.69,47.35-153s-6.11-95.27-28.75-133.2a248,248,0,0,0-47.87-57.16c-23.16-20.42-53.66-39.36-91.83-48.27-33.71-7.86-64.65-5.86-90.14-.59s-45.54,13.82-57.46,19a323,323,0,0,0-60.59,35,299.31,299.31,0,0,0-40.74,35.59V673.08Z',
+      },
+      {
+        type: 'path',
+        d: 'M489.31,673.08V370.53a299.31,299.31,0,0,0-40.74-35.59,323,323,0,0,0-60.59-35c-11.92-5.22-32-13.76-57.46-19s-56.43-7.27-90.14.59c-38.17,8.91-68.67,27.85-91.83,48.27a248,248,0,0,0-47.87,57.16c-22.64,37.93-32,83.92-28.75,133.2s19.26,101.86,47.35,153h370Z',
+      },
+      {
+        type: 'path',
+        d: 'M510.69,694.47H131.78Q143.3,713,156.94,731.05t29.41,35.41L343.17,910.11,500,1053.75,656.83,910.11,813.65,766.46q15.76-17.34,29.41-35.41t25.16-36.58H510.69Z',
+      },
+    ],
+  },
+];
 
 export interface RenderDesignPageInput {
   design: unknown;
@@ -133,6 +204,49 @@ async function drawPhotoBookImage(
 
   const radius = numberValue(style.borderRadius, 0) * styleScale;
   const borderWidth = numberValue(style.borderWidth, 0) * styleScale;
+  const mask = resolveImageMask(style);
+  if (mask !== IMAGE_MASKS[0]) {
+    const maskGeometry = createMaskGeometry(mask, width, height);
+    ctx.save();
+    ctx.globalAlpha *= numberValue(style.opacity, 1);
+    if (style.shadow) {
+      ctx.shadowColor = 'rgba(0,0,0,0.35)';
+      ctx.shadowBlur = 24 * styleScale;
+      ctx.shadowOffsetY = 8 * styleScale;
+    }
+    ctx.clip(maskGeometry.path);
+    ctx.filter = stringValue(style.filter, 'none');
+    const drawBox = getImageDrawBox(
+      image.width,
+      image.height,
+      maskGeometry.width,
+      maskGeometry.height,
+      stringValue(style.objectFit, 'cover') as 'cover' | 'contain' | 'fill',
+      numberValue(style.imageScale, 1),
+      numberValue(style.objectPositionX, 50),
+      numberValue(style.objectPositionY, 50),
+    );
+    ctx.drawImage(
+      image,
+      maskGeometry.x + drawBox.x,
+      maskGeometry.y + drawBox.y,
+      drawBox.width,
+      drawBox.height,
+    );
+    ctx.restore();
+
+    if (borderWidth > 0) {
+      ctx.save();
+      ctx.globalAlpha *= numberValue(style.opacity, 1);
+      ctx.strokeStyle = stringValue(style.borderColor, '#000000');
+      ctx.lineWidth = borderWidth;
+      ctx.lineJoin = 'round';
+      ctx.stroke(maskGeometry.path);
+      ctx.restore();
+    }
+    return;
+  }
+
   const contentX = borderWidth;
   const contentY = borderWidth;
   const contentWidth = Math.max(0, width - borderWidth * 2);
@@ -405,10 +519,159 @@ function getImageDrawBox(
     const height = frameHeight * imageScale;
     return { x: (frameWidth - width) * positionX, y: (frameHeight - height) * positionY, width, height };
   }
-  const baseScale = objectFit === 'contain' ? Math.min(frameWidth / imageWidth, frameHeight / imageHeight) : Math.max(frameWidth / imageWidth, frameHeight / imageHeight);
-  const width = imageWidth * baseScale * imageScale;
-  const height = imageHeight * baseScale * imageScale;
+  const coverScale = Math.max(frameWidth / imageWidth, frameHeight / imageHeight);
+  const containScale = Math.min(frameWidth / imageWidth, frameHeight / imageHeight);
+  const baseScale = objectFit === 'contain' ? containScale : coverScale;
+  const effectiveScale = objectFit === 'cover'
+    ? Math.max(imageScale, containScale / coverScale)
+    : imageScale;
+  const width = imageWidth * baseScale * effectiveScale;
+  const height = imageHeight * baseScale * effectiveScale;
   return { x: (frameWidth - width) * positionX, y: (frameHeight - height) * positionY, width, height };
+}
+
+function resolveImageMask(style: Record<string, any>): ImageMaskDefinition {
+  const customMask = parseCustomMask(style.customMask);
+  if (customMask) return customMask;
+  const maskId = stringValue(style.maskId, 'rect');
+  return IMAGE_MASKS.find((mask) => mask.id === maskId) ?? IMAGE_MASKS[0];
+}
+
+function parseCustomMask(value: unknown): ImageMaskDefinition | undefined {
+  if (!isRecord(value) || !Array.isArray(value.elements) || value.elements.length === 0) return undefined;
+  const viewBox = parseViewBox(stringValue(value.viewBox, '0 0 100 100'));
+  if (!(viewBox.width > 0) || !(viewBox.height > 0)) return undefined;
+  const elements = value.elements.filter(isSvgMaskElement);
+  if (elements.length === 0) return undefined;
+  return {
+    id: stringValue(value.id, 'custom'),
+    label: stringValue(value.label, 'Custom mask'),
+    viewBox: `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`,
+    aspectRatio: positiveNumber(value.aspectRatio, viewBox.width / viewBox.height),
+    elements,
+  };
+}
+
+function isSvgMaskElement(value: unknown): value is SvgMaskElement {
+  if (!isRecord(value)) return false;
+  if (value.type === 'rect') return hasFiniteNumbers(value, ['x', 'y', 'width', 'height']);
+  if (value.type === 'circle') return hasFiniteNumbers(value, ['cx', 'cy', 'r']);
+  if (value.type === 'ellipse') return hasFiniteNumbers(value, ['cx', 'cy', 'rx', 'ry']);
+  if (value.type === 'polygon') return typeof value.points === 'string' && parsePolygonPoints(value.points).length >= 3;
+  return value.type === 'path' && typeof value.d === 'string' && value.d.trim().length > 0;
+}
+
+function hasFiniteNumbers(value: Record<string, any>, keys: string[]) {
+  return keys.every((key) => Number.isFinite(Number(value[key])));
+}
+
+function createMaskGeometry(mask: ImageMaskDefinition, frameWidth: number, frameHeight: number) {
+  const viewBox = parseViewBox(mask.viewBox);
+  const viewBoxAspect = viewBox.width / viewBox.height;
+  const maskAspect = positiveNumber(mask.aspectRatio, viewBoxAspect);
+  const frameAspect = frameWidth / frameHeight;
+  const width = frameAspect > maskAspect ? frameHeight * maskAspect : frameWidth;
+  const height = frameAspect > maskAspect ? frameHeight : frameWidth / maskAspect;
+  const x = (frameWidth - width) / 2;
+  const y = (frameHeight - height) / 2;
+  const transform = {
+    scaleX: width / viewBox.width,
+    scaleY: height / viewBox.height,
+    offsetX: x - viewBox.x * (width / viewBox.width),
+    offsetY: y - viewBox.y * (height / viewBox.height),
+  };
+  const path = new Path2D();
+  for (const shape of mask.elements) addMaskShapePath(path, shape, transform);
+  return { path, x, y, width, height };
+}
+
+function addMaskShapePath(
+  path: Path2D,
+  shape: SvgMaskElement,
+  transform: { scaleX: number; scaleY: number; offsetX: number; offsetY: number },
+) {
+  const pointX = (x: number) => x * transform.scaleX + transform.offsetX;
+  const pointY = (y: number) => y * transform.scaleY + transform.offsetY;
+  if (shape.type === 'rect') {
+    const x = pointX(Number(shape.x));
+    const y = pointY(Number(shape.y));
+    const width = Number(shape.width) * transform.scaleX;
+    const height = Number(shape.height) * transform.scaleY;
+    const radius = Math.min(
+      Number(shape.rx ?? 0) * Math.min(transform.scaleX, transform.scaleY),
+      width / 2,
+      height / 2,
+    );
+    if (radius > 0) roundedPath(path, x, y, width, height, radius);
+    else path.rect(x, y, width, height);
+    return;
+  }
+  if (shape.type === 'circle') {
+    path.ellipse(
+      pointX(Number(shape.cx)),
+      pointY(Number(shape.cy)),
+      Number(shape.r) * transform.scaleX,
+      Number(shape.r) * transform.scaleY,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    return;
+  }
+  if (shape.type === 'ellipse') {
+    path.ellipse(
+      pointX(Number(shape.cx)),
+      pointY(Number(shape.cy)),
+      Number(shape.rx) * transform.scaleX,
+      Number(shape.ry) * transform.scaleY,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    return;
+  }
+  if (shape.type === 'path') {
+    path.addPath(new Path2D(shape.d), {
+      a: transform.scaleX,
+      b: 0,
+      c: 0,
+      d: transform.scaleY,
+      e: transform.offsetX,
+      f: transform.offsetY,
+    });
+    return;
+  }
+  const points = parsePolygonPoints(shape.points);
+  points.forEach(([x, y], index) => {
+    if (index === 0) path.moveTo(pointX(x), pointY(y));
+    else path.lineTo(pointX(x), pointY(y));
+  });
+  path.closePath();
+}
+
+function parsePolygonPoints(points: string): Array<[number, number]> {
+  const values = points.match(/[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi)?.map(Number) ?? [];
+  const output: Array<[number, number]> = [];
+  for (let index = 0; index + 1 < values.length; index += 2) {
+    if (Number.isFinite(values[index]) && Number.isFinite(values[index + 1])) {
+      output.push([values[index], values[index + 1]]);
+    }
+  }
+  return output;
+}
+
+function roundedPath(path: Path2D, x: number, y: number, width: number, height: number, radius: number) {
+  const r = Math.min(radius, width / 2, height / 2);
+  path.moveTo(x + r, y);
+  path.lineTo(x + width - r, y);
+  path.quadraticCurveTo(x + width, y, x + width, y + r);
+  path.lineTo(x + width, y + height - r);
+  path.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  path.lineTo(x + r, y + height);
+  path.quadraticCurveTo(x, y + height, x, y + height - r);
+  path.lineTo(x, y + r);
+  path.quadraticCurveTo(x, y, x + r, y);
+  path.closePath();
 }
 
 function drawImageFit(ctx: CanvasRenderingContext2D, image: Image, x: number, y: number, width: number, height: number, fitMode: 'cover' | 'contain' | 'stretch') {
@@ -536,6 +799,11 @@ function stringValue(value: unknown, fallback: string) {
 function numberValue(value: unknown, fallback: number) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function positiveNumber(value: unknown, fallback: number) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
 }
 
 function isRecord(value: unknown): value is Record<string, any> {
