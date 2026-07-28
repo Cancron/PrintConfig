@@ -1776,7 +1776,11 @@ function resolveFinalPrintPages(design: unknown, cartItem: Record<string, any>, 
   const designPages = getDesignPages(designRecord);
   const previews = Array.isArray(cartItem.pagePreviews) ? [...cartItem.pagePreviews] : [];
   previews.sort((a, b) => Number(a.pageNumber ?? 0) - Number(b.pageNumber ?? 0));
-  const dpi = positiveNumber((designRecord as any).exportRules?.dpi, positiveNumber(product?.exportRules?.dpi, 300));
+  const selectedVariant = resolveFinalPrintVariant(designRecord, product);
+  const dpi = positiveNumber(
+    selectedVariant?.dpi,
+    positiveNumber((designRecord as any).exportRules?.dpi, positiveNumber(product?.exportRules?.dpi, 300))
+  );
   const sourcePages: Record<string, any>[] = designPages.length > 0 ? designPages : previews.map((preview, index) => ({ pageNumber: Number(preview.pageNumber ?? index + 1), pageId: preview.pageId }));
   const productType = normalizeDesignProductType(product?.productType, cartItem.productType);
   if (productType === 'Photo Collage Print') {
@@ -1785,7 +1789,7 @@ function resolveFinalPrintPages(design: unknown, cartItem: Record<string, any>, 
     const pageId = String(page.pageId ?? page._id ?? page.id ?? `page-${pageNumber}`);
     const preview = previews.find((item) => String(item.pageId ?? '') === pageId) ?? previews[0];
     const previewUrl = String(preview?.publicUrl ?? preview?.url ?? '');
-    const dimensions = finalPrintDimensions(page, designRecord, dpi);
+    const dimensions = finalPrintDimensions(page, designRecord, dpi, selectedVariant);
     return [{
       ...page,
       pageNumber,
@@ -1809,7 +1813,7 @@ function resolveFinalPrintPages(design: unknown, cartItem: Record<string, any>, 
     const pageId = String(page.pageId ?? page._id ?? page.id ?? `page-${pageNumber}`);
     const preview = previews.find((item) => String(item.pageId ?? '') === pageId) ?? previews.find((item) => Number(item.pageNumber) === printPageNumber) ?? previews[printPageNumber - 1];
     const previewUrl = String(preview?.publicUrl ?? preview?.url ?? '');
-    const dimensions = finalPrintDimensions(page, designRecord, dpi);
+    const dimensions = finalPrintDimensions(page, designRecord, dpi, selectedVariant);
     pages.push({
       ...page,
       pageNumber,
@@ -1846,10 +1850,60 @@ function getDesignPages(design: Record<string, unknown>) {
   return [];
 }
 
-function finalPrintDimensions(page: Record<string, unknown>, design: Record<string, unknown>, dpi: number) {
-  const unit = String(page.unit ?? design.unit ?? 'inch');
-  const width = positiveNumber(page.width, positiveNumber(page.canvasWidth, positiveNumber(design.pageWidth, positiveNumber(design.canvasWidth, 12))));
-  const height = positiveNumber(page.height, positiveNumber(page.canvasHeight, positiveNumber(design.pageHeight, positiveNumber(design.canvasHeight, 12))));
+function resolveFinalPrintVariant(design: Record<string, unknown>, product: any) {
+  const nestedDesign = isRecordLike(design.design) ? design.design : {};
+  const designProduct = isRecordLike(design.product)
+    ? design.product
+    : isRecordLike(nestedDesign.product)
+      ? nestedDesign.product
+      : {};
+  const selectedVariantId = String(
+    designProduct.variantId
+      ?? designProduct.sizeId
+      ?? design.variantId
+      ?? design.selectedVariantId
+      ?? nestedDesign.variantId
+      ?? nestedDesign.selectedVariantId
+      ?? ''
+  ).trim();
+  if (!selectedVariantId) return undefined;
+
+  const currentVariant = Array.isArray(product?.variants)
+    ? product.variants.find((variant: any) => String(variant?._id ?? variant?.id ?? '') === selectedVariantId)
+    : undefined;
+  if (currentVariant && hasValidVariantDimensions(currentVariant)) return currentVariant;
+
+  const productConfig = isRecordLike(design.productConfig)
+    ? design.productConfig
+    : isRecordLike(nestedDesign.productConfig)
+      ? nestedDesign.productConfig
+      : {};
+  const savedVariant = Array.isArray(productConfig.variants)
+    ? productConfig.variants.find((variant: any) => String(variant?._id ?? variant?.id ?? '') === selectedVariantId)
+    : undefined;
+  return savedVariant && hasValidVariantDimensions(savedVariant) ? savedVariant : undefined;
+}
+
+function hasValidVariantDimensions(variant: Record<string, unknown>) {
+  return Number.isFinite(Number(variant.width))
+    && Number(variant.width) > 0
+    && Number.isFinite(Number(variant.height))
+    && Number(variant.height) > 0;
+}
+
+function finalPrintDimensions(
+  page: Record<string, unknown>,
+  design: Record<string, unknown>,
+  dpi: number,
+  selectedVariant?: Record<string, unknown>
+) {
+  const unit = String(selectedVariant?.unit ?? page.unit ?? design.unit ?? 'inch').trim().toLowerCase();
+  const width = selectedVariant
+    ? positiveNumber(selectedVariant.width, 12)
+    : positiveNumber(page.width, positiveNumber(page.canvasWidth, positiveNumber(design.pageWidth, positiveNumber(design.canvasWidth, 12))));
+  const height = selectedVariant
+    ? positiveNumber(selectedVariant.height, 12)
+    : positiveNumber(page.height, positiveNumber(page.canvasHeight, positiveNumber(design.pageHeight, positiveNumber(design.canvasHeight, 12))));
   if (unit === 'px') return { widthPx: Math.round(width), heightPx: Math.round(height) };
   if (unit === 'mm') return { widthPx: Math.round((width / 25.4) * dpi), heightPx: Math.round((height / 25.4) * dpi) };
   return { widthPx: Math.round(width * dpi), heightPx: Math.round(height * dpi) };
