@@ -9,8 +9,8 @@ import { EditorProductSelection } from './EditorProductSelection';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { useCategories } from '../../hooks/useCategories';
 import { validateProductBasicInfo } from '../../lib/validation';
-import { createDefaultPhotoBookConfig } from '../../lib/storage';
-import type { EditorProductSelectionMode, PhotoBookConfig, Product, ProductScope, ProductType, ProductStatus } from '../../types';
+import { createDefaultPhotoBookConfig, createDefaultPillowProductConfig } from '../../lib/storage';
+import type { EditorProductSelectionMode, PhotoBookConfig, PillowProductConfig, Product, ProductScope, ProductType, ProductStatus } from '../../types';
 
 interface Props {
   product: Product;
@@ -25,6 +25,7 @@ const productTypeOptions: { value: ProductType; label: ProductType }[] = [
   { value: 'Photo Print', label: 'Photo Print' },
   { value: 'Photo Collage Print', label: 'Photo Collage Print' },
   { value: 'Photo Book Print', label: 'Photo Book Print' },
+  { value: 'Pillow Print', label: 'Pillow Print' },
   { value: 'AI Art Generation', label: 'AI Art Generation' },
   { value: 'Art Print', label: 'Art Print' },
   { value: 'T-Shirt', label: 'T-Shirt' },
@@ -79,6 +80,7 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
   const [selectionMode, setSelectionMode] = useState<EditorProductSelectionMode>(product.editorProductSelection.mode);
   const [specificProductIds, setSpecificProductIds] = useState([...product.editorProductSelection.specificProductIds]);
   const [photoBook, setPhotoBook] = useState<PhotoBookConfig>(product.photoBook ?? createDefaultPhotoBookConfig(product.productType === 'Photo Book Print'));
+  const [pillow, setPillow] = useState<PillowProductConfig>(product.pillow ?? createDefaultPillowProductConfig(product.productType === 'Pillow Print'));
 
   const errors = useMemo(
     () => validateProductBasicInfo({ name, slug, productType, basePrice, categoryId }),
@@ -88,6 +90,17 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
 
   function updatePhotoBook<K extends keyof PhotoBookConfig>(key: K, value: PhotoBookConfig[K]) {
     setPhotoBook((current) => ({ ...current, [key]: value }));
+  }
+
+  function updatePillow<K extends keyof PillowProductConfig>(key: K, value: PillowProductConfig[K]) {
+    setPillow((current) => ({ ...current, [key]: value }));
+  }
+
+  function handleProductTypeChange(nextType: ProductType) {
+    setProductType(nextType);
+    if (nextType === 'Pillow Print' && product.productType !== 'Pillow Print') {
+      setPillow((current) => ({ ...current, enabled: true }));
+    }
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -115,6 +128,12 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
         ...photoBook,
         enabled: productType === 'Photo Book Print',
       },
+      pillow: {
+        ...pillow,
+        enabled: productType === 'Pillow Print' && pillow.enabled,
+        sides: ['front', 'back'],
+        defaultLayout: 'full-bleed',
+      },
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -125,7 +144,7 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
       <Input label="Product Name" value={name} onChange={(e) => setName(e.target.value)} error={errors.name} placeholder="e.g. Canvas Print" />
       <Input label="Slug" value={slug} onChange={(e) => setSlug(e.target.value)} error={errors.slug} placeholder="e.g. canvas-print" />
       <Select label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} options={categories.map((category) => ({ value: category._id, label: category.name }))} error={errors.categoryId} />
-      <Select label="Product Type" value={productType} onChange={(e) => setProductType(e.target.value as ProductType)} options={productTypeOptions} error={errors.productType} />
+      <Select label="Product Type" value={productType} onChange={(e) => handleProductTypeChange(e.target.value as ProductType)} options={productTypeOptions} error={errors.productType} />
       {productType === 'Photo Book Print' && (
         <section className="rounded-lg bg-white p-5 ring-1 ring-gray-200">
           <div className="mb-4">
@@ -146,6 +165,20 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
             <Select label="Starts With Cover" value={photoBook.startsWithCover ? 'yes' : 'no'} onChange={(e) => updatePhotoBook('startsWithCover', e.target.value === 'yes')} options={yesNoOptions} />
             <Select label="Has Back Cover" value={photoBook.hasBackCover ? 'yes' : 'no'} onChange={(e) => updatePhotoBook('hasBackCover', e.target.value === 'yes')} options={yesNoOptions} />
           </div>
+        </section>
+      )}
+      {productType === 'Pillow Print' && (
+        <section className="rounded-lg bg-white p-5 ring-1 ring-gray-200">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-gray-900">Pillow Settings</h3>
+            <p className="mt-1 text-sm text-gray-500">Controls which sides customers must design. Pillow print areas and mockups are configured on each variant.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Select label="Enable Pillow Editor" value={pillow.enabled ? 'yes' : 'no'} onChange={(e) => updatePillow('enabled', e.target.value === 'yes')} options={yesNoOptions} />
+            <Select label="Minimum Designed Sides" value={String(pillow.minimumDesignedSides)} onChange={(e) => updatePillow('minimumDesignedSides', Number(e.target.value) === 2 ? 2 : 1)} options={[{ value: '1', label: 'Either side (1)' }, { value: '2', label: 'Both sides (2)' }]} />
+            <Select label="Default Layout" value="full-bleed" onChange={() => undefined} options={[{ value: 'full-bleed', label: 'Full Bleed' }]} disabled />
+          </div>
+          <p className="mt-3 text-sm text-gray-500">Available sides are fixed to Front and Back for the current pillow editor.</p>
         </section>
       )}
       <Textarea label="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="Describe the product..." />

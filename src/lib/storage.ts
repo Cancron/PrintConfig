@@ -10,6 +10,9 @@ import type {
   EditorRules,
   ExportRules,
   Merchant,
+  PillowPrintUnit,
+  PillowProductConfig,
+  PillowVariantConfig,
   PhotoBookConfig,
   Product,
   ProductCategory,
@@ -127,6 +130,100 @@ export function normalizePhotoBookConfig(input: Partial<PhotoBookConfig> | undef
   };
 }
 
+export const defaultPillowProductConfig: PillowProductConfig = {
+  enabled: false,
+  sides: ['front', 'back'],
+  minimumDesignedSides: 1,
+  defaultLayout: 'full-bleed',
+};
+
+export function createDefaultPillowProductConfig(enabled = false): PillowProductConfig {
+  return { ...defaultPillowProductConfig, sides: [...defaultPillowProductConfig.sides], enabled };
+}
+
+export function normalizePillowProductConfig(
+  input: Partial<PillowProductConfig> | undefined | null,
+  enabledFallback = false,
+): PillowProductConfig {
+  return {
+    enabled: input?.enabled ?? enabledFallback,
+    sides: ['front', 'back'],
+    minimumDesignedSides: input?.minimumDesignedSides === 2 ? 2 : 1,
+    defaultLayout: 'full-bleed',
+  };
+}
+
+export function createDefaultPillowVariantConfig(
+  width = 0,
+  height = 0,
+  unit: PillowPrintUnit = 'inch',
+): PillowVariantConfig {
+  const inset = (value: number) => ({ top: value, right: value, bottom: value, left: value });
+  const mockup = () => ({
+    imageUrl: '',
+    thumbnailImageUrl: '',
+    designArea: { x: 15, y: 12, width: 70, height: 70, cornerRadius: 8 },
+  });
+  return {
+    shape: width > 0 && height > 0 && width !== height ? 'rectangle' : 'square',
+    printArea: {
+      width,
+      height,
+      unit,
+      bleed: inset(0.25),
+      safeArea: inset(0.5),
+    },
+    mockups: { front: mockup(), back: mockup() },
+  };
+}
+
+export function normalizePillowVariantConfig(
+  input: Partial<PillowVariantConfig> | undefined | null,
+  width: number,
+  height: number,
+  unit: ProductUnit,
+): PillowVariantConfig {
+  const fallbackUnit: PillowPrintUnit = unit === 'mm' ? 'mm' : 'inch';
+  const defaults = createDefaultPillowVariantConfig(width, height, fallbackUnit);
+  const printArea = input?.printArea;
+  const normalizeInsets = (value: Partial<PillowVariantConfig['printArea']['bleed']> | undefined, fallback: PillowVariantConfig['printArea']['bleed']) => ({
+    top: numberOr(value?.top, fallback.top),
+    right: numberOr(value?.right, fallback.right),
+    bottom: numberOr(value?.bottom, fallback.bottom),
+    left: numberOr(value?.left, fallback.left),
+  });
+  const normalizeMockup = (
+    value: Partial<PillowVariantConfig['mockups']['front']> | undefined,
+    fallback: PillowVariantConfig['mockups']['front'],
+  ) => ({
+    imageUrl: typeof value?.imageUrl === 'string' ? value.imageUrl : fallback.imageUrl,
+    imageAssetId: typeof value?.imageAssetId === 'string' ? value.imageAssetId : undefined,
+    thumbnailImageUrl: typeof value?.thumbnailImageUrl === 'string' ? value.thumbnailImageUrl : fallback.thumbnailImageUrl,
+    thumbnailImageAssetId: typeof value?.thumbnailImageAssetId === 'string' ? value.thumbnailImageAssetId : undefined,
+    designArea: {
+      x: numberOr(value?.designArea?.x, fallback.designArea.x),
+      y: numberOr(value?.designArea?.y, fallback.designArea.y),
+      width: numberOr(value?.designArea?.width, fallback.designArea.width),
+      height: numberOr(value?.designArea?.height, fallback.designArea.height),
+      cornerRadius: numberOr(value?.designArea?.cornerRadius, fallback.designArea.cornerRadius ?? 0),
+    },
+  });
+  return {
+    shape: input?.shape === 'rectangle' ? 'rectangle' : defaults.shape,
+    printArea: {
+      width: numberOr(printArea?.width, width),
+      height: numberOr(printArea?.height, height),
+      unit: printArea?.unit === 'cm' || printArea?.unit === 'mm' ? printArea.unit : fallbackUnit,
+      bleed: normalizeInsets(printArea?.bleed, defaults.printArea.bleed),
+      safeArea: normalizeInsets(printArea?.safeArea, defaults.printArea.safeArea),
+    },
+    mockups: {
+      front: normalizeMockup(input?.mockups?.front, defaults.mockups.front),
+      back: normalizeMockup(input?.mockups?.back, defaults.mockups.back),
+    },
+  };
+}
+
 export function loadAccount(): Account {
   try {
     const raw = localStorage.getItem(ACCOUNT_KEY);
@@ -238,9 +335,16 @@ export function normalizeProduct(product: Product): Product {
     exportRules: { ...defaultExportRules, ...(product.exportRules ?? {}) },
     layoutSettings: normalizeLayoutSettings(product.layoutSettings),
     roomPreviews: liftLegacyRoomPreviews({ ...product, variants, roomPreviews: sharedRooms }),
-    variants: variants.map((variant) => ({ ...variant, roomPreviews: undefined })),
+    variants: variants.map((variant) => ({
+      ...variant,
+      pillow: product.productType === 'Pillow Print'
+        ? normalizePillowVariantConfig(variant.pillow, variant.width, variant.height, variant.unit)
+        : variant.pillow,
+      roomPreviews: undefined,
+    })),
     aiArt: product.aiArt ?? createDefaultAiArtConfig(),
     photoBook: normalizePhotoBookConfig(product.photoBook, product.productType === 'Photo Book Print'),
+    pillow: normalizePillowProductConfig(product.pillow, product.productType === 'Pillow Print'),
   };
 }
 
@@ -312,6 +416,7 @@ function normalizeVariant(variant: LegacyVariant, productId: string): ProductVar
     previewImageAssetId: variant.previewImageAssetId,
     thumbnailImageUrl: typeof variant.thumbnailImageUrl === 'string' ? variant.thumbnailImageUrl : '',
     thumbnailImageAssetId: variant.thumbnailImageAssetId,
+    pillow: variant.pillow ? normalizePillowVariantConfig(variant.pillow, numberOr(variant.width, 0), numberOr(variant.height, 0), normalizeUnit(variant.unit)) : undefined,
     roomPreviews: variant.roomPreviews ?? [],
     createdAt: typeof variant.createdAt === 'string' ? variant.createdAt : now,
     updatedAt: typeof variant.updatedAt === 'string' ? variant.updatedAt : now,

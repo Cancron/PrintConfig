@@ -17,6 +17,7 @@ const productTypes: ProductType[] = [
   'Photo Print',
   'Photo Collage Print',
   'Photo Book Print',
+  'Pillow Print',
   'AI Art Generation',
   'Art Print',
   'T-Shirt',

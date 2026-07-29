@@ -219,6 +219,91 @@ function validatePhotoBookSettings(data: Record<string, any>) {
   if (!(settings.pagesPerSpread > 0)) throw new ApiError(400, 'Photo book pages per spread must be greater than 0.');
 }
 
+function normalizePillowSettings(data: Record<string, any>) {
+  const input = data.pillow ?? {};
+  const isPillow = data.productType === 'Pillow Print';
+  data.pillow = {
+    enabled: isPillow && input.enabled !== false,
+    sides: ['front', 'back'],
+    minimumDesignedSides: Number(input.minimumDesignedSides) === 2 ? 2 : 1,
+    defaultLayout: 'full-bleed',
+  };
+  data.variants = (data.variants ?? []).map((variant: Record<string, any>) => {
+    if (!isPillow && !variant.pillow) return variant;
+    const pillow = variant.pillow ?? {};
+    const printArea = pillow.printArea ?? {};
+    const fallbackUnit = variant.unit === 'mm' ? 'mm' : 'inch';
+    const normalizeInsets = (value: Record<string, unknown> | undefined, fallback: number) => ({
+      top: numberOr(value?.top, fallback),
+      right: numberOr(value?.right, fallback),
+      bottom: numberOr(value?.bottom, fallback),
+      left: numberOr(value?.left, fallback),
+    });
+    const normalizeMockup = (value: Record<string, any> | undefined) => {
+      const designArea = value?.designArea ?? {};
+      return {
+        imageUrl: typeof value?.imageUrl === 'string' ? value.imageUrl.trim() : '',
+        imageAssetId: value?.imageAssetId || undefined,
+        thumbnailImageUrl: typeof value?.thumbnailImageUrl === 'string' ? value.thumbnailImageUrl.trim() : '',
+        thumbnailImageAssetId: value?.thumbnailImageAssetId || undefined,
+        designArea: {
+          x: numberOr(designArea.x, 15),
+          y: numberOr(designArea.y, 12),
+          width: numberOr(designArea.width, 70),
+          height: numberOr(designArea.height, 70),
+          cornerRadius: numberOr(designArea.cornerRadius, 8),
+        },
+      };
+    };
+    return {
+      ...variant,
+      pillow: {
+        shape: pillow.shape === 'rectangle' ? 'rectangle' : Number(variant.width) === Number(variant.height) ? 'square' : 'rectangle',
+        printArea: {
+          width: numberOr(printArea.width, numberOr(variant.width, 0)),
+          height: numberOr(printArea.height, numberOr(variant.height, 0)),
+          unit: ['inch', 'cm', 'mm'].includes(printArea.unit) ? printArea.unit : fallbackUnit,
+          bleed: normalizeInsets(printArea.bleed, 0.25),
+          safeArea: normalizeInsets(printArea.safeArea, 0.5),
+        },
+        mockups: {
+          front: normalizeMockup(pillow.mockups?.front),
+          back: normalizeMockup(pillow.mockups?.back),
+        },
+      },
+    };
+  });
+}
+
+function validatePillowSettings(data: Record<string, any>) {
+  if (data.productType !== 'Pillow Print') return;
+  if (![1, 2].includes(Number(data.pillow?.minimumDesignedSides))) throw new ApiError(400, 'Pillow minimum designed sides must be 1 or 2.');
+  for (const variant of data.variants ?? []) {
+    const label = String(variant.sku || variant.name || 'Pillow variant');
+    const pillow = variant.pillow;
+    if (!pillow) throw new ApiError(400, `${label} requires pillow configuration.`);
+    if (!['square', 'rectangle'].includes(pillow.shape)) throw new ApiError(400, `${label} requires a valid pillow shape.`);
+    const printArea = pillow.printArea;
+    if (!printArea || !(Number(printArea.width) > 0) || !(Number(printArea.height) > 0)) throw new ApiError(400, `${label} print width and height must be greater than 0.`);
+    if (!['inch', 'cm', 'mm'].includes(printArea.unit)) throw new ApiError(400, `${label} print unit must be inch, cm, or mm.`);
+    if (pillow.shape === 'square' && Math.abs(Number(printArea.width) - Number(printArea.height)) > 0.0001) throw new ApiError(400, `${label} square print width and height must match.`);
+    for (const [groupName, insets] of [['bleed', printArea.bleed], ['safe area', printArea.safeArea]] as const) {
+      for (const side of ['top', 'right', 'bottom', 'left']) {
+        if (!Number.isFinite(Number(insets?.[side])) || Number(insets[side]) < 0) throw new ApiError(400, `${label} ${groupName} ${side} cannot be negative.`);
+      }
+    }
+    for (const side of ['front', 'back'] as const) {
+      const mockup = pillow.mockups?.[side];
+      if (!String(mockup?.imageUrl ?? '').trim()) throw new ApiError(400, `${label} ${side} mockup image is required.`);
+      const area = mockup.designArea;
+      if (!area) throw new ApiError(400, `${label} ${side} mockup design area is required.`);
+      if (![area.x, area.y, area.width, area.height].every((value) => Number.isFinite(Number(value)))) throw new ApiError(400, `${label} ${side} mockup design area must be numeric.`);
+      if (area.x < 0 || area.y < 0 || !(area.width > 0) || !(area.height > 0) || area.x + area.width > 100 || area.y + area.height > 100) throw new ApiError(400, `${label} ${side} mockup design area must remain inside the image.`);
+      if (!Number.isFinite(Number(area.cornerRadius)) || area.cornerRadius < 0 || area.cornerRadius > 50) throw new ApiError(400, `${label} ${side} mockup corner radius must be between 0 and 50.`);
+    }
+  }
+}
+
 function numberOr(value: unknown, fallback: number) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
@@ -248,6 +333,7 @@ function normalizeRoomOwnership(data: Record<string, any>) {
 }
 function validateProductShape(data: Record<string, any>) {
   validatePhotoBookSettings(data);
+  validatePillowSettings(data);
   if (data.surface && !data.surface.code) throw new ApiError(400, 'Surface code is required.');
   const frontendContent = data.frontendContent ?? {};
   const rating = Number(frontendContent.reviewRating);
@@ -407,6 +493,7 @@ export async function createProduct(payload: Record<string, any>) {
   normalizeEditorProductSelection(payload);
   normalizeLayoutSettings(payload);
   normalizePhotoBookSettings(payload);
+  normalizePillowSettings(payload);
   normalizeRoomOwnership(payload);
   validateProductShape(payload);
   await validateEditorProductSelection(payload);
@@ -423,6 +510,7 @@ export async function updateProduct(id: string, payload: Record<string, any>) {
   normalizeEditorProductSelection(payload);
   normalizeLayoutSettings(payload);
   normalizePhotoBookSettings(payload);
+  normalizePillowSettings(payload);
   normalizeRoomOwnership(payload);
   validateProductShape(payload);
   await validateEditorProductSelection(payload, id);
@@ -670,6 +758,7 @@ export async function getPublicProductConfig(id: string, merchantId?: string) {
     dpi: variant.dpi,
     previewImageUrl: variant.previewImageUrl,
     thumbnailImageUrl: variant.thumbnailImageUrl,
+    pillow: variant.pillow,
     roomOrientation: getVariantRoomOrientation(variant),
 
   }));
@@ -691,6 +780,7 @@ export async function getPublicProductConfig(id: string, merchantId?: string) {
     editorRules: { ...(product.editorRules ?? {}), allowCustomSize: product.editorRules?.allowCustomSize ?? false },
     exportRules: product.exportRules,
     photoBook: publicPhotoBookConfig(product.photoBook, product.productType),
+    pillow: publicPillowConfig(product.pillow, product.productType),
     variants: activeVariants,
     aiArt: publicAiArtConfig(product.aiArt),
   };
@@ -980,6 +1070,16 @@ export async function markDesignCartItemOrderedForAdmin(input: { cartItemId: str
     processed: false,
     printGenerationStatus: cartItem.printGenerationStatus,
     message: 'Design cart item marked as ordered.',
+  };
+}
+
+function publicPillowConfig(pillow: any, productType: string) {
+  const input = pillow ?? {};
+  return {
+    enabled: productType === 'Pillow Print' && input.enabled !== false,
+    sides: ['front', 'back'],
+    minimumDesignedSides: Number(input.minimumDesignedSides) === 2 ? 2 : 1,
+    defaultLayout: 'full-bleed',
   };
 }
 
@@ -1501,6 +1601,7 @@ function normalizeDesignProductType(value: unknown, fallback: unknown = 'Photo B
   for (const candidate of [value, fallback]) {
     const raw = String(candidate ?? '').trim().toLowerCase();
     if (!raw) continue;
+    if (raw.includes('pillow')) return 'Pillow Print';
     if (raw.includes('collage')) return 'Photo Collage Print';
     if (raw.includes('book')) return 'Photo Book Print';
   }
@@ -1803,6 +1904,28 @@ function resolveFinalPrintPages(design: unknown, cartItem: Record<string, any>, 
       ...dimensions,
     }];
   }
+  if (productType === 'Pillow Print') {
+    return sourcePages.slice(0, 2).map((page, index) => {
+      const pageNumber = positiveInteger(page.pageNumber, index + 1);
+      const side = String(page.side ?? page.pageRole ?? (index === 0 ? 'front' : 'back')).toLowerCase() === 'back' ? 'back' : 'front';
+      const pageId = String(page.pageId ?? page._id ?? page.id ?? `pillow-${side}`);
+      const preview = previews.find((item) => String(item.pageId ?? '') === pageId)
+        ?? previews.find((item) => Number(item.pageNumber) === pageNumber)
+        ?? previews[index];
+      return {
+        ...page,
+        pageNumber,
+        printPageNumber: index + 1,
+        pageRole: `pillow-${side}`,
+        filename: `final-pillow-${side}.png`,
+        pageId,
+        previewUrl: String(preview?.publicUrl ?? preview?.url ?? ''),
+        dpi,
+        backgroundColor: typeof page.backgroundColor === 'string' ? page.backgroundColor : typeof (designRecord as any).backgroundColor === 'string' ? (designRecord as any).backgroundColor : '#ffffff',
+        ...finalPrintDimensions(page, designRecord, dpi, selectedVariant, true),
+      };
+    });
+  }
   const pages = [];
   for (let index = 0; index < sourcePages.length; index += 1) {
     const page = sourcePages[index];
@@ -1895,23 +2018,38 @@ function finalPrintDimensions(
   page: Record<string, unknown>,
   design: Record<string, unknown>,
   dpi: number,
-  selectedVariant?: Record<string, unknown>
+  selectedVariant?: Record<string, unknown>,
+  includePillowBleed = false,
 ) {
-  const unit = String(selectedVariant?.unit ?? page.unit ?? design.unit ?? 'inch').trim().toLowerCase();
-  const width = selectedVariant
-    ? positiveNumber(selectedVariant.width, 12)
+  const pillowPrintArea = includePillowBleed && isRecordLike(selectedVariant?.pillow) && isRecordLike(selectedVariant.pillow.printArea)
+    ? selectedVariant.pillow.printArea
+    : undefined;
+  const pillowBleed = pillowPrintArea && isRecordLike(pillowPrintArea.bleed) ? pillowPrintArea.bleed : {};
+  const unit = String(pillowPrintArea?.unit ?? selectedVariant?.unit ?? page.unit ?? design.unit ?? 'inch').trim().toLowerCase();
+  const width = pillowPrintArea
+    ? positiveNumber(pillowPrintArea.width, 12) + nonNegativeNumber(pillowBleed.left) + nonNegativeNumber(pillowBleed.right)
+    : selectedVariant
+      ? positiveNumber(selectedVariant.width, 12)
     : positiveNumber(page.width, positiveNumber(page.canvasWidth, positiveNumber(design.pageWidth, positiveNumber(design.canvasWidth, 12))));
-  const height = selectedVariant
-    ? positiveNumber(selectedVariant.height, 12)
+  const height = pillowPrintArea
+    ? positiveNumber(pillowPrintArea.height, 12) + nonNegativeNumber(pillowBleed.top) + nonNegativeNumber(pillowBleed.bottom)
+    : selectedVariant
+      ? positiveNumber(selectedVariant.height, 12)
     : positiveNumber(page.height, positiveNumber(page.canvasHeight, positiveNumber(design.pageHeight, positiveNumber(design.canvasHeight, 12))));
   if (unit === 'px') return { widthPx: Math.round(width), heightPx: Math.round(height) };
   if (unit === 'mm') return { widthPx: Math.round((width / 25.4) * dpi), heightPx: Math.round((height / 25.4) * dpi) };
+  if (unit === 'cm') return { widthPx: Math.round((width / 2.54) * dpi), heightPx: Math.round((height / 2.54) * dpi) };
   return { widthPx: Math.round(width * dpi), heightPx: Math.round(height * dpi) };
 }
 
 function positiveNumber(value: unknown, fallback: number) {
   const numeric = Number(value);
   return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
+}
+
+function nonNegativeNumber(value: unknown) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : 0;
 }
 
 function positiveInteger(value: unknown, fallback: number) {

@@ -9,7 +9,7 @@ import { ImageField } from '../components/gallery/ImageField';
 import { useProducts } from '../hooks/useProducts';
 import { useCategories } from '../hooks/useCategories';
 import { useWorkspace } from '../hooks/useWorkspace';
-import { createDefaultAiArtConfig, createDefaultEditorRules, createDefaultExportRules, createDefaultPhotoBookConfig } from '../lib/storage';
+import { createDefaultAiArtConfig, createDefaultEditorRules, createDefaultExportRules, createDefaultPhotoBookConfig, createDefaultPillowProductConfig } from '../lib/storage';
 import { validateProductBasicInfo } from '../lib/validation';
 import { createDefaultVariantOptionDefinitions } from '../lib/variantOptions';
 import { createDefaultFrontendContent } from '../lib/frontendContent';
@@ -23,6 +23,7 @@ const productTypeOptions: { value: ProductType; label: ProductType }[] = [
   { value: 'Photo Print', label: 'Photo Print' },
   { value: 'Photo Collage Print', label: 'Photo Collage Print' },
   { value: 'Photo Book Print', label: 'Photo Book Print' },
+  { value: 'Pillow Print', label: 'Pillow Print' },
   { value: 'AI Art Generation', label: 'AI Art Generation' },
   { value: 'Art Print', label: 'Art Print' },
   { value: 'T-Shirt', label: 'T-Shirt' },
@@ -103,6 +104,7 @@ export function CreateProduct() {
       variants: [],
       aiArt: createDefaultAiArtConfig(),
       photoBook: createDefaultPhotoBookConfig(productType === 'Photo Book Print'),
+      pillow: createDefaultPillowProductConfig(productType === 'Pillow Print'),
       createdAt: now,
       updatedAt: now,
     };

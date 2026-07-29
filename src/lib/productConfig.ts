@@ -1,4 +1,10 @@
-import { createDefaultEditorRules, createDefaultExportRules, normalizePhotoBookConfig } from './storage';
+import {
+  createDefaultEditorRules,
+  createDefaultExportRules,
+  normalizePhotoBookConfig,
+  normalizePillowProductConfig,
+  normalizePillowVariantConfig,
+} from './storage';
 import { createDefaultVariantOptionDefinitions } from './variantOptions';
 import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
 import { normalizeFrontendContent } from './frontendContent';
@@ -31,6 +37,7 @@ const PRODUCT_TYPES: ProductType[] = [
   'Photo Print',
   'Photo Collage Print',
   'Photo Book Print',
+  'Pillow Print',
   'AI Art Generation',
   'Art Print',
   'T-Shirt',
@@ -113,6 +120,7 @@ function buildImportCandidate(input: Record<string, unknown>): Product {
     variants: variants.map((variant, index) => normalizeVariant(variant, id, now, index)),
     aiArt: normalizeAiArtConfig(isRecord(input.aiArt) ? input.aiArt : undefined, now),
     photoBook: normalizePhotoBookConfig(isRecord(input.photoBook) ? input.photoBook : undefined, input.productType === 'Photo Book Print'),
+    pillow: normalizePillowProductConfig(isRecord(input.pillow) ? input.pillow : undefined, input.productType === 'Pillow Print'),
     createdAt: now,
     updatedAt: now,
   };
@@ -264,6 +272,14 @@ function normalizeVariant(input: Record<string, unknown>, productId: string, now
     previewImageAssetId: typeof input.previewImageAssetId === 'string' ? input.previewImageAssetId : undefined,
     thumbnailImageUrl: typeof input.thumbnailImageUrl === 'string' ? input.thumbnailImageUrl : '',
     thumbnailImageAssetId: typeof input.thumbnailImageAssetId === 'string' ? input.thumbnailImageAssetId : undefined,
+    pillow: isRecord(input.pillow)
+      ? normalizePillowVariantConfig(
+          input.pillow,
+          numberOr(input.width, isRecord(legacySurface) ? numberOr(legacySurface.width, 1) : 1),
+          numberOr(input.height, isRecord(legacySurface) ? numberOr(legacySurface.height, 1) : 1),
+          normalizeUnit(input.unit ?? (isRecord(legacySurface) ? legacySurface.unit : undefined)),
+        )
+      : undefined,
     roomPreviews: Array.isArray(input.roomPreviews) ? input.roomPreviews.filter(isRecord).map((room) => normalizeRoomPreview(room, now)) : [],
     createdAt: now,
     updatedAt: now,

@@ -57,6 +57,68 @@ const productRoomPreviewSchema = new Schema(
   },
   { timestamps: true }
 );
+const pillowInsetsSchema = new Schema(
+  {
+    top: { type: Number, required: true, min: 0, default: 0 },
+    right: { type: Number, required: true, min: 0, default: 0 },
+    bottom: { type: Number, required: true, min: 0, default: 0 },
+    left: { type: Number, required: true, min: 0, default: 0 },
+  },
+  { _id: false }
+);
+
+const pillowDesignAreaSchema = new Schema(
+  {
+    x: { type: Number, required: true, min: 0, max: 100, default: 15 },
+    y: { type: Number, required: true, min: 0, max: 100, default: 12 },
+    width: { type: Number, required: true, min: 0.0001, max: 100, default: 70 },
+    height: { type: Number, required: true, min: 0.0001, max: 100, default: 70 },
+    cornerRadius: { type: Number, min: 0, max: 50, default: 8 },
+  },
+  { _id: false }
+);
+
+const pillowMockupSchema = new Schema(
+  {
+    imageUrl: { type: String, default: '', trim: true },
+    imageAssetId: { type: Schema.Types.ObjectId, ref: 'ImageAsset' },
+    thumbnailImageUrl: { type: String, default: '', trim: true },
+    thumbnailImageAssetId: { type: Schema.Types.ObjectId, ref: 'ImageAsset' },
+    designArea: { type: pillowDesignAreaSchema, default: () => ({}) },
+  },
+  { _id: false }
+);
+
+const pillowVariantSchema = new Schema(
+  {
+    shape: { type: String, enum: ['square', 'rectangle'], required: true, default: 'square' },
+    printArea: {
+      type: new Schema(
+        {
+          width: { type: Number, required: true, min: 0.0001 },
+          height: { type: Number, required: true, min: 0.0001 },
+          unit: { type: String, enum: ['inch', 'cm', 'mm'], required: true, default: 'inch' },
+          bleed: { type: pillowInsetsSchema, default: () => ({}) },
+          safeArea: { type: pillowInsetsSchema, default: () => ({}) },
+        },
+        { _id: false }
+      ),
+      required: true,
+    },
+    mockups: {
+      type: new Schema(
+        {
+          front: { type: pillowMockupSchema, default: () => ({}) },
+          back: { type: pillowMockupSchema, default: () => ({}) },
+        },
+        { _id: false }
+      ),
+      required: true,
+    },
+  },
+  { _id: false }
+);
+
 const variantSchema = new Schema(
   {
     productId: { type: Schema.Types.ObjectId, ref: 'Product' },
@@ -73,6 +135,7 @@ const variantSchema = new Schema(
     previewImageAssetId: { type: Schema.Types.ObjectId, ref: 'ImageAsset' },
     thumbnailImageUrl: { type: String, default: '' },
     thumbnailImageAssetId: { type: Schema.Types.ObjectId, ref: 'ImageAsset' },
+    pillow: { type: pillowVariantSchema },
     roomPreviews: { type: [variantRoomPreviewSchema], default: [] },
   },
   { timestamps: true }
@@ -328,6 +391,16 @@ const photoBookSchema = new Schema(
   { _id: false }
 );
 
+const pillowProductSchema = new Schema(
+  {
+    enabled: { type: Boolean, default: false },
+    sides: { type: [{ type: String, enum: ['front', 'back'] }], default: ['front', 'back'] },
+    minimumDesignedSides: { type: Number, enum: [1, 2], default: 1 },
+    defaultLayout: { type: String, enum: ['full-bleed'], default: 'full-bleed' },
+  },
+  { _id: false }
+);
+
 const productSchema = new Schema(
   {
     accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
@@ -354,6 +427,7 @@ const productSchema = new Schema(
     layoutSettings: { type: layoutSettingsSchema, default: () => ({}) },
     aiArt: { type: aiArtSchema, default: () => ({ enabled: false }) },
     photoBook: { type: photoBookSchema, default: () => ({}) },
+    pillow: { type: pillowProductSchema, default: () => ({}) },
   },
   { timestamps: true }
 );

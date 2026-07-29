@@ -4,12 +4,14 @@ import { Check, Eye, ListPlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { SurfacePreview } from './SurfacePreview';
 import { BulkVariantsModal } from './BulkVariantsModal';
 import { VariantOptionDefinitions } from './VariantOptionDefinitions';
+import { PillowVariantFields } from './PillowVariantFields';
 import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { ImageField } from '../gallery/ImageField';
-import { toPixels, validateVariant, validateVariantOptions } from '../../lib/validation';
+import { toPixels, validatePillowVariant, validateVariant, validateVariantOptions } from '../../lib/validation';
+import { createDefaultPillowVariantConfig, normalizePillowVariantConfig } from '../../lib/storage';
 import { compatibleRooms } from '../../lib/roomPreview';
 import type { Product, ProductStatus, ProductUnit, ProductVariant } from '../../types';
 
@@ -47,6 +49,7 @@ export function VariantsTab({ product, onSave }: Props) {
     previewImageAssetId: undefined as string | undefined,
     thumbnailImageUrl: '',
     thumbnailImageAssetId: undefined as string | undefined,
+    pillow: createDefaultPillowVariantConfig(),
     options: [...product.variantOptionDefinitions.map((definition) => ({ key: definition.key, value: '' })), { key: '', value: '' }],
   });
 
@@ -68,8 +71,9 @@ export function VariantsTab({ product, onSave }: Props) {
         existingSkus: product.variants.map((variant) => ({ _id: variant._id, sku: variant.sku })),
       }),
       ...validateVariantOptions(formOptions, product.variantOptionDefinitions),
+      ...(product.productType === 'Pillow Print' ? validatePillowVariant(form.pillow) : {}),
     }),
-    [editingId, form.dpi, form.height, form.name, form.price, form.sku, form.unit, form.width, formOptions, product.variantOptionDefinitions, product.variants]
+    [editingId, form.dpi, form.height, form.name, form.pillow, form.price, form.sku, form.unit, form.width, formOptions, product.productType, product.variantOptionDefinitions, product.variants]
   );
   const isValid = Object.keys(errors).length === 0;
 
@@ -87,6 +91,7 @@ export function VariantsTab({ product, onSave }: Props) {
       previewImageAssetId: undefined,
       thumbnailImageUrl: '',
       thumbnailImageAssetId: undefined,
+      pillow: createDefaultPillowVariantConfig(),
       options: [...product.variantOptionDefinitions.map((definition) => ({ key: definition.key, value: '' })), { key: '', value: '' }],
     });
   }
@@ -111,6 +116,7 @@ export function VariantsTab({ product, onSave }: Props) {
       previewImageAssetId: variant.previewImageAssetId,
       thumbnailImageUrl: variant.thumbnailImageUrl,
       thumbnailImageAssetId: variant.thumbnailImageAssetId,
+      pillow: normalizePillowVariantConfig(variant.pillow, variant.width, variant.height, variant.unit),
       options: [
         ...product.variantOptionDefinitions.map((definition) => ({ key: definition.key, value: variant.options[definition.key] ?? '' })),
         ...Object.entries(variant.options).filter(([key]) => !product.variantOptionDefinitions.some((definition) => definition.key === key)).map(([key, value]) => ({ key, value })),
@@ -146,6 +152,41 @@ export function VariantsTab({ product, onSave }: Props) {
     setForm((prev) => ({ ...prev, options: prev.options.map((opt, i) => (i === index ? { ...opt, [field]: value } : opt)) }));
   }
 
+  function updateVariantDimension(field: 'width' | 'height', value: string) {
+    setForm((prev) => {
+      const previousDimension = Number(prev[field]);
+      const shouldSync = !(prev.pillow.printArea[field] > 0) || prev.pillow.printArea[field] === previousDimension;
+      const nextWidth = field === 'width' ? Number(value) : Number(prev.width);
+      const nextHeight = field === 'height' ? Number(value) : Number(prev.height);
+      return {
+        ...prev,
+        [field]: value,
+        pillow: {
+          ...prev.pillow,
+          shape: nextWidth > 0 && nextHeight > 0 && nextWidth !== nextHeight ? 'rectangle' : 'square',
+          printArea: {
+            ...prev.pillow.printArea,
+            ...(shouldSync ? { [field]: Number(value) } : {}),
+          },
+        },
+      };
+    });
+  }
+
+  function updateVariantUnit(unit: ProductUnit) {
+    setForm((prev) => ({
+      ...prev,
+      unit,
+      pillow: {
+        ...prev.pillow,
+        printArea: {
+          ...prev.pillow.printArea,
+          unit: unit === 'mm' ? 'mm' : 'inch',
+        },
+      },
+    }));
+  }
+
   function handleSave() {
     if (!isValid) return;
     const options: Record<string, string> = {};
@@ -172,6 +213,7 @@ export function VariantsTab({ product, onSave }: Props) {
       previewImageAssetId: form.previewImageAssetId,
       thumbnailImageUrl: form.thumbnailImageUrl.trim(),
       thumbnailImageAssetId: form.thumbnailImageAssetId,
+      pillow: product.productType === 'Pillow Print' ? form.pillow : existing?.pillow,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
@@ -201,9 +243,11 @@ export function VariantsTab({ product, onSave }: Props) {
         <h2 className="text-lg font-medium text-gray-900">Variants</h2>
         {!isFormOpen && (
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setBulkOpen(true)} className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 transition-colors hover:bg-gray-50">
-              <ListPlus className="h-4 w-4" /> Bulk Add
-            </button>
+            {product.productType !== 'Pillow Print' && (
+              <button type="button" onClick={() => setBulkOpen(true)} className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 transition-colors hover:bg-gray-50">
+                <ListPlus className="h-4 w-4" /> Bulk Add
+              </button>
+            )}
             <button onClick={startAdd} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800">
               <Plus className="h-4 w-4" /> Add Variant
             </button>
@@ -230,13 +274,17 @@ export function VariantsTab({ product, onSave }: Props) {
                 <Input label="SKU" value={form.sku} onChange={(event) => setForm((prev) => ({ ...prev, sku: event.target.value }))} error={errors.sku} placeholder="e.g. CANVAS-16X20" />
                 <Input label="Price" type="number" step="0.01" min="0" value={form.price} onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))} error={errors.price} placeholder="0.00" />
                 <Select label="Status" value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value as ProductStatus }))} options={statusOptions} />
-                <Input label="Width" type="number" step="0.01" min="0" value={form.width} onChange={(event) => setForm((prev) => ({ ...prev, width: event.target.value }))} error={errors.width} />
-                <Input label="Height" type="number" step="0.01" min="0" value={form.height} onChange={(event) => setForm((prev) => ({ ...prev, height: event.target.value }))} error={errors.height} />
-                <Select label="Unit" value={form.unit} onChange={(event) => setForm((prev) => ({ ...prev, unit: event.target.value as ProductUnit }))} options={unitOptions} error={errors.unit} />
+                <Input label="Width" type="number" step="0.01" min="0" value={form.width} onChange={(event) => updateVariantDimension('width', event.target.value)} error={errors.width} />
+                <Input label="Height" type="number" step="0.01" min="0" value={form.height} onChange={(event) => updateVariantDimension('height', event.target.value)} error={errors.height} />
+                <Select label="Unit" value={form.unit} onChange={(event) => updateVariantUnit(event.target.value as ProductUnit)} options={unitOptions} error={errors.unit} />
                 <Input label="DPI" type="number" min="1" value={form.dpi} onChange={(event) => setForm((prev) => ({ ...prev, dpi: event.target.value }))} error={errors.dpi} />
                 <ImageField label="Preview Image URL" url={form.previewImageUrl} assetId={form.previewImageAssetId} onChange={(url, assetId) => setForm((prev) => ({ ...prev, previewImageUrl: url, previewImageAssetId: assetId }))} />
                 <ImageField label="Thumbnail Image URL" url={form.thumbnailImageUrl} assetId={form.thumbnailImageAssetId} onChange={(url, assetId) => setForm((prev) => ({ ...prev, thumbnailImageUrl: url, thumbnailImageAssetId: assetId }))} />
               </div>
+
+              {product.productType === 'Pillow Print' && (
+                <PillowVariantFields value={form.pillow} errors={errors} onChange={(pillow) => setForm((prev) => ({ ...prev, pillow }))} />
+              )}
 
               <div className="mt-6">
                 <h4 className="text-sm font-semibold text-gray-900">Configured Options</h4>
@@ -310,7 +358,7 @@ export function VariantsTab({ product, onSave }: Props) {
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">${variant.price.toFixed(2)}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700"><Badge status={variant.status} /></td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{variant.width} x {variant.height} {variant.unit} at {variant.dpi} DPI</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{Math.round(toPixels(variant.width, variant.unit, variant.dpi))} x {Math.round(toPixels(variant.height, variant.unit, variant.dpi))} px</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{variantPixelDimensions(product, variant).width} x {variantPixelDimensions(product, variant).height} px</td>
                   <td className="px-4 py-3 text-sm text-gray-700"><div className="flex flex-wrap gap-1">{Object.entries(variant.options).map(([key, value]) => <span key={key} className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">{key}: {value}</span>)}</div></td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm"><p className="text-gray-700">{compatibleRooms(product.roomPreviews, variant).length} compatible</p><Link to={`?tab=preview&variantId=${variant._id}`} className="mt-1 inline-block font-medium text-slate-700 hover:text-slate-900">Manage Shared Rooms</Link></td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
@@ -337,8 +385,9 @@ function VariantPreviewModal({ product, variant, onClose }: { product: Product; 
   const trimWidthPx = Math.round(toPixels(variant.width, variant.unit, variant.dpi));
   const trimHeightPx = Math.round(toPixels(variant.height, variant.unit, variant.dpi));
   const bleed = product.surface?.bleed;
-  const totalWidthPx = Math.round(trimWidthPx + (bleed ? toPixels(bleed.left + bleed.right, bleed.unit, variant.dpi) : 0));
-  const totalHeightPx = Math.round(trimHeightPx + (bleed ? toPixels(bleed.top + bleed.bottom, bleed.unit, variant.dpi) : 0));
+  const exportDimensions = variantPixelDimensions(product, variant);
+  const totalWidthPx = product.productType === 'Pillow Print' ? exportDimensions.width : Math.round(trimWidthPx + (bleed ? toPixels(bleed.left + bleed.right, bleed.unit, variant.dpi) : 0));
+  const totalHeightPx = product.productType === 'Pillow Print' ? exportDimensions.height : Math.round(trimHeightPx + (bleed ? toPixels(bleed.top + bleed.bottom, bleed.unit, variant.dpi) : 0));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -368,4 +417,22 @@ function VariantPreviewModal({ product, variant, onClose }: { product: Product; 
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return <div className="flex justify-between gap-3"><dt className="text-gray-500">{label}</dt><dd className="text-right font-medium text-gray-900">{value}</dd></div>;
+}
+
+function variantPixelDimensions(product: Product, variant: ProductVariant) {
+  const printArea = product.productType === 'Pillow Print' ? variant.pillow?.printArea : undefined;
+  if (!printArea) {
+    return {
+      width: Math.round(toPixels(variant.width, variant.unit, variant.dpi)),
+      height: Math.round(toPixels(variant.height, variant.unit, variant.dpi)),
+    };
+  }
+  const width = printArea.width + printArea.bleed.left + printArea.bleed.right;
+  const height = printArea.height + printArea.bleed.top + printArea.bleed.bottom;
+  const toPrintPixels = (value: number) => printArea.unit === 'mm'
+    ? (value / 25.4) * variant.dpi
+    : printArea.unit === 'cm'
+      ? (value / 2.54) * variant.dpi
+      : value * variant.dpi;
+  return { width: Math.round(toPrintPixels(width)), height: Math.round(toPrintPixels(height)) };
 }

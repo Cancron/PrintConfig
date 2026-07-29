@@ -176,16 +176,28 @@ function ScopeBadge({ scope }: { scope: ProductScope }) {
 
 function ProductReadinessPanel({ product }: { product: Product }) {
   const readiness = getProductReadiness(product);
+  const isPillow = product.productType === 'Pillow Print';
   const checks = [
     { label: 'Has basic info', value: readiness.hasBasicInfo },
     { label: 'Has at least one active variant', value: readiness.hasActiveVariant },
     { label: 'Active variants have width, height, unit, and DPI', value: readiness.activeVariantsHaveDimensions },
-    { label: 'Product surface exists', value: readiness.hasSurface },
-    { label: 'Surface settings are valid', value: readiness.surfaceValid },
+    ...(isPillow
+      ? [
+          { label: 'Pillow editor settings are complete', value: readiness.pillowSettingsValid },
+          { label: 'Pillow print areas and mockups are valid', value: readiness.activePillowVariantsValid },
+        ]
+      : [
+          { label: 'Product surface exists', value: readiness.hasSurface },
+          { label: 'Surface settings are valid', value: readiness.surfaceValid },
+        ]),
     { label: 'Export rules exist', value: readiness.hasExportRules },
     { label: 'Editor rules exist', value: readiness.hasEditorRules },
-    { label: 'Active variants have compatible shared rooms', value: readiness.activeVariantsHaveRoomPreviews },
-    { label: 'Active variant orientations have defaults', value: readiness.activeVariantsHaveDefaultRoomPreview },
+    ...(!isPillow
+      ? [
+          { label: 'Active variants have compatible shared rooms', value: readiness.activeVariantsHaveRoomPreviews },
+          { label: 'Active variant orientations have defaults', value: readiness.activeVariantsHaveDefaultRoomPreview },
+        ]
+      : []),
   ];
 
   return (
@@ -197,12 +209,12 @@ function ProductReadinessPanel({ product }: { product: Product }) {
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {checks.map((check) => { const Icon = check.value ? CheckCircle : XCircle; return <div key={check.label} className="flex items-center gap-2 text-sm text-gray-700"><Icon className={`h-4 w-4 ${check.value ? 'text-emerald-600' : 'text-amber-600'}`} /><span>{check.label}</span></div>; })}
       </div>
-      <div className="mt-5 border-t border-gray-200 pt-4">
+      {!isPillow && <div className="mt-5 border-t border-gray-200 pt-4">
         <p className="text-sm font-medium text-gray-900">Optional room preview enhancements</p>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           {[{ label: 'At least one variant has room preview images', value: readiness.hasAnyRoomPreviews }, { label: 'Each active variant has at least one room preview', value: readiness.activeVariantsHaveRoomPreviews }, { label: 'Each active variant has a default room preview', value: readiness.activeVariantsHaveDefaultRoomPreview }].map((check) => { const Icon = check.value ? CheckCircle : XCircle; return <div key={check.label} className="flex items-center gap-2 text-sm text-gray-700"><Icon className={`h-4 w-4 ${check.value ? 'text-emerald-600' : 'text-gray-400'}`} /><span>{check.label}</span></div>; })}
         </div>
-      </div>
+      </div>}
       {!readiness.ready && <div className="mt-4 rounded-md bg-amber-50 p-3 ring-1 ring-inset ring-amber-200"><p className="text-sm font-medium text-amber-900">Missing</p><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-800">{readiness.missing.map((item) => <li key={item}>{item}</li>)}</ul></div>}
     </section>
   );

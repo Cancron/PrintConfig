@@ -1,4 +1,4 @@
-import type { LayoutCategory, LayoutElement, LayoutTemplate, Product, ProductCategory, ProductSurface, ProductType, ProductUnit, ProductVariant, VariantOptionDefinition } from '../types';
+import type { LayoutCategory, LayoutElement, LayoutTemplate, PillowVariantConfig, Product, ProductCategory, ProductSurface, ProductType, ProductUnit, ProductVariant, VariantOptionDefinition } from '../types';
 import { missingRequiredVariantOptions } from './variantOptions';
 import { compatibleRooms, getVariantRoomOrientation } from './roomPreview';
 
@@ -11,6 +11,7 @@ const PRODUCT_TYPES: ProductType[] = [
   'Photo Print',
   'Photo Collage Print',
   'Photo Book Print',
+  'Pillow Print',
   'AI Art Generation',
   'Art Print',
   'T-Shirt',
@@ -89,6 +90,44 @@ export function validateVariantOptions(options: Record<string, string>, definiti
   }
   return errors;
 }
+
+export function validatePillowVariant(pillow: PillowVariantConfig | undefined): ValidationErrors {
+  const errors: ValidationErrors = {};
+  if (!pillow) return { pillow: 'Pillow configuration is required.' };
+  if (pillow.shape !== 'square' && pillow.shape !== 'rectangle') errors['pillow.shape'] = 'Select a pillow shape.';
+  if (!Number.isFinite(Number(pillow.printArea.width)) || Number(pillow.printArea.width) <= 0) errors['pillow.printArea.width'] = 'Print width must be greater than zero.';
+  if (!Number.isFinite(Number(pillow.printArea.height)) || Number(pillow.printArea.height) <= 0) errors['pillow.printArea.height'] = 'Print height must be greater than zero.';
+  if (!['inch', 'cm', 'mm'].includes(pillow.printArea.unit)) errors['pillow.printArea.unit'] = 'Select inch, cm, or mm.';
+
+  for (const group of ['bleed', 'safeArea'] as const) {
+    for (const side of ['top', 'right', 'bottom', 'left'] as const) {
+      const value = pillow.printArea[group][side];
+      if (!Number.isFinite(Number(value)) || Number(value) < 0) {
+        errors[`pillow.printArea.${group}.${side}`] = `${group === 'bleed' ? 'Bleed' : 'Safe area'} cannot be negative.`;
+      }
+    }
+  }
+
+  for (const side of ['front', 'back'] as const) {
+    const mockup = pillow.mockups[side];
+    if (!mockup?.imageUrl?.trim()) errors[`pillow.mockups.${side}.imageUrl`] = `${side === 'front' ? 'Front' : 'Back'} mockup image is required.`;
+    const area = mockup?.designArea;
+    if (!area) {
+      errors[`pillow.mockups.${side}.designArea`] = 'Design area is required.';
+      continue;
+    }
+    if (!Number.isFinite(Number(area.x)) || area.x < 0 || area.x > 100) errors[`pillow.mockups.${side}.designArea.x`] = 'X must be between 0 and 100.';
+    if (!Number.isFinite(Number(area.y)) || area.y < 0 || area.y > 100) errors[`pillow.mockups.${side}.designArea.y`] = 'Y must be between 0 and 100.';
+    if (!Number.isFinite(Number(area.width)) || area.width <= 0 || area.width > 100) errors[`pillow.mockups.${side}.designArea.width`] = 'Width must be greater than 0 and no more than 100.';
+    if (!Number.isFinite(Number(area.height)) || area.height <= 0 || area.height > 100) errors[`pillow.mockups.${side}.designArea.height`] = 'Height must be greater than 0 and no more than 100.';
+    if (Number(area.x) + Number(area.width) > 100) errors[`pillow.mockups.${side}.designArea.width`] = 'X plus width cannot exceed 100.';
+    if (Number(area.y) + Number(area.height) > 100) errors[`pillow.mockups.${side}.designArea.height`] = 'Y plus height cannot exceed 100.';
+    if (area.cornerRadius !== undefined && (!Number.isFinite(Number(area.cornerRadius)) || area.cornerRadius < 0 || area.cornerRadius > 50)) {
+      errors[`pillow.mockups.${side}.designArea.cornerRadius`] = 'Corner radius must be between 0 and 50.';
+    }
+  }
+  return errors;
+}
 export function validateSurface(surface: ProductSurface, previewVariant?: Pick<ProductVariant, 'width' | 'height'> | null): ValidationErrors {
   const errors: ValidationErrors = {};
 
@@ -145,34 +184,48 @@ export function getProductReadiness(product: Product) {
   });
   const activeVariants = product.variants.filter((variant) => variant.status === 'Active');
   const activeVariantsHaveDimensions = activeVariants.every(variantHasValidDimensions);
+  const isPillow = product.productType === 'Pillow Print';
+  const pillowSettingsValid = !isPillow || (
+    product.pillow?.enabled === true
+    && product.pillow.defaultLayout === 'full-bleed'
+    && product.pillow.sides.includes('front')
+    && product.pillow.sides.includes('back')
+    && (product.pillow.minimumDesignedSides === 1 || product.pillow.minimumDesignedSides === 2)
+  );
+  const activePillowVariantsValid = !isPillow
+    || activeVariants.every((variant) => Object.keys(validatePillowVariant(variant.pillow)).length === 0);
   const previewVariant = activeVariants[0] ?? product.variants[0] ?? null;
-  const hasSurface = !!product.surface;
-  const surfaceValid = hasSurface && surfaceHasValidSettings(product.surface, previewVariant);
+  const hasSurface = isPillow ? activeVariants.length > 0 && activePillowVariantsValid : !!product.surface;
+  const surfaceValid = isPillow ? activePillowVariantsValid : hasSurface && surfaceHasValidSettings(product.surface, previewVariant);
   const hasExportRules = !!product.exportRules;
   const hasEditorRules = !!product.editorRules;
   const variantsHaveRequiredOptions = product.variants.every((variant) => missingRequiredVariantOptions(variant, product.variantOptionDefinitions).length === 0);
-  const hasAnyRoomPreviews = product.roomPreviews.length > 0;
-  const activeVariantsHaveRoomPreviews = activeVariants.length > 0 && activeVariants.every((variant) => compatibleRooms(product.roomPreviews, variant).length > 0);
-  const activeVariantsHaveDefaultRoomPreview = activeVariants.length > 0 && activeVariants.every((variant) => {
+  const hasAnyRoomPreviews = isPillow || product.roomPreviews.length > 0;
+  const activeVariantsHaveRoomPreviews = isPillow || (activeVariants.length > 0 && activeVariants.every((variant) => compatibleRooms(product.roomPreviews, variant).length > 0));
+  const activeVariantsHaveDefaultRoomPreview = isPillow || (activeVariants.length > 0 && activeVariants.every((variant) => {
     const orientation = getVariantRoomOrientation(variant);
     return compatibleRooms(product.roomPreviews, variant).some((room) => room.defaultOrientations.includes(orientation));
-  });
+  }));
 
   if (Object.keys(basicErrors).length > 0) missing.push('Complete valid product name, slug, type, and base price.');
   if (activeVariants.length === 0) missing.push('Add at least one active variant.');
   if (!activeVariantsHaveDimensions) missing.push('Add width, height, unit, and DPI to every active variant.');
-  if (!hasSurface) missing.push('Add a product surface configuration.');
-  if (hasSurface && !surfaceValid) missing.push('Fix invalid surface bleed, safe area, code, or background color settings.');
+  if (!pillowSettingsValid) missing.push('Enable and complete the product-level pillow settings.');
+  if (!activePillowVariantsValid) missing.push('Complete print areas and front/back mockups for every active pillow variant.');
+  if (!isPillow && !hasSurface) missing.push('Add a product surface configuration.');
+  if (!isPillow && hasSurface && !surfaceValid) missing.push('Fix invalid surface bleed, safe area, code, or background color settings.');
   if (!hasExportRules) missing.push('Configure export rules.');
   if (!hasEditorRules) missing.push('Configure editor rules.');
   if (!variantsHaveRequiredOptions) missing.push('Fill every required option value on all variants.');
-  if (activeVariants.length > 0 && !activeVariantsHaveRoomPreviews) missing.push('Add a compatible shared room for every active variant orientation.');
-  if (activeVariants.length > 0 && !activeVariantsHaveDefaultRoomPreview) missing.push('Choose a default shared room for every active variant orientation.');
+  if (!isPillow && activeVariants.length > 0 && !activeVariantsHaveRoomPreviews) missing.push('Add a compatible shared room for every active variant orientation.');
+  if (!isPillow && activeVariants.length > 0 && !activeVariantsHaveDefaultRoomPreview) missing.push('Choose a default shared room for every active variant orientation.');
 
   return {
     hasBasicInfo: Object.keys(basicErrors).length === 0,
     hasActiveVariant: activeVariants.length > 0,
     activeVariantsHaveDimensions,
+    pillowSettingsValid,
+    activePillowVariantsValid,
     hasSurface,
     surfaceValid,
     hasExportRules,

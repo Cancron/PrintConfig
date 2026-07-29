@@ -5,6 +5,7 @@ export type ProductType =
   | 'Photo Print'
   | 'Photo Collage Print'
   | 'Photo Book Print'
+  | 'Pillow Print'
   | 'AI Art Generation'
   | 'Art Print'
   | 'T-Shirt'
@@ -35,6 +36,8 @@ export type ProductOptionDisplayType = 'Dropdown' | 'Radio Buttons' | 'Color Swa
 export type PriceModifierType = 'none' | 'fixed' | 'variant-fixed' | 'variant-override' | 'percentage';
 export type PhotoBookCoverType = 'softcover' | 'hardcover' | 'layflat' | 'custom';
 export type PhotoBookBindingType = 'perfect' | 'saddle_stitch' | 'spiral' | 'layflat';
+export type PillowPrintUnit = 'inch' | 'cm' | 'mm';
+export type PillowSide = 'front' | 'back';
 
 export interface ImageFolder {
   _id: string;
@@ -576,6 +579,7 @@ export interface ProductVariant {
   previewImageAssetId?: string;
   thumbnailImageUrl: string;
   thumbnailImageAssetId?: string;
+  pillow?: PillowVariantConfig;
   roomPreviews?: LegacyVariantRoomPreview[];
   createdAt: string;
   updatedAt: string;
@@ -633,6 +637,51 @@ export interface PhotoBookConfig {
   hasBackCover: boolean;
 }
 
+export interface PillowInsets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+export interface PillowDesignArea {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  cornerRadius?: number;
+}
+
+export interface PillowMockupConfig {
+  imageUrl: string;
+  imageAssetId?: string;
+  thumbnailImageUrl?: string;
+  thumbnailImageAssetId?: string;
+  designArea: PillowDesignArea;
+}
+
+export interface PillowVariantConfig {
+  shape: 'square' | 'rectangle';
+  printArea: {
+    width: number;
+    height: number;
+    unit: PillowPrintUnit;
+    bleed: PillowInsets;
+    safeArea: PillowInsets;
+  };
+  mockups: {
+    front: PillowMockupConfig;
+    back: PillowMockupConfig;
+  };
+}
+
+export interface PillowProductConfig {
+  enabled: boolean;
+  sides: PillowSide[];
+  minimumDesignedSides: 1 | 2;
+  defaultLayout: 'full-bleed';
+}
+
 export interface Product {
   _id: string;
   accountId: string;
@@ -660,6 +709,7 @@ export interface Product {
   variants: ProductVariant[];
   aiArt: AiArtConfig;
   photoBook: PhotoBookConfig;
+  pillow: PillowProductConfig;
   createdAt: string;
   updatedAt: string;
 }

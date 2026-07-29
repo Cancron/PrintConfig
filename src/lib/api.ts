@@ -4,6 +4,7 @@ import { normalizeVariantOptionDefinitions } from './variantOptions';
 import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
 import { normalizeFrontendContent } from './frontendContent';
 import { normalizeEditorProductSelection } from './productSelection';
+import { normalizePillowProductConfig, normalizePillowVariantConfig } from './storage';
 
 export interface AuthUser {
   _id: string;
@@ -275,6 +276,9 @@ function normalizeProduct(raw: any): Product {
     productId: String(variant.productId ?? productId),
     status: variant.status === 'active' || variant.status === 'Active' ? 'Active' : 'Draft',
     options: variant.options ?? {},
+    pillow: raw.productType === 'Pillow Print' || variant.pillow
+      ? normalizePillowVariantConfig(variant.pillow, Number(variant.width ?? 0), Number(variant.height ?? 0), variant.unit)
+      : undefined,
     roomPreviews: (variant.roomPreviews ?? []).map((room: any) => ({ ...room, _id: idOf(room), variantId: String(room.variantId ?? variant._id ?? '') })),
   }));
   const product: Product = {
@@ -295,6 +299,7 @@ function normalizeProduct(raw: any): Product {
     editorRules: raw.editorRules ?? {},
     exportRules: raw.exportRules ?? {},
     layoutSettings: normalizeProductLayoutSettings(raw.layoutSettings),
+    pillow: normalizePillowProductConfig(raw.pillow, raw.productType === 'Pillow Print'),
     createdAt: raw.createdAt ?? new Date().toISOString(),
     updatedAt: raw.updatedAt ?? new Date().toISOString(),
   };
