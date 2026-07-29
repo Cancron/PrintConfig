@@ -18,10 +18,10 @@ const productTypes: ProductType[] = [
   'Photo Collage Print',
   'Photo Book Print',
   'Pillow Print',
+  'Mug Print',
   'AI Art Generation',
   'Art Print',
   'T-Shirt',
-  'Mug',
   'Business Card', 
   'Sticker'
 ];

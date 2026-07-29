@@ -5,13 +5,14 @@ import { SurfacePreview } from './SurfacePreview';
 import { BulkVariantsModal } from './BulkVariantsModal';
 import { VariantOptionDefinitions } from './VariantOptionDefinitions';
 import { PillowVariantFields } from './PillowVariantFields';
+import { MugVariantFields } from './MugVariantFields';
 import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { ImageField } from '../gallery/ImageField';
-import { toPixels, validatePillowVariant, validateVariant, validateVariantOptions } from '../../lib/validation';
-import { createDefaultPillowVariantConfig, normalizePillowVariantConfig } from '../../lib/storage';
+import { toPixels, validateMugVariant, validatePillowVariant, validateVariant, validateVariantOptions } from '../../lib/validation';
+import { createDefaultMugVariantConfig, createDefaultPillowVariantConfig, normalizeMugVariantConfig, normalizePillowVariantConfig } from '../../lib/storage';
 import { compatibleRooms } from '../../lib/roomPreview';
 import type { Product, ProductStatus, ProductUnit, ProductVariant } from '../../types';
 
@@ -50,6 +51,7 @@ export function VariantsTab({ product, onSave }: Props) {
     thumbnailImageUrl: '',
     thumbnailImageAssetId: undefined as string | undefined,
     pillow: createDefaultPillowVariantConfig(),
+    mug: createDefaultMugVariantConfig(),
     options: [...product.variantOptionDefinitions.map((definition) => ({ key: definition.key, value: '' })), { key: '', value: '' }],
   });
 
@@ -72,8 +74,9 @@ export function VariantsTab({ product, onSave }: Props) {
       }),
       ...validateVariantOptions(formOptions, product.variantOptionDefinitions),
       ...(product.productType === 'Pillow Print' ? validatePillowVariant(form.pillow) : {}),
+      ...(product.productType === 'Mug Print' ? validateMugVariant(form.mug) : {}),
     }),
-    [editingId, form.dpi, form.height, form.name, form.pillow, form.price, form.sku, form.unit, form.width, formOptions, product.productType, product.variantOptionDefinitions, product.variants]
+    [editingId, form.dpi, form.height, form.mug, form.name, form.pillow, form.price, form.sku, form.unit, form.width, formOptions, product.productType, product.variantOptionDefinitions, product.variants]
   );
   const isValid = Object.keys(errors).length === 0;
 
@@ -92,6 +95,7 @@ export function VariantsTab({ product, onSave }: Props) {
       thumbnailImageUrl: '',
       thumbnailImageAssetId: undefined,
       pillow: createDefaultPillowVariantConfig(),
+      mug: createDefaultMugVariantConfig(),
       options: [...product.variantOptionDefinitions.map((definition) => ({ key: definition.key, value: '' })), { key: '', value: '' }],
     });
   }
@@ -117,6 +121,7 @@ export function VariantsTab({ product, onSave }: Props) {
       thumbnailImageUrl: variant.thumbnailImageUrl,
       thumbnailImageAssetId: variant.thumbnailImageAssetId,
       pillow: normalizePillowVariantConfig(variant.pillow, variant.width, variant.height, variant.unit),
+      mug: normalizeMugVariantConfig(variant.mug, variant.width, variant.height, variant.unit),
       options: [
         ...product.variantOptionDefinitions.map((definition) => ({ key: definition.key, value: variant.options[definition.key] ?? '' })),
         ...Object.entries(variant.options).filter(([key]) => !product.variantOptionDefinitions.some((definition) => definition.key === key)).map(([key, value]) => ({ key, value })),
@@ -155,7 +160,8 @@ export function VariantsTab({ product, onSave }: Props) {
   function updateVariantDimension(field: 'width' | 'height', value: string) {
     setForm((prev) => {
       const previousDimension = Number(prev[field]);
-      const shouldSync = !(prev.pillow.printArea[field] > 0) || prev.pillow.printArea[field] === previousDimension;
+      const shouldSyncPillow = !(prev.pillow.printArea[field] > 0) || prev.pillow.printArea[field] === previousDimension;
+      const shouldSyncMug = !(prev.mug.printArea[field] > 0) || prev.mug.printArea[field] === previousDimension;
       const nextWidth = field === 'width' ? Number(value) : Number(prev.width);
       const nextHeight = field === 'height' ? Number(value) : Number(prev.height);
       return {
@@ -166,7 +172,14 @@ export function VariantsTab({ product, onSave }: Props) {
           shape: nextWidth > 0 && nextHeight > 0 && nextWidth !== nextHeight ? 'rectangle' : 'square',
           printArea: {
             ...prev.pillow.printArea,
-            ...(shouldSync ? { [field]: Number(value) } : {}),
+            ...(shouldSyncPillow ? { [field]: Number(value) } : {}),
+          },
+        },
+        mug: {
+          ...prev.mug,
+          printArea: {
+            ...prev.mug.printArea,
+            ...(shouldSyncMug ? { [field]: Number(value) } : {}),
           },
         },
       };
@@ -181,6 +194,13 @@ export function VariantsTab({ product, onSave }: Props) {
         ...prev.pillow,
         printArea: {
           ...prev.pillow.printArea,
+          unit: unit === 'mm' ? 'mm' : 'inch',
+        },
+      },
+      mug: {
+        ...prev.mug,
+        printArea: {
+          ...prev.mug.printArea,
           unit: unit === 'mm' ? 'mm' : 'inch',
         },
       },
@@ -214,6 +234,7 @@ export function VariantsTab({ product, onSave }: Props) {
       thumbnailImageUrl: form.thumbnailImageUrl.trim(),
       thumbnailImageAssetId: form.thumbnailImageAssetId,
       pillow: product.productType === 'Pillow Print' ? form.pillow : existing?.pillow,
+      mug: product.productType === 'Mug Print' ? form.mug : existing?.mug,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
@@ -243,7 +264,7 @@ export function VariantsTab({ product, onSave }: Props) {
         <h2 className="text-lg font-medium text-gray-900">Variants</h2>
         {!isFormOpen && (
           <div className="flex items-center gap-2">
-            {product.productType !== 'Pillow Print' && (
+            {product.productType !== 'Pillow Print' && product.productType !== 'Mug Print' && (
               <button type="button" onClick={() => setBulkOpen(true)} className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 transition-colors hover:bg-gray-50">
                 <ListPlus className="h-4 w-4" /> Bulk Add
               </button>
@@ -284,6 +305,9 @@ export function VariantsTab({ product, onSave }: Props) {
 
               {product.productType === 'Pillow Print' && (
                 <PillowVariantFields value={form.pillow} errors={errors} onChange={(pillow) => setForm((prev) => ({ ...prev, pillow }))} />
+              )}
+              {product.productType === 'Mug Print' && (
+                <MugVariantFields value={form.mug} errors={errors} onChange={(mug) => setForm((prev) => ({ ...prev, mug }))} />
               )}
 
               <div className="mt-6">
@@ -386,8 +410,9 @@ function VariantPreviewModal({ product, variant, onClose }: { product: Product; 
   const trimHeightPx = Math.round(toPixels(variant.height, variant.unit, variant.dpi));
   const bleed = product.surface?.bleed;
   const exportDimensions = variantPixelDimensions(product, variant);
-  const totalWidthPx = product.productType === 'Pillow Print' ? exportDimensions.width : Math.round(trimWidthPx + (bleed ? toPixels(bleed.left + bleed.right, bleed.unit, variant.dpi) : 0));
-  const totalHeightPx = product.productType === 'Pillow Print' ? exportDimensions.height : Math.round(trimHeightPx + (bleed ? toPixels(bleed.top + bleed.bottom, bleed.unit, variant.dpi) : 0));
+  const usesVariantPrintArea = product.productType === 'Pillow Print' || product.productType === 'Mug Print';
+  const totalWidthPx = usesVariantPrintArea ? exportDimensions.width : Math.round(trimWidthPx + (bleed ? toPixels(bleed.left + bleed.right, bleed.unit, variant.dpi) : 0));
+  const totalHeightPx = usesVariantPrintArea ? exportDimensions.height : Math.round(trimHeightPx + (bleed ? toPixels(bleed.top + bleed.bottom, bleed.unit, variant.dpi) : 0));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -420,7 +445,11 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 }
 
 function variantPixelDimensions(product: Product, variant: ProductVariant) {
-  const printArea = product.productType === 'Pillow Print' ? variant.pillow?.printArea : undefined;
+  const printArea = product.productType === 'Pillow Print'
+    ? variant.pillow?.printArea
+    : product.productType === 'Mug Print'
+      ? variant.mug?.printArea
+      : undefined;
   if (!printArea) {
     return {
       width: Math.round(toPixels(variant.width, variant.unit, variant.dpi)),

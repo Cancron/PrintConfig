@@ -119,6 +119,35 @@ const pillowVariantSchema = new Schema(
   { _id: false }
 );
 
+const mugVariantSchema = new Schema(
+  {
+    printArea: {
+      type: new Schema(
+        {
+          width: { type: Number, required: true, min: 0.0001 },
+          height: { type: Number, required: true, min: 0.0001 },
+          unit: { type: String, enum: ['inch', 'cm', 'mm'], required: true, default: 'inch' },
+          bleed: { type: pillowInsetsSchema, default: () => ({}) },
+          safeArea: { type: pillowInsetsSchema, default: () => ({}) },
+        },
+        { _id: false }
+      ),
+      required: true,
+    },
+    model: {
+      type: new Schema(
+        {
+          url: { type: String, required: true, trim: true },
+          printableMaterialName: { type: String, required: true, trim: true },
+        },
+        { _id: false }
+      ),
+      required: true,
+    },
+  },
+  { _id: false }
+);
+
 const variantSchema = new Schema(
   {
     productId: { type: Schema.Types.ObjectId, ref: 'Product' },
@@ -136,6 +165,7 @@ const variantSchema = new Schema(
     thumbnailImageUrl: { type: String, default: '' },
     thumbnailImageAssetId: { type: Schema.Types.ObjectId, ref: 'ImageAsset' },
     pillow: { type: pillowVariantSchema },
+    mug: { type: mugVariantSchema },
     roomPreviews: { type: [variantRoomPreviewSchema], default: [] },
   },
   { timestamps: true }
@@ -402,6 +432,14 @@ const pillowProductSchema = new Schema(
   { _id: false }
 );
 
+const mugProductSchema = new Schema(
+  {
+    enabled: { type: Boolean, default: false },
+    defaultLayout: { type: String, enum: ['blank'], default: 'blank' },
+  },
+  { _id: false }
+);
+
 const productSchema = new Schema(
   {
     accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
@@ -429,6 +467,7 @@ const productSchema = new Schema(
     aiArt: { type: aiArtSchema, default: () => ({ enabled: false }) },
     photoBook: { type: photoBookSchema, default: () => ({}) },
     pillow: { type: pillowProductSchema, default: () => ({}) },
+    mug: { type: mugProductSchema, default: () => ({}) },
   },
   { timestamps: true }
 );

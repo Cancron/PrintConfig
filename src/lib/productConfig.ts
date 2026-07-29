@@ -1,6 +1,8 @@
 import {
   createDefaultEditorRules,
   createDefaultExportRules,
+  normalizeMugProductConfig,
+  normalizeMugVariantConfig,
   normalizePhotoBookConfig,
   normalizePillowProductConfig,
   normalizePillowVariantConfig,
@@ -38,10 +40,10 @@ const PRODUCT_TYPES: ProductType[] = [
   'Photo Collage Print',
   'Photo Book Print',
   'Pillow Print',
+  'Mug Print',
   'AI Art Generation',
   'Art Print',
   'T-Shirt',
-  'Mug',
   'Business Card',
   'Sticker',
 ];
@@ -121,6 +123,7 @@ function buildImportCandidate(input: Record<string, unknown>): Product {
     aiArt: normalizeAiArtConfig(isRecord(input.aiArt) ? input.aiArt : undefined, now),
     photoBook: normalizePhotoBookConfig(isRecord(input.photoBook) ? input.photoBook : undefined, input.productType === 'Photo Book Print'),
     pillow: normalizePillowProductConfig(isRecord(input.pillow) ? input.pillow : undefined, input.productType === 'Pillow Print'),
+    mug: normalizeMugProductConfig(isRecord(input.mug) ? input.mug : undefined, input.productType === 'Mug Print'),
     createdAt: now,
     updatedAt: now,
   };
@@ -275,6 +278,14 @@ function normalizeVariant(input: Record<string, unknown>, productId: string, now
     pillow: isRecord(input.pillow)
       ? normalizePillowVariantConfig(
           input.pillow,
+          numberOr(input.width, isRecord(legacySurface) ? numberOr(legacySurface.width, 1) : 1),
+          numberOr(input.height, isRecord(legacySurface) ? numberOr(legacySurface.height, 1) : 1),
+          normalizeUnit(input.unit ?? (isRecord(legacySurface) ? legacySurface.unit : undefined)),
+        )
+      : undefined,
+    mug: isRecord(input.mug)
+      ? normalizeMugVariantConfig(
+          input.mug,
           numberOr(input.width, isRecord(legacySurface) ? numberOr(legacySurface.width, 1) : 1),
           numberOr(input.height, isRecord(legacySurface) ? numberOr(legacySurface.height, 1) : 1),
           normalizeUnit(input.unit ?? (isRecord(legacySurface) ? legacySurface.unit : undefined)),

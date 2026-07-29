@@ -10,6 +10,10 @@ import type {
   EditorRules,
   ExportRules,
   Merchant,
+  MugInsets,
+  MugPrintUnit,
+  MugProductConfig,
+  MugVariantConfig,
   PillowPrintUnit,
   PillowProductConfig,
   PillowVariantConfig,
@@ -225,6 +229,78 @@ export function normalizePillowVariantConfig(
   };
 }
 
+export const defaultMugProductConfig: MugProductConfig = {
+  enabled: false,
+  defaultLayout: 'blank',
+};
+
+export function createDefaultMugProductConfig(enabled = false): MugProductConfig {
+  return { ...defaultMugProductConfig, enabled };
+}
+
+export function normalizeMugProductConfig(
+  input: Partial<MugProductConfig> | undefined | null,
+  enabledFallback = false,
+): MugProductConfig {
+  return {
+    enabled: input?.enabled ?? enabledFallback,
+    defaultLayout: 'blank',
+  };
+}
+
+export function createDefaultMugVariantConfig(
+  width = 0,
+  height = 0,
+  unit: MugPrintUnit = 'inch',
+): MugVariantConfig {
+  const inset = (value: number) => ({ top: value, right: value, bottom: value, left: value });
+  return {
+    printArea: {
+      width,
+      height,
+      unit,
+      bleed: inset(0.125),
+      safeArea: inset(0.25),
+    },
+    model: {
+      url: '',
+      printableMaterialName: '',
+    },
+  };
+}
+
+export function normalizeMugVariantConfig(
+  input: Partial<MugVariantConfig> | undefined | null,
+  width: number,
+  height: number,
+  unit: ProductUnit,
+): MugVariantConfig {
+  const fallbackUnit: MugPrintUnit = unit === 'mm' ? 'mm' : 'inch';
+  const defaults = createDefaultMugVariantConfig(width, height, fallbackUnit);
+  const normalizeInsets = (
+    value: Partial<MugInsets> | undefined,
+    fallback: MugInsets,
+  ): MugInsets => ({
+    top: numberOr(value?.top, fallback.top),
+    right: numberOr(value?.right, fallback.right),
+    bottom: numberOr(value?.bottom, fallback.bottom),
+    left: numberOr(value?.left, fallback.left),
+  });
+  return {
+    printArea: {
+      width: numberOr(input?.printArea?.width, width),
+      height: numberOr(input?.printArea?.height, height),
+      unit: input?.printArea?.unit === 'cm' || input?.printArea?.unit === 'mm' ? input.printArea.unit : fallbackUnit,
+      bleed: normalizeInsets(input?.printArea?.bleed, defaults.printArea.bleed),
+      safeArea: normalizeInsets(input?.printArea?.safeArea, defaults.printArea.safeArea),
+    },
+    model: {
+      url: typeof input?.model?.url === 'string' ? input.model.url : '',
+      printableMaterialName: typeof input?.model?.printableMaterialName === 'string' ? input.model.printableMaterialName : '',
+    },
+  };
+}
+
 export function loadAccount(): Account {
   try {
     const raw = localStorage.getItem(ACCOUNT_KEY);
@@ -341,11 +417,15 @@ export function normalizeProduct(product: Product): Product {
       pillow: product.productType === 'Pillow Print'
         ? normalizePillowVariantConfig(variant.pillow, variant.width, variant.height, variant.unit)
         : variant.pillow,
+      mug: product.productType === 'Mug Print'
+        ? normalizeMugVariantConfig(variant.mug, variant.width, variant.height, variant.unit)
+        : variant.mug,
       roomPreviews: undefined,
     })),
     aiArt: product.aiArt ?? createDefaultAiArtConfig(),
     photoBook: normalizePhotoBookConfig(product.photoBook, product.productType === 'Photo Book Print'),
     pillow: normalizePillowProductConfig(product.pillow, product.productType === 'Pillow Print'),
+    mug: normalizeMugProductConfig(product.mug, product.productType === 'Mug Print'),
   };
 }
 
@@ -418,6 +498,7 @@ function normalizeVariant(variant: LegacyVariant, productId: string): ProductVar
     thumbnailImageUrl: typeof variant.thumbnailImageUrl === 'string' ? variant.thumbnailImageUrl : '',
     thumbnailImageAssetId: variant.thumbnailImageAssetId,
     pillow: variant.pillow ? normalizePillowVariantConfig(variant.pillow, numberOr(variant.width, 0), numberOr(variant.height, 0), normalizeUnit(variant.unit)) : undefined,
+    mug: variant.mug ? normalizeMugVariantConfig(variant.mug, numberOr(variant.width, 0), numberOr(variant.height, 0), normalizeUnit(variant.unit)) : undefined,
     roomPreviews: variant.roomPreviews ?? [],
     createdAt: typeof variant.createdAt === 'string' ? variant.createdAt : now,
     updatedAt: typeof variant.updatedAt === 'string' ? variant.updatedAt : now,

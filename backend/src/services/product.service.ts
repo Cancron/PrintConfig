@@ -304,6 +304,75 @@ function validatePillowSettings(data: Record<string, any>) {
   }
 }
 
+function normalizeMugSettings(data: Record<string, any>) {
+  const input = data.mug ?? {};
+  const isMug = data.productType === 'Mug Print';
+  data.mug = {
+    enabled: isMug && input.enabled !== false,
+    defaultLayout: 'blank',
+  };
+  data.variants = (data.variants ?? []).map((variant: Record<string, any>) => {
+    if (!isMug && !variant.mug) return variant;
+    const mug = variant.mug ?? {};
+    const printArea = mug.printArea ?? {};
+    const fallbackUnit = variant.unit === 'mm' ? 'mm' : 'inch';
+    const normalizeInsets = (value: Record<string, unknown> | undefined, fallback: number) => ({
+      top: numberOr(value?.top, fallback),
+      right: numberOr(value?.right, fallback),
+      bottom: numberOr(value?.bottom, fallback),
+      left: numberOr(value?.left, fallback),
+    });
+    return {
+      ...variant,
+      mug: {
+        printArea: {
+          width: numberOr(printArea.width, numberOr(variant.width, 0)),
+          height: numberOr(printArea.height, numberOr(variant.height, 0)),
+          unit: ['inch', 'cm', 'mm'].includes(printArea.unit) ? printArea.unit : fallbackUnit,
+          bleed: normalizeInsets(printArea.bleed, 0.125),
+          safeArea: normalizeInsets(printArea.safeArea, 0.25),
+        },
+        model: {
+          url: typeof mug.model?.url === 'string' ? mug.model.url.trim() : '',
+          printableMaterialName: typeof mug.model?.printableMaterialName === 'string' ? mug.model.printableMaterialName.trim() : '',
+        },
+      },
+    };
+  });
+}
+
+function validateMugSettings(data: Record<string, any>) {
+  if (data.productType !== 'Mug Print') return;
+  if (data.mug?.enabled !== true || data.mug?.defaultLayout !== 'blank') throw new ApiError(400, 'Mug editor must be enabled with the blank default layout.');
+  for (const variant of data.variants ?? []) {
+    const label = String(variant.sku || variant.name || 'Mug variant');
+    const mug = variant.mug;
+    if (!mug) throw new ApiError(400, `${label} requires mug configuration.`);
+    const printArea = mug.printArea;
+    if (!printArea || !(Number(printArea.width) > 0) || !(Number(printArea.height) > 0)) throw new ApiError(400, `${label} print width and height must be greater than 0.`);
+    if (!['inch', 'cm', 'mm'].includes(printArea.unit)) throw new ApiError(400, `${label} print unit must be inch, cm, or mm.`);
+    for (const [groupName, insets] of [['bleed', printArea.bleed], ['safe area', printArea.safeArea]] as const) {
+      for (const side of ['top', 'right', 'bottom', 'left']) {
+        if (!Number.isFinite(Number(insets?.[side])) || Number(insets[side]) < 0) throw new ApiError(400, `${label} ${groupName} ${side} cannot be negative.`);
+      }
+    }
+    if (Number(printArea.safeArea.left) > Number(printArea.width) / 2 || Number(printArea.safeArea.right) > Number(printArea.width) / 2) {
+      throw new ApiError(400, `${label} horizontal safe area cannot exceed half the print width.`);
+    }
+    if (Number(printArea.safeArea.top) > Number(printArea.height) / 2 || Number(printArea.safeArea.bottom) > Number(printArea.height) / 2) {
+      throw new ApiError(400, `${label} vertical safe area cannot exceed half the print height.`);
+    }
+    const modelUrl = String(mug.model?.url ?? '').trim();
+    try {
+      const url = new URL(modelUrl);
+      if (!/^https?:$/.test(url.protocol) || !url.pathname.toLowerCase().endsWith('.glb')) throw new Error('invalid');
+    } catch {
+      throw new ApiError(400, `${label} requires a public HTTP(S) GLB model URL.`);
+    }
+    if (!String(mug.model?.printableMaterialName ?? '').trim()) throw new ApiError(400, `${label} printable material name is required.`);
+  }
+}
+
 function numberOr(value: unknown, fallback: number) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
@@ -334,6 +403,7 @@ function normalizeRoomOwnership(data: Record<string, any>) {
 function validateProductShape(data: Record<string, any>) {
   validatePhotoBookSettings(data);
   validatePillowSettings(data);
+  validateMugSettings(data);
   if (data.surface && !data.surface.code) throw new ApiError(400, 'Surface code is required.');
   const frontendContent = data.frontendContent ?? {};
   const rating = Number(frontendContent.reviewRating);
@@ -494,6 +564,7 @@ export async function createProduct(payload: Record<string, any>) {
   normalizeLayoutSettings(payload);
   normalizePhotoBookSettings(payload);
   normalizePillowSettings(payload);
+  normalizeMugSettings(payload);
   normalizeRoomOwnership(payload);
   validateProductShape(payload);
   await validateEditorProductSelection(payload);
@@ -511,6 +582,7 @@ export async function updateProduct(id: string, payload: Record<string, any>) {
   normalizeLayoutSettings(payload);
   normalizePhotoBookSettings(payload);
   normalizePillowSettings(payload);
+  normalizeMugSettings(payload);
   normalizeRoomOwnership(payload);
   validateProductShape(payload);
   await validateEditorProductSelection(payload, id);
@@ -759,6 +831,7 @@ export async function getPublicProductConfig(id: string, merchantId?: string) {
     previewImageUrl: variant.previewImageUrl,
     thumbnailImageUrl: variant.thumbnailImageUrl,
     pillow: variant.pillow,
+    mug: variant.mug,
     roomOrientation: getVariantRoomOrientation(variant),
 
   }));
@@ -781,6 +854,7 @@ export async function getPublicProductConfig(id: string, merchantId?: string) {
     exportRules: product.exportRules,
     photoBook: publicPhotoBookConfig(product.photoBook, product.productType),
     pillow: publicPillowConfig(product.pillow, product.productType),
+    mug: publicMugConfig(product.mug, product.productType),
     variants: activeVariants,
     aiArt: publicAiArtConfig(product.aiArt),
   };
@@ -1151,6 +1225,14 @@ async function findDownloadableCartItem(cartItemId: string, accountId?: string) 
     throw new ApiError(400, 'No final print images are available for download.');
   }
   return cartItem;
+}
+
+function publicMugConfig(mug: any, productType: string) {
+  const input = mug ?? {};
+  return {
+    enabled: productType === 'Mug Print' && input.enabled !== false,
+    defaultLayout: 'blank',
+  };
 }
 
 async function markCartItemAndProjectOrdered(cartItem: any, requestedOrderId?: unknown) {
@@ -1608,6 +1690,7 @@ function normalizeDesignProductType(value: unknown, fallback: unknown = 'Photo B
     const raw = String(candidate ?? '').trim().toLowerCase();
     if (!raw) continue;
     if (raw.includes('pillow')) return 'Pillow Print';
+    if (raw.includes('mug')) return 'Mug Print';
     if (raw.includes('collage')) return 'Photo Collage Print';
     if (raw.includes('book')) return 'Photo Book Print';
   }
@@ -1996,6 +2079,24 @@ function resolveFinalPrintPages(design: unknown, cartItem: Record<string, any>, 
       ...dimensions,
     }];
   }
+  if (productType === 'Mug Print') {
+    const page = sourcePages[0] ?? {};
+    const pageNumber = positiveInteger(page.pageNumber, 1);
+    const pageId = String(page.pageId ?? page._id ?? page.id ?? 'mug-wrap');
+    const preview = previews.find((item) => String(item.pageId ?? '') === pageId) ?? previews[0];
+    return [{
+      ...page,
+      pageNumber,
+      printPageNumber: 1,
+      pageRole: 'mug-wrap',
+      filename: 'final-mug-wrap.png',
+      pageId,
+      previewUrl: String(preview?.publicUrl ?? preview?.url ?? ''),
+      dpi,
+      backgroundColor: typeof page.backgroundColor === 'string' ? page.backgroundColor : typeof (designRecord as any).backgroundColor === 'string' ? (designRecord as any).backgroundColor : '#ffffff',
+      ...finalPrintDimensions(page, designRecord, dpi, selectedVariant, 'mug'),
+    }];
+  }
   if (productType === 'Pillow Print') {
     return sourcePages.slice(0, 2).map((page, index) => {
       const pageNumber = positiveInteger(page.pageNumber, index + 1);
@@ -2014,7 +2115,7 @@ function resolveFinalPrintPages(design: unknown, cartItem: Record<string, any>, 
         previewUrl: String(preview?.publicUrl ?? preview?.url ?? ''),
         dpi,
         backgroundColor: typeof page.backgroundColor === 'string' ? page.backgroundColor : typeof (designRecord as any).backgroundColor === 'string' ? (designRecord as any).backgroundColor : '#ffffff',
-        ...finalPrintDimensions(page, designRecord, dpi, selectedVariant, true),
+        ...finalPrintDimensions(page, designRecord, dpi, selectedVariant, 'pillow'),
       };
     });
   }
@@ -2111,20 +2212,21 @@ function finalPrintDimensions(
   design: Record<string, unknown>,
   dpi: number,
   selectedVariant?: Record<string, unknown>,
-  includePillowBleed = false,
+  printAreaType?: 'pillow' | 'mug',
 ) {
-  const pillowPrintArea = includePillowBleed && isRecordLike(selectedVariant?.pillow) && isRecordLike(selectedVariant.pillow.printArea)
-    ? selectedVariant.pillow.printArea
+  const variantConfig = printAreaType && isRecordLike(selectedVariant?.[printAreaType])
+    ? selectedVariant[printAreaType]
     : undefined;
-  const pillowBleed = pillowPrintArea && isRecordLike(pillowPrintArea.bleed) ? pillowPrintArea.bleed : {};
-  const unit = String(pillowPrintArea?.unit ?? selectedVariant?.unit ?? page.unit ?? design.unit ?? 'inch').trim().toLowerCase();
-  const width = pillowPrintArea
-    ? positiveNumber(pillowPrintArea.width, 12) + nonNegativeNumber(pillowBleed.left) + nonNegativeNumber(pillowBleed.right)
+  const printArea = variantConfig && isRecordLike(variantConfig.printArea) ? variantConfig.printArea : undefined;
+  const printBleed = printArea && isRecordLike(printArea.bleed) ? printArea.bleed : {};
+  const unit = String(printArea?.unit ?? selectedVariant?.unit ?? page.unit ?? design.unit ?? 'inch').trim().toLowerCase();
+  const width = printArea
+    ? positiveNumber(printArea.width, 12) + nonNegativeNumber(printBleed.left) + nonNegativeNumber(printBleed.right)
     : selectedVariant
       ? positiveNumber(selectedVariant.width, 12)
     : positiveNumber(page.width, positiveNumber(page.canvasWidth, positiveNumber(design.pageWidth, positiveNumber(design.canvasWidth, 12))));
-  const height = pillowPrintArea
-    ? positiveNumber(pillowPrintArea.height, 12) + nonNegativeNumber(pillowBleed.top) + nonNegativeNumber(pillowBleed.bottom)
+  const height = printArea
+    ? positiveNumber(printArea.height, 12) + nonNegativeNumber(printBleed.top) + nonNegativeNumber(printBleed.bottom)
     : selectedVariant
       ? positiveNumber(selectedVariant.height, 12)
     : positiveNumber(page.height, positiveNumber(page.canvasHeight, positiveNumber(design.pageHeight, positiveNumber(design.canvasHeight, 12))));

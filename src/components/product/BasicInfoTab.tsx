@@ -9,8 +9,8 @@ import { EditorProductSelection } from './EditorProductSelection';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { useCategories } from '../../hooks/useCategories';
 import { validateProductBasicInfo } from '../../lib/validation';
-import { createDefaultPhotoBookConfig, createDefaultPillowProductConfig } from '../../lib/storage';
-import type { EditorProductSelectionMode, PhotoBookConfig, PillowProductConfig, Product, ProductScope, ProductType, ProductStatus } from '../../types';
+import { createDefaultMugProductConfig, createDefaultPhotoBookConfig, createDefaultPillowProductConfig } from '../../lib/storage';
+import type { EditorProductSelectionMode, MugProductConfig, PhotoBookConfig, PillowProductConfig, Product, ProductScope, ProductType, ProductStatus } from '../../types';
 
 interface Props {
   product: Product;
@@ -26,10 +26,10 @@ const productTypeOptions: { value: ProductType; label: ProductType }[] = [
   { value: 'Photo Collage Print', label: 'Photo Collage Print' },
   { value: 'Photo Book Print', label: 'Photo Book Print' },
   { value: 'Pillow Print', label: 'Pillow Print' },
+  { value: 'Mug Print', label: 'Mug Print' },
   { value: 'AI Art Generation', label: 'AI Art Generation' },
   { value: 'Art Print', label: 'Art Print' },
   { value: 'T-Shirt', label: 'T-Shirt' },
-  { value: 'Mug', label: 'Mug' },
   { value: 'Business Card', label: 'Business Card' },
   { value: 'Sticker', label: 'Sticker' },
 ];
@@ -81,6 +81,7 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
   const [specificProductIds, setSpecificProductIds] = useState([...product.editorProductSelection.specificProductIds]);
   const [photoBook, setPhotoBook] = useState<PhotoBookConfig>(product.photoBook ?? createDefaultPhotoBookConfig(product.productType === 'Photo Book Print'));
   const [pillow, setPillow] = useState<PillowProductConfig>(product.pillow ?? createDefaultPillowProductConfig(product.productType === 'Pillow Print'));
+  const [mug, setMug] = useState<MugProductConfig>(product.mug ?? createDefaultMugProductConfig(product.productType === 'Mug Print'));
 
   const errors = useMemo(
     () => validateProductBasicInfo({ name, slug, productType, basePrice, categoryId }),
@@ -96,10 +97,17 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
     setPillow((current) => ({ ...current, [key]: value }));
   }
 
+  function updateMug<K extends keyof MugProductConfig>(key: K, value: MugProductConfig[K]) {
+    setMug((current) => ({ ...current, [key]: value }));
+  }
+
   function handleProductTypeChange(nextType: ProductType) {
     setProductType(nextType);
     if (nextType === 'Pillow Print' && product.productType !== 'Pillow Print') {
       setPillow((current) => ({ ...current, enabled: true }));
+    }
+    if (nextType === 'Mug Print' && product.productType !== 'Mug Print') {
+      setMug((current) => ({ ...current, enabled: true }));
     }
   }
 
@@ -133,6 +141,11 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
         enabled: productType === 'Pillow Print' && pillow.enabled,
         sides: ['front', 'back'],
         defaultLayout: 'full-bleed',
+      },
+      mug: {
+        ...mug,
+        enabled: productType === 'Mug Print' && mug.enabled,
+        defaultLayout: 'blank',
       },
     });
     setSaved(true);
@@ -179,6 +192,18 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
             <Select label="Default Layout" value="full-bleed" onChange={() => undefined} options={[{ value: 'full-bleed', label: 'Full Bleed' }]} disabled />
           </div>
           <p className="mt-3 text-sm text-gray-500">Available sides are fixed to Front and Back for the current pillow editor.</p>
+        </section>
+      )}
+      {productType === 'Mug Print' && (
+        <section className="rounded-lg bg-white p-5 ring-1 ring-gray-200">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-gray-900">Mug Settings</h3>
+            <p className="mt-1 text-sm text-gray-500">Mug print areas and 3D model material targets are configured on each variant.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Select label="Enable Mug Editor" value={mug.enabled ? 'yes' : 'no'} onChange={(e) => updateMug('enabled', e.target.value === 'yes')} options={yesNoOptions} />
+            <Select label="Default Layout" value="blank" onChange={() => undefined} options={[{ value: 'blank', label: 'Blank' }]} disabled />
+          </div>
         </section>
       )}
       <Textarea label="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="Describe the product..." />

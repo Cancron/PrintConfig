@@ -1,4 +1,4 @@
-import type { LayoutCategory, LayoutElement, LayoutTemplate, PillowVariantConfig, Product, ProductCategory, ProductSurface, ProductType, ProductUnit, ProductVariant, VariantOptionDefinition } from '../types';
+import type { LayoutCategory, LayoutElement, LayoutTemplate, MugVariantConfig, PillowVariantConfig, Product, ProductCategory, ProductSurface, ProductType, ProductUnit, ProductVariant, VariantOptionDefinition } from '../types';
 import { missingRequiredVariantOptions } from './variantOptions';
 import { compatibleRooms, getVariantRoomOrientation } from './roomPreview';
 
@@ -12,10 +12,10 @@ const PRODUCT_TYPES: ProductType[] = [
   'Photo Collage Print',
   'Photo Book Print',
   'Pillow Print',
+  'Mug Print',
   'AI Art Generation',
   'Art Print',
   'T-Shirt',
-  'Mug',
   'Business Card',
   'Sticker',
 ];
@@ -128,6 +128,42 @@ export function validatePillowVariant(pillow: PillowVariantConfig | undefined): 
   }
   return errors;
 }
+
+export function validateMugVariant(mug: MugVariantConfig | undefined): ValidationErrors {
+  const errors: ValidationErrors = {};
+  if (!mug) return { mug: 'Mug configuration is required.' };
+  const printArea = mug.printArea;
+  if (!Number.isFinite(Number(printArea?.width)) || Number(printArea.width) <= 0) errors['mug.printArea.width'] = 'Print width must be greater than zero.';
+  if (!Number.isFinite(Number(printArea?.height)) || Number(printArea.height) <= 0) errors['mug.printArea.height'] = 'Print height must be greater than zero.';
+  if (!['inch', 'cm', 'mm'].includes(printArea?.unit)) errors['mug.printArea.unit'] = 'Select inch, cm, or mm.';
+
+  for (const group of ['bleed', 'safeArea'] as const) {
+    for (const side of ['top', 'right', 'bottom', 'left'] as const) {
+      const value = printArea?.[group]?.[side];
+      if (!Number.isFinite(Number(value)) || Number(value) < 0) {
+        errors[`mug.printArea.${group}.${side}`] = `${group === 'bleed' ? 'Bleed' : 'Safe area'} cannot be negative.`;
+      }
+    }
+  }
+  if (Number(printArea?.safeArea?.left) > Number(printArea?.width) / 2) errors['mug.printArea.safeArea.left'] = 'Safe area cannot exceed half the print width.';
+  if (Number(printArea?.safeArea?.right) > Number(printArea?.width) / 2) errors['mug.printArea.safeArea.right'] = 'Safe area cannot exceed half the print width.';
+  if (Number(printArea?.safeArea?.top) > Number(printArea?.height) / 2) errors['mug.printArea.safeArea.top'] = 'Safe area cannot exceed half the print height.';
+  if (Number(printArea?.safeArea?.bottom) > Number(printArea?.height) / 2) errors['mug.printArea.safeArea.bottom'] = 'Safe area cannot exceed half the print height.';
+
+  const modelUrl = mug.model?.url?.trim() ?? '';
+  if (!modelUrl) errors['mug.model.url'] = 'GLB model URL is required.';
+  else {
+    try {
+      const url = new URL(modelUrl);
+      if (!/^https?:$/.test(url.protocol) || !url.pathname.toLowerCase().endsWith('.glb')) errors['mug.model.url'] = 'Use a public HTTP(S) URL ending in .glb.';
+    } catch {
+      errors['mug.model.url'] = 'Use a valid public GLB URL.';
+    }
+  }
+  if (!mug.model?.printableMaterialName?.trim()) errors['mug.model.printableMaterialName'] = 'Printable material name is required.';
+  return errors;
+}
+
 export function validateSurface(surface: ProductSurface, previewVariant?: Pick<ProductVariant, 'width' | 'height'> | null): ValidationErrors {
   const errors: ValidationErrors = {};
 
@@ -185,6 +221,8 @@ export function getProductReadiness(product: Product) {
   const activeVariants = product.variants.filter((variant) => variant.status === 'Active');
   const activeVariantsHaveDimensions = activeVariants.every(variantHasValidDimensions);
   const isPillow = product.productType === 'Pillow Print';
+  const isMug = product.productType === 'Mug Print';
+  const usesVariantPrintArea = isPillow || isMug;
   const pillowSettingsValid = !isPillow || (
     product.pillow?.enabled === true
     && product.pillow.defaultLayout === 'full-bleed'
@@ -194,15 +232,18 @@ export function getProductReadiness(product: Product) {
   );
   const activePillowVariantsValid = !isPillow
     || activeVariants.every((variant) => Object.keys(validatePillowVariant(variant.pillow)).length === 0);
+  const mugSettingsValid = !isMug || (product.mug?.enabled === true && product.mug.defaultLayout === 'blank');
+  const activeMugVariantsValid = !isMug
+    || activeVariants.every((variant) => Object.keys(validateMugVariant(variant.mug)).length === 0);
   const previewVariant = activeVariants[0] ?? product.variants[0] ?? null;
-  const hasSurface = isPillow ? activeVariants.length > 0 && activePillowVariantsValid : !!product.surface;
-  const surfaceValid = isPillow ? activePillowVariantsValid : hasSurface && surfaceHasValidSettings(product.surface, previewVariant);
+  const hasSurface = usesVariantPrintArea ? activeVariants.length > 0 && activePillowVariantsValid && activeMugVariantsValid : !!product.surface;
+  const surfaceValid = usesVariantPrintArea ? activePillowVariantsValid && activeMugVariantsValid : hasSurface && surfaceHasValidSettings(product.surface, previewVariant);
   const hasExportRules = !!product.exportRules;
   const hasEditorRules = !!product.editorRules;
   const variantsHaveRequiredOptions = product.variants.every((variant) => missingRequiredVariantOptions(variant, product.variantOptionDefinitions).length === 0);
-  const hasAnyRoomPreviews = isPillow || product.roomPreviews.length > 0;
-  const activeVariantsHaveRoomPreviews = isPillow || (activeVariants.length > 0 && activeVariants.every((variant) => compatibleRooms(product.roomPreviews, variant).length > 0));
-  const activeVariantsHaveDefaultRoomPreview = isPillow || (activeVariants.length > 0 && activeVariants.every((variant) => {
+  const hasAnyRoomPreviews = usesVariantPrintArea || product.roomPreviews.length > 0;
+  const activeVariantsHaveRoomPreviews = usesVariantPrintArea || (activeVariants.length > 0 && activeVariants.every((variant) => compatibleRooms(product.roomPreviews, variant).length > 0));
+  const activeVariantsHaveDefaultRoomPreview = usesVariantPrintArea || (activeVariants.length > 0 && activeVariants.every((variant) => {
     const orientation = getVariantRoomOrientation(variant);
     return compatibleRooms(product.roomPreviews, variant).some((room) => room.defaultOrientations.includes(orientation));
   }));
@@ -212,13 +253,15 @@ export function getProductReadiness(product: Product) {
   if (!activeVariantsHaveDimensions) missing.push('Add width, height, unit, and DPI to every active variant.');
   if (!pillowSettingsValid) missing.push('Enable and complete the product-level pillow settings.');
   if (!activePillowVariantsValid) missing.push('Complete print areas and front/back mockups for every active pillow variant.');
-  if (!isPillow && !hasSurface) missing.push('Add a product surface configuration.');
-  if (!isPillow && hasSurface && !surfaceValid) missing.push('Fix invalid surface bleed, safe area, code, or background color settings.');
+  if (!mugSettingsValid) missing.push('Enable and complete the product-level mug settings.');
+  if (!activeMugVariantsValid) missing.push('Complete print areas and GLB model settings for every active mug variant.');
+  if (!usesVariantPrintArea && !hasSurface) missing.push('Add a product surface configuration.');
+  if (!usesVariantPrintArea && hasSurface && !surfaceValid) missing.push('Fix invalid surface bleed, safe area, code, or background color settings.');
   if (!hasExportRules) missing.push('Configure export rules.');
   if (!hasEditorRules) missing.push('Configure editor rules.');
   if (!variantsHaveRequiredOptions) missing.push('Fill every required option value on all variants.');
-  if (!isPillow && activeVariants.length > 0 && !activeVariantsHaveRoomPreviews) missing.push('Add a compatible shared room for every active variant orientation.');
-  if (!isPillow && activeVariants.length > 0 && !activeVariantsHaveDefaultRoomPreview) missing.push('Choose a default shared room for every active variant orientation.');
+  if (!usesVariantPrintArea && activeVariants.length > 0 && !activeVariantsHaveRoomPreviews) missing.push('Add a compatible shared room for every active variant orientation.');
+  if (!usesVariantPrintArea && activeVariants.length > 0 && !activeVariantsHaveDefaultRoomPreview) missing.push('Choose a default shared room for every active variant orientation.');
 
   return {
     hasBasicInfo: Object.keys(basicErrors).length === 0,
@@ -226,6 +269,8 @@ export function getProductReadiness(product: Product) {
     activeVariantsHaveDimensions,
     pillowSettingsValid,
     activePillowVariantsValid,
+    mugSettingsValid,
+    activeMugVariantsValid,
     hasSurface,
     surfaceValid,
     hasExportRules,

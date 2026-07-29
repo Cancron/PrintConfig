@@ -6,10 +6,10 @@ export type ProductType =
   | 'Photo Collage Print'
   | 'Photo Book Print'
   | 'Pillow Print'
+  | 'Mug Print'
   | 'AI Art Generation'
   | 'Art Print'
   | 'T-Shirt'
-  | 'Mug'
   | 'Business Card'
   | 'Sticker';
 
@@ -38,6 +38,7 @@ export type PhotoBookCoverType = 'softcover' | 'hardcover' | 'layflat' | 'custom
 export type PhotoBookBindingType = 'perfect' | 'saddle_stitch' | 'spiral' | 'layflat';
 export type PillowPrintUnit = 'inch' | 'cm' | 'mm';
 export type PillowSide = 'front' | 'back';
+export type MugPrintUnit = 'inch' | 'cm' | 'mm';
 
 export interface ImageFolder {
   _id: string;
@@ -581,6 +582,7 @@ export interface ProductVariant {
   thumbnailImageUrl: string;
   thumbnailImageAssetId?: string;
   pillow?: PillowVariantConfig;
+  mug?: MugVariantConfig;
   roomPreviews?: LegacyVariantRoomPreview[];
   createdAt: string;
   updatedAt: string;
@@ -683,6 +685,32 @@ export interface PillowProductConfig {
   defaultLayout: 'full-bleed';
 }
 
+export interface MugInsets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+export interface MugVariantConfig {
+  printArea: {
+    width: number;
+    height: number;
+    unit: MugPrintUnit;
+    bleed: MugInsets;
+    safeArea: MugInsets;
+  };
+  model: {
+    url: string;
+    printableMaterialName: string;
+  };
+}
+
+export interface MugProductConfig {
+  enabled: boolean;
+  defaultLayout: 'blank';
+}
+
 export interface Product {
   _id: string;
   accountId: string;
@@ -711,6 +739,7 @@ export interface Product {
   aiArt: AiArtConfig;
   photoBook: PhotoBookConfig;
   pillow: PillowProductConfig;
+  mug: MugProductConfig;
   createdAt: string;
   updatedAt: string;
 }
