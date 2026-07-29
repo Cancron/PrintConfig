@@ -241,6 +241,7 @@ const exportRulesSchema = new Schema(
   {
     format: { type: String, enum: ['PNG', 'JPG', 'PDF', 'SVG'], default: 'PDF' },
     dpi: { type: Number, default: 300 },
+    rasterQuality: { type: Number, min: 1, max: 100, default: 94 },
     includeBleed: { type: Boolean, default: true },
     flattenOutput: { type: Boolean, default: true },
     transparentBackground: { type: Boolean, default: false },

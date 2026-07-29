@@ -81,6 +81,19 @@ export function ExportRulesTab({ product, onSave }: Props) {
           />
         </RuleField>
 
+        <RuleField description="Controls JPEG compression quality. The default 94 keeps print detail while substantially reducing file size.">
+          <Input
+            label="Raster Quality"
+            type="number"
+            min="1"
+            max="100"
+            step="1"
+            value={rules.rasterQuality}
+            onChange={(event) => update('rasterQuality', Number(event.target.value))}
+            error={errors.rasterQuality}
+          />
+        </RuleField>
+
         <RuleField description="Adds the configured bleed area to the final production file.">
           <Select
             label="Include Bleed"
@@ -181,6 +194,9 @@ function validateRules(rules: ExportRules): Record<string, string> {
 
   if (!Number.isFinite(rules.dpi) || rules.dpi <= 0) {
     errors.dpi = 'DPI must be greater than zero.';
+  }
+  if (!Number.isFinite(rules.rasterQuality) || rules.rasterQuality < 1 || rules.rasterQuality > 100) {
+    errors.rasterQuality = 'Raster quality must be between 1 and 100.';
   }
   if (!/^#[0-9a-f]{6}$/i.test(rules.backgroundColor)) {
     errors.backgroundColor = 'Use a valid hex color, such as #ffffff.';

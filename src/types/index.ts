@@ -517,6 +517,7 @@ export type ColorMode = 'RGB' | 'CMYK';
 export interface ExportRules {
   format: ExportFormat;
   dpi: number;
+  rasterQuality: number;
   includeBleed: boolean;
   flattenOutput: boolean;
   transparentBackground: boolean;

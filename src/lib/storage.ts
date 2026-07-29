@@ -61,6 +61,7 @@ export function createDefaultEditorRules(): EditorRules {
 export const defaultExportRules: ExportRules = {
   format: 'PDF',
   dpi: 300,
+  rasterQuality: 94,
   includeBleed: true,
   flattenOutput: true,
   transparentBackground: false,

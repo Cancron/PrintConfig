@@ -16,7 +16,7 @@ import { applyModifier, getVariantConfiguredPrice } from '../utils/pricing.js';
 import { slugify } from '../utils/slug.js';
 import { getVariantRoomOrientation, liftLegacyProductRooms, ROOM_ORIENTATIONS } from '../utils/roomPreview.js';
 import { normalizeFrontendContentPayload, publicFrontendContent } from '../utils/frontendContent.js';
-import { renderDesignPageToPngBuffer } from '../utils/designRenderer.js';
+import { renderDesignPageToImageBuffer } from '../utils/designRenderer.js';
 import { visibleQuery } from './category.service.js';
 import { resolveAccountId } from './account.service.js';
 import { authenticateApiPrivateKey } from './merchant.service.js';
@@ -1813,6 +1813,7 @@ async function generateFinalPrintImages(cartItem: Record<string, any>, orderPref
   const product = await ProductModel.findById(cartItem.productId).lean();
   const pages = resolveFinalPrintPages(design, cartItem, product);
   if (pages.length === 0) throw new ApiError(400, 'No pages are available for final print generation.');
+  const rasterOutput = resolveFinalPrintRasterOutput(design, product);
   const supabase = getSupabaseAdmin();
   const output = [];
   cartItem.printGenerationTotalPages = pages.length;
@@ -1822,18 +1823,25 @@ async function generateFinalPrintImages(cartItem: Record<string, any>, orderPref
 
   for (let index = 0; index < pages.length; index += 1) {
     const page = pages[index];
-    const filename = page.filename;
+    const filename = replaceFilenameExtension(page.filename, rasterOutput.extension);
     const storagePath = `${orderPrefix}/final-prints/${filename}`;
-    const buffer = await renderDesignPageToPngBuffer({
+    const buffer = await renderDesignPageToImageBuffer({
       design,
       page,
       cartItem,
       widthPx: page.widthPx,
       heightPx: page.heightPx,
+      format: rasterOutput.rendererFormat,
+      quality: rasterOutput.quality / 100,
+      transparentBackground: rasterOutput.transparentBackground,
     });
-    await supabase.storage.from(galleryBucket).remove([storagePath]);
+    const alternateStoragePath = `${orderPrefix}/final-prints/${replaceFilenameExtension(
+      page.filename,
+      rasterOutput.extension === 'jpg' ? 'png' : 'jpg',
+    )}`;
+    await supabase.storage.from(galleryBucket).remove([storagePath, alternateStoragePath]);
     const { error } = await supabase.storage.from(galleryBucket).upload(storagePath, buffer, {
-      contentType: 'image/png',
+      contentType: rasterOutput.mimeType,
       upsert: true,
       cacheControl: '0',
     });
@@ -1847,7 +1855,7 @@ async function generateFinalPrintImages(cartItem: Record<string, any>, orderPref
       storagePath,
       filename,
       originalName: filename,
-      mimeType: 'image/png',
+      mimeType: rasterOutput.mimeType,
       size: buffer.length,
     };
     output.push(file);
@@ -1859,6 +1867,54 @@ async function generateFinalPrintImages(cartItem: Record<string, any>, orderPref
     await cartItem.save();
   }
   return output;
+}
+
+function resolveFinalPrintRasterOutput(design: unknown, product: any) {
+  const designRecord = isRecordLike(design) ? design : {};
+  const nestedDesign = isRecordLike(designRecord.design) ? designRecord.design : {};
+  const designProduct = isRecordLike(designRecord.product)
+    ? designRecord.product
+    : isRecordLike(nestedDesign.product)
+      ? nestedDesign.product
+      : {};
+  const designRules = isRecordLike(designRecord.exportRules)
+    ? designRecord.exportRules
+    : isRecordLike(nestedDesign.exportRules)
+      ? nestedDesign.exportRules
+    : isRecordLike(designProduct.exportRules)
+      ? designProduct.exportRules
+      : {};
+  const productRules = isRecordLike(product?.exportRules) ? product.exportRules : {};
+  const transparentBackground = designRules.transparentBackground === true
+    || (designRules.transparentBackground === undefined && productRules.transparentBackground === true);
+  const configuredFormat = String(designRules.format ?? productRules.format ?? 'PDF').toUpperCase();
+  const usePng = transparentBackground || configuredFormat === 'PNG';
+  const quality = clamp(
+    positiveNumber(designRules.rasterQuality, positiveNumber(productRules.rasterQuality, 94)),
+    1,
+    100,
+  );
+
+  return usePng
+    ? {
+        rendererFormat: 'png' as const,
+        extension: 'png',
+        mimeType: 'image/png',
+        quality,
+        transparentBackground,
+      }
+    : {
+        rendererFormat: 'jpeg' as const,
+        extension: 'jpg',
+        mimeType: 'image/jpeg',
+        quality,
+        transparentBackground: false,
+      };
+}
+
+function replaceFilenameExtension(filename: string, extension: string) {
+  const normalized = String(filename || 'final-print').replace(/\.[^.]+$/, '');
+  return `${normalized}.${extension}`;
 }
 
 async function readDesignJsonFromStorage(storagePath: string) {
@@ -2055,6 +2111,10 @@ function nonNegativeNumber(value: unknown) {
 function positiveInteger(value: unknown, fallback: number) {
   const numeric = Math.round(Number(value));
   return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
+}
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(maximum, Math.max(minimum, value));
 }
 
 function isRecordLike(value: unknown): value is Record<string, any> {

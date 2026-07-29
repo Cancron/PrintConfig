@@ -91,16 +91,27 @@ export interface RenderDesignPageInput {
   cartItem?: Record<string, any>;
   widthPx: number;
   heightPx: number;
+  format?: 'png' | 'jpeg';
+  quality?: number;
+  transparentBackground?: boolean;
 }
 
-export async function renderDesignPageToPngBuffer(input: RenderDesignPageInput) {
+export async function renderDesignPageToImageBuffer(input: RenderDesignPageInput) {
   const canvas = new Canvas(input.widthPx, input.heightPx);
   const ctx = canvas.getContext('2d');
   const design = isRecord(input.design) ? input.design : {};
   const styleScale = input.widthPx / EDITOR_PAGE_REFERENCE_WIDTH;
   const photoUrlById = getPhotoUrlMap(design, input.cartItem);
 
-  await drawPageBackground(ctx, input.page, design, input.widthPx, input.heightPx, styleScale);
+  await drawPageBackground(
+    ctx,
+    input.page,
+    design,
+    input.widthPx,
+    input.heightPx,
+    styleScale,
+    input.transparentBackground === true,
+  );
 
   const elements = Array.isArray(input.page.elements) ? input.page.elements.filter(isRecord) : [];
   const sorted = elements
@@ -113,6 +124,9 @@ export async function renderDesignPageToPngBuffer(input: RenderDesignPageInput) 
     await drawElement(ctx, element, photoUrlById, input.widthPx, input.heightPx, styleScale);
   }
 
+  if (input.format === 'jpeg') {
+    return canvas.toBuffer('jpeg', { quality: clamp(input.quality ?? 0.94, 0.01, 1) });
+  }
   return canvas.toBuffer('png');
 }
 
@@ -123,11 +137,14 @@ async function drawPageBackground(
   width: number,
   height: number,
   styleScale: number,
+  transparentBackground: boolean,
 ) {
   const color = stringValue(page.backgroundColor, stringValue(design.backgroundColor, '#ffffff'));
   ctx.save();
-  ctx.fillStyle = color;
-  ctx.fillRect(0, 0, width, height);
+  if (!transparentBackground) {
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, width, height);
+  }
 
   const backgroundUrl = stringValue(page.backgroundImageUrl, stringValue(design.backgroundImageUrl, ''));
   if (backgroundUrl) {
@@ -804,6 +821,10 @@ function numberValue(value: unknown, fallback: number) {
 function positiveNumber(value: unknown, fallback: number) {
   const numeric = Number(value);
   return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
+}
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(maximum, Math.max(minimum, value));
 }
 
 function isRecord(value: unknown): value is Record<string, any> {
