@@ -17,5 +17,6 @@ const designProjectSchema = new Schema(
 );
 
 designProjectSchema.index({ merchantId: 1, productId: 1, userKey: 1, projectId: 1 }, { unique: true });
+designProjectSchema.index({ merchantId: 1, productId: 1, userKey: 1, status: 1, lastActivityAt: -1 });
 
 export const DesignProjectModel = model('DesignProject', designProjectSchema);

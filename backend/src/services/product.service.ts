@@ -1506,7 +1506,10 @@ export async function getPublicDesignWithProduct(input: { productId: string; mer
   if (error) {
     const exists = await storageObjectExists(designStoragePath);
     if (exists) {
-      project = await resolveDesignProject({ merchant, product, userKey });
+      project = await createDesignProject({ merchant, product, userKey }, {
+        requestedProjectLocked: false,
+        projectResolutionReason: 'design_read_failed',
+      });
       designStoragePath = `${project.tempStoragePrefix}/design.json`;
     }
   } else if (data) {
@@ -1514,7 +1517,10 @@ export async function getPublicDesignWithProduct(input: { productId: string; mer
       designData = JSON.parse(await data.text());
       designExists = true;
     } catch {
-      project = await resolveDesignProject({ merchant, product, userKey });
+      project = await createDesignProject({ merchant, product, userKey }, {
+        requestedProjectLocked: false,
+        projectResolutionReason: 'design_json_invalid',
+      });
       designStoragePath = `${project.tempStoragePrefix}/design.json`;
       designData = null;
       designExists = false;
@@ -1609,7 +1615,15 @@ function normalizeDesignProductType(value: unknown, fallback: unknown = 'Photo B
 }
 
 async function resolveDesignProject(input: { merchant: any; product: any; userKey: string; requestedProjectId?: unknown }) {
+  const rawRequestedProjectId = String(input.requestedProjectId ?? '').trim();
   const requestedProjectId = sanitizeProjectId(input.requestedProjectId);
+  if (rawRequestedProjectId && !requestedProjectId) {
+    return createDesignProject(input, {
+      sourceProjectId: rawRequestedProjectId.slice(0, 120),
+      requestedProjectLocked: false,
+      projectResolutionReason: 'requested_project_invalid',
+    });
+  }
   if (requestedProjectId) {
     const existing = await DesignProjectModel.findOne({
       projectId: requestedProjectId,
@@ -1642,11 +1656,33 @@ async function resolveDesignProject(input: { merchant: any; product: any; userKe
     }
   }
 
+  if (!requestedProjectId) {
+    const latestDraft = await DesignProjectModel.findOne({
+      merchantId: input.merchant._id,
+      productId: input.product._id,
+      userKey: input.userKey,
+      status: 'draft',
+    }).sort({ lastActivityAt: -1, updatedAt: -1 });
+
+    if (latestDraft) {
+      latestDraft.lastActivityAt = new Date();
+      await latestDraft.save();
+      return withDesignProjectResolution(latestDraft, {
+        sourceProjectId: latestDraft.projectId,
+        requestedProjectLocked: false,
+        projectResolutionReason: 'latest_draft_loaded',
+      });
+    }
+  }
+
   return createDesignProject(input, requestedProjectId ? {
     sourceProjectId: requestedProjectId,
     requestedProjectLocked: false,
     projectResolutionReason: 'requested_project_not_found',
-  } : undefined);
+  } : {
+    requestedProjectLocked: false,
+    projectResolutionReason: 'new_project_created',
+  });
 }
 
 async function createDesignProject(
