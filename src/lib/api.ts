@@ -4,7 +4,7 @@ import { normalizeVariantOptionDefinitions } from './variantOptions';
 import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
 import { normalizeFrontendContent } from './frontendContent';
 import { normalizeEditorProductSelection } from './productSelection';
-import { normalizeMugProductConfig, normalizeMugVariantConfig, normalizePillowProductConfig, normalizePillowVariantConfig } from './storage';
+import { normalizeMugProductConfig, normalizeMugVariantConfig, normalizePillowProductConfig, normalizePillowVariantConfig, normalizeTShirtProductConfig } from './storage';
 
 export interface AuthUser {
   _id: string;
@@ -304,6 +304,7 @@ function normalizeProduct(raw: any): Product {
     layoutSettings: normalizeProductLayoutSettings(raw.layoutSettings),
     pillow: normalizePillowProductConfig(raw.pillow, raw.productType === 'Pillow Print'),
     mug: normalizeMugProductConfig(raw.mug, raw.productType === 'Mug Print'),
+    tshirt: normalizeTShirtProductConfig(raw.tshirt, raw.productType === 'T-Shirt Print'),
     createdAt: raw.createdAt ?? new Date().toISOString(),
     updatedAt: raw.updatedAt ?? new Date().toISOString(),
   };
@@ -333,9 +334,10 @@ function normalizeProductLayoutSettings(raw: any) {
 function apiPayload<T>(value: T): T {
   if (Array.isArray(value)) return value.map(apiPayload) as T;
   if (value && typeof value === 'object') {
+    const hasMongoId = Object.prototype.hasOwnProperty.call(value, '_id');
     const output: Record<string, unknown> = {};
     for (const [key, child] of Object.entries(value)) {
-      if (key === 'clientId' || key === 'id' || (key === '_id' && !child)) continue;
+      if (key === 'clientId' || (key === 'id' && hasMongoId) || (key === '_id' && !child)) continue;
       if (!child && ['productId', 'optionGroupId', 'variantId', 'surfaceId', 'categoryId', 'thumbnailAssetId', 'backgroundImageAssetId', 'imageAssetId'].includes(key)) continue;
       output[key] = apiPayload(child);
     }

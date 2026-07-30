@@ -373,6 +373,140 @@ function validateMugSettings(data: Record<string, any>) {
   }
 }
 
+function mockupEntries(value: unknown): Array<[string, any]> {
+  if (value instanceof Map) return [...value.entries()].map(([key, mockup]) => [String(key), mockup]);
+  if (value && typeof value === 'object') return Object.entries(value as Record<string, any>);
+  return [];
+}
+
+function getMockupByPlacementId(value: unknown, placementId: string) {
+  const normalizedId = String(placementId).trim().toLowerCase();
+  return mockupEntries(value).find(([key]) => key.trim().toLowerCase() === normalizedId)?.[1];
+}
+
+function normalizeTShirtSettings(data: Record<string, any>) {
+  const input = data.tshirt ?? {};
+  const isTShirt = data.productType === 'T-Shirt Print';
+  const inset = (value: Record<string, unknown> | undefined, fallback: number) => ({
+    top: numberOr(value?.top, fallback),
+    right: numberOr(value?.right, fallback),
+    bottom: numberOr(value?.bottom, fallback),
+    left: numberOr(value?.left, fallback),
+  });
+  const placements = (Array.isArray(input.placements) && input.placements.length ? input.placements : [{
+    id: 'front',
+    label: 'Front',
+    additionalPrice: 0,
+    printArea: { width: 12, height: 16, unit: 'inch' },
+  }]).map((placement: Record<string, any>, index: number) => {
+    const id = String(placement.id ?? `placement-${index + 1}`).trim();
+    const legacyArea = (Array.isArray(input.colors) ? input.colors : [])
+      .map((color: Record<string, any>) => color.mockups?.[id]?.designArea)
+      .find(Boolean);
+    const designArea = placement.designArea ?? legacyArea ?? {};
+    return {
+      id,
+      label: String(placement.label ?? `Placement ${index + 1}`).trim(),
+      additionalPrice: numberOr(placement.additionalPrice, 0),
+      designArea: {
+        x: numberOr(designArea.x, 34),
+        y: numberOr(designArea.y, 20),
+        width: numberOr(designArea.width, 32),
+        height: numberOr(designArea.height, 48),
+        cornerRadius: numberOr(designArea.cornerRadius, 0),
+      },
+      printArea: {
+        width: numberOr(placement.printArea?.width, 12),
+        height: numberOr(placement.printArea?.height, 16),
+        unit: ['inch', 'cm', 'mm'].includes(placement.printArea?.unit) ? placement.printArea.unit : 'inch',
+        bleed: inset(placement.printArea?.bleed, 0.125),
+        safeArea: inset(placement.printArea?.safeArea, 0.25),
+      },
+    };
+  });
+  const normalizeMockup = (mockup: Record<string, any> | undefined) => ({
+    imageUrl: String(mockup?.imageUrl ?? '').trim(),
+    imageAssetId: mockup?.imageAssetId || undefined,
+    thumbnailImageUrl: String(mockup?.thumbnailImageUrl ?? '').trim(),
+    thumbnailImageAssetId: mockup?.thumbnailImageAssetId || undefined,
+  });
+  const colors = (Array.isArray(input.colors) ? input.colors : []).map((color: Record<string, any>) => {
+    return {
+      value: String(color.value ?? '').trim(),
+      label: String(color.label ?? '').trim(),
+      swatchColor: String(color.swatchColor ?? '').trim(),
+      swatchImageUrl: String(color.swatchImageUrl ?? '').trim(),
+      mockups: Object.fromEntries(placements.map((placement: Record<string, any>) => {
+        const exact = getMockupByPlacementId(color.mockups, placement.id);
+        return [placement.id, normalizeMockup(exact)];
+      })),
+    };
+  });
+  const requestedDefault = String(input.defaultPlacementId ?? '').trim();
+  data.tshirt = {
+    enabled: isTShirt && input.enabled !== false,
+    colorOptionKey: String(input.colorOptionKey ?? 'Color').trim(),
+    sizeOptionKey: String(input.sizeOptionKey ?? 'Size').trim(),
+    defaultPlacementId: placements.some((placement: Record<string, any>) => placement.id === requestedDefault) ? requestedDefault : placements[0]?.id ?? '',
+    placements,
+    colors,
+  };
+}
+
+function validateTShirtSettings(data: Record<string, any>) {
+  if (data.productType !== 'T-Shirt Print') return;
+  const settings = data.tshirt;
+  if (!settings?.enabled) throw new ApiError(400, 'T-shirt editor must be enabled.');
+  if (!settings.colorOptionKey || !settings.sizeOptionKey) throw new ApiError(400, 'T-shirt color and size option keys are required.');
+  if (settings.colorOptionKey.toLowerCase() === settings.sizeOptionKey.toLowerCase()) throw new ApiError(400, 'T-shirt color and size option keys must be different.');
+  if (!Array.isArray(settings.placements) || settings.placements.length === 0) throw new ApiError(400, 'Add at least one T-shirt print placement.');
+  const placementIds = new Set<string>();
+  for (const placement of settings.placements) {
+    const id = String(placement.id ?? '');
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) throw new ApiError(400, `T-shirt placement ID "${id}" must be URL-safe.`);
+    if (placementIds.has(id.toLowerCase())) throw new ApiError(400, 'T-shirt placement IDs must be unique.');
+    placementIds.add(id.toLowerCase());
+    if (!String(placement.label ?? '').trim()) throw new ApiError(400, `T-shirt placement ${id} requires a label.`);
+    if (!Number.isFinite(Number(placement.additionalPrice)) || Number(placement.additionalPrice) < 0) throw new ApiError(400, `${placement.label} additional price cannot be negative.`);
+    const area = placement.printArea;
+    if (!(Number(area?.width) > 0) || !(Number(area?.height) > 0) || !['inch', 'cm', 'mm'].includes(area?.unit)) throw new ApiError(400, `${placement.label} requires valid print dimensions and unit.`);
+    for (const [groupName, insets] of [['bleed', area.bleed], ['safe area', area.safeArea]] as const) {
+      for (const side of ['top', 'right', 'bottom', 'left']) {
+        if (!Number.isFinite(Number(insets?.[side])) || Number(insets[side]) < 0) throw new ApiError(400, `${placement.label} ${groupName} ${side} cannot be negative.`);
+      }
+    }
+    if (Number(area.safeArea.left) > Number(area.width) / 2 || Number(area.safeArea.right) > Number(area.width) / 2 || Number(area.safeArea.top) > Number(area.height) / 2 || Number(area.safeArea.bottom) > Number(area.height) / 2) {
+      throw new ApiError(400, `${placement.label} safe area cannot exceed half its print width or height.`);
+    }
+    const designArea = placement.designArea;
+    if (!designArea || designArea.x < 0 || designArea.y < 0 || !(designArea.width > 0) || !(designArea.height > 0) || designArea.x + designArea.width > 100 || designArea.y + designArea.height > 100) {
+      throw new ApiError(400, `${placement.label} design area must remain inside the mockup.`);
+    }
+    if (designArea.cornerRadius < 0 || designArea.cornerRadius > 50) throw new ApiError(400, `${placement.label} design area corner radius must be between 0 and 50.`);
+  }
+  if (!placementIds.has(String(settings.defaultPlacementId ?? '').toLowerCase())) throw new ApiError(400, 'Default T-shirt placement must match a configured placement.');
+  const colorValues = new Set<string>();
+  for (const color of settings.colors ?? []) {
+    const normalizedValue = String(color.value ?? '').trim().toLowerCase();
+    if (!normalizedValue || !String(color.label ?? '').trim()) throw new ApiError(400, 'Every T-shirt color requires a value and label.');
+    if (colorValues.has(normalizedValue)) throw new ApiError(400, 'T-shirt color values must be unique.');
+    colorValues.add(normalizedValue);
+    if (color.swatchColor && !/^#[0-9a-f]{6}$/i.test(color.swatchColor)) throw new ApiError(400, `${color.label} swatch color must be a 6-digit hex color.`);
+    for (const placement of settings.placements) {
+      const mockup = color.mockups?.[placement.id];
+      if (!mockup || !String(mockup.imageUrl ?? '').trim()) throw new ApiError(400, `${color.label} requires a ${placement.label} mockup image.`);
+    }
+  }
+  for (const variant of data.variants ?? []) {
+    const options = variant.options instanceof Map ? Object.fromEntries(variant.options) : variant.options ?? {};
+    const optionValue = (key: string) => Object.entries(options).find(([optionKey]) => optionKey.toLowerCase() === key.toLowerCase())?.[1];
+    const color = String(optionValue(settings.colorOptionKey) ?? '').trim();
+    const size = String(optionValue(settings.sizeOptionKey) ?? '').trim();
+    if (!color || !size) throw new ApiError(400, `${variant.sku || variant.name || 'T-shirt variant'} requires ${settings.colorOptionKey} and ${settings.sizeOptionKey} options.`);
+    if (colorValues.size && !colorValues.has(color.toLowerCase())) throw new ApiError(400, `${variant.sku || variant.name} uses an unconfigured T-shirt color "${color}".`);
+  }
+}
+
 function numberOr(value: unknown, fallback: number) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
@@ -404,6 +538,7 @@ function validateProductShape(data: Record<string, any>) {
   validatePhotoBookSettings(data);
   validatePillowSettings(data);
   validateMugSettings(data);
+  validateTShirtSettings(data);
   if (data.surface && !data.surface.code) throw new ApiError(400, 'Surface code is required.');
   const frontendContent = data.frontendContent ?? {};
   const rating = Number(frontendContent.reviewRating);
@@ -565,6 +700,7 @@ export async function createProduct(payload: Record<string, any>) {
   normalizePhotoBookSettings(payload);
   normalizePillowSettings(payload);
   normalizeMugSettings(payload);
+  normalizeTShirtSettings(payload);
   normalizeRoomOwnership(payload);
   validateProductShape(payload);
   await validateEditorProductSelection(payload);
@@ -583,6 +719,7 @@ export async function updateProduct(id: string, payload: Record<string, any>) {
   normalizePhotoBookSettings(payload);
   normalizePillowSettings(payload);
   normalizeMugSettings(payload);
+  normalizeTShirtSettings(payload);
   normalizeRoomOwnership(payload);
   validateProductShape(payload);
   await validateEditorProductSelection(payload, id);
@@ -855,6 +992,7 @@ export async function getPublicProductConfig(id: string, merchantId?: string) {
     photoBook: publicPhotoBookConfig(product.photoBook, product.productType),
     pillow: publicPillowConfig(product.pillow, product.productType),
     mug: publicMugConfig(product.mug, product.productType),
+    tshirt: publicTShirtConfig(product.tshirt, product.productType),
     variants: activeVariants,
     aiArt: publicAiArtConfig(product.aiArt),
   };
@@ -1232,6 +1370,36 @@ function publicMugConfig(mug: any, productType: string) {
   return {
     enabled: productType === 'Mug Print' && input.enabled !== false,
     defaultLayout: 'blank',
+  };
+}
+
+function publicTShirtConfig(tshirt: any, productType: string) {
+  const input = tshirt ?? {};
+  const colors = Array.isArray(input.colors) ? input.colors : [];
+  const placements = (Array.isArray(input.placements) ? input.placements : []).map((placement: Record<string, any>) => {
+    const legacyArea = colors.map((color: Record<string, any>) => color.mockups?.[placement.id]?.designArea).find(Boolean);
+    return {
+      ...placement,
+      designArea: placement.designArea ?? legacyArea ?? { x: 34, y: 20, width: 32, height: 48, cornerRadius: 0 },
+    };
+  });
+  return {
+    enabled: productType === 'T-Shirt Print' && input.enabled !== false,
+    colorOptionKey: input.colorOptionKey || 'Color',
+    sizeOptionKey: input.sizeOptionKey || 'Size',
+    defaultPlacementId: input.defaultPlacementId || placements[0]?.id || '',
+    placements,
+    colors: colors.map((color: Record<string, any>) => {
+      return {
+        ...color,
+        mockups: Object.fromEntries(placements.map((placement: Record<string, any>) => {
+          const mockup = getMockupByPlacementId(color.mockups, placement.id) ?? {};
+          const publicMockup = { ...mockup };
+          delete publicMockup.designArea;
+          return [placement.id, publicMockup];
+        })),
+      };
+    }),
   };
 }
 
@@ -1672,6 +1840,7 @@ function parsePagePreviewMeta(value: unknown, fileCount: number) {
     const meta = entry as Record<string, unknown>;
     return {
       pageId: meta.pageId === undefined ? undefined : String(meta.pageId),
+      placementId: meta.placementId === undefined ? undefined : String(meta.placementId),
       pageNumber: meta.pageNumber === undefined || meta.pageNumber === '' ? undefined : Number(meta.pageNumber),
       filename: meta.filename === undefined ? undefined : String(meta.filename),
     };
@@ -1689,6 +1858,7 @@ function normalizeDesignProductType(value: unknown, fallback: unknown = 'Photo B
   for (const candidate of [value, fallback]) {
     const raw = String(candidate ?? '').trim().toLowerCase();
     if (!raw) continue;
+    if (raw.includes('t-shirt') || raw.includes('tshirt') || raw.includes('tee shirt')) return 'T-Shirt Print';
     if (raw.includes('pillow')) return 'Pillow Print';
     if (raw.includes('mug')) return 'Mug Print';
     if (raw.includes('collage')) return 'Photo Collage Print';
@@ -2066,6 +2236,60 @@ function resolveFinalPrintPages(design: unknown, cartItem: Record<string, any>, 
   );
   const sourcePages: Record<string, any>[] = designPages.length > 0 ? designPages : previews.map((preview, index) => ({ pageNumber: Number(preview.pageNumber ?? index + 1), pageId: preview.pageId }));
   const productType = normalizeDesignProductType(product?.productType, cartItem.productType);
+  if (productType === 'T-Shirt Print') {
+    const placements = Array.isArray(product?.tshirt?.placements) ? product.tshirt.placements : [];
+    const placementById = new Map<string, Record<string, any>>(
+      placements.map((placement: Record<string, any>) => [String(placement.id).toLowerCase(), placement])
+    );
+    const nestedDesign = isRecordLike(designRecord.design) ? designRecord.design : {};
+    const configuredDesignedPlacements = Array.isArray(designRecord.tshirtPlacements)
+      ? designRecord.tshirtPlacements
+      : Array.isArray(nestedDesign.tshirtPlacements)
+        ? nestedDesign.tshirtPlacements
+        : [];
+    const designedPlacementIds = new Set<string>(
+      configuredDesignedPlacements
+        .map((item: unknown) => String(isRecordLike(item) ? item.id ?? item.placementId ?? '' : item).trim().toLowerCase())
+        .filter(Boolean)
+    );
+    if (designedPlacementIds.size === 0) {
+      for (const preview of previews) {
+        const placementId = String(preview.placementId ?? '').trim().toLowerCase();
+        if (placementId) designedPlacementIds.add(placementId);
+      }
+    }
+    const placementIdFor = (page: Record<string, any>, index: number) => {
+      const preview = previews.find((item) => String(item.pageId ?? '') === String(page.pageId ?? page.id ?? page._id ?? '')) ?? previews[index];
+      const explicit = String(page.placementId ?? preview?.placementId ?? '').trim();
+      if (explicit) return explicit;
+      const pageId = String(page.pageId ?? page.id ?? page._id ?? '').trim();
+      return pageId.toLowerCase().startsWith('tshirt-') ? pageId.slice(7) : pageId;
+    };
+    return sourcePages.flatMap((page, index) => {
+      const placementId = placementIdFor(page, index);
+      if (designedPlacementIds.size > 0 && !designedPlacementIds.has(placementId.toLowerCase())) return [];
+      const placement = placementById.get(placementId.toLowerCase());
+      if (!placement) return [];
+      const pageNumber = positiveInteger(page.pageNumber, index + 1);
+      const pageId = String(page.pageId ?? page._id ?? page.id ?? `tshirt-${placement.id}`);
+      const preview = previews.find((item) => String(item.placementId ?? '').toLowerCase() === placementId.toLowerCase())
+        ?? previews.find((item) => String(item.pageId ?? '') === pageId)
+        ?? previews[index];
+      return [{
+        ...page,
+        placementId: placement.id,
+        pageNumber,
+        printPageNumber: index + 1,
+        pageRole: `tshirt-${placement.id}`,
+        filename: `final-tshirt-${sanitizeUploadSegment(String(placement.id))}.png`,
+        pageId,
+        previewUrl: String(preview?.publicUrl ?? preview?.url ?? ''),
+        dpi,
+        backgroundColor: typeof page.backgroundColor === 'string' ? page.backgroundColor : typeof (designRecord as any).backgroundColor === 'string' ? (designRecord as any).backgroundColor : '#ffffff',
+        ...finalPrintAreaDimensions(placement.printArea, dpi),
+      }];
+    });
+  }
   if (productType === 'Photo Collage Print') {
     const page = sourcePages[0] ?? {};
     const pageNumber = positiveInteger(page.pageNumber, 1);
@@ -2171,6 +2395,16 @@ function getDesignPages(design: Record<string, unknown>) {
   if (isRecordLike(design.design) && Array.isArray(design.design.pages)) return design.design.pages.filter(isRecordLike);
   if (isRecordLike(design.book) && Array.isArray(design.book.pages)) return design.book.pages.filter(isRecordLike);
   return [];
+}
+
+function finalPrintAreaDimensions(printArea: Record<string, any>, dpi: number) {
+  const bleed = isRecordLike(printArea?.bleed) ? printArea.bleed : {};
+  const width = positiveNumber(printArea?.width, 12) + nonNegativeNumber(bleed.left) + nonNegativeNumber(bleed.right);
+  const height = positiveNumber(printArea?.height, 16) + nonNegativeNumber(bleed.top) + nonNegativeNumber(bleed.bottom);
+  const unit = String(printArea?.unit ?? 'inch').toLowerCase();
+  if (unit === 'mm') return { widthPx: Math.round((width / 25.4) * dpi), heightPx: Math.round((height / 25.4) * dpi) };
+  if (unit === 'cm') return { widthPx: Math.round((width / 2.54) * dpi), heightPx: Math.round((height / 2.54) * dpi) };
+  return { widthPx: Math.round(width * dpi), heightPx: Math.round(height * dpi) };
 }
 
 function resolveFinalPrintVariant(design: Record<string, unknown>, product: any) {
@@ -2303,7 +2537,12 @@ function sanitizeUploadFilename(value: string, fallbackExtension: string) {
   const extension = (dotIndex > 0 ? raw.slice(dotIndex).toLowerCase() : fallbackExtension).replace(/[^a-z0-9.]/g, '');
   return `${base}${extension || fallbackExtension}`;
 }
-export async function calculatePrice(id: string, variantId: string, selectedOptions: Record<string, string>) {
+export async function calculatePrice(
+  id: string,
+  variantId: string,
+  selectedOptions: Record<string, string>,
+  designedPlacements: Array<string | { id?: string }> = [],
+) {
   const product = await ProductModel.findById(id).lean();
   if (!product) throw new ApiError(404, 'Product not found.');
   const variant = product.variants.find((item: any) => String(item._id) === variantId);
@@ -2340,7 +2579,25 @@ export async function calculatePrice(id: string, variantId: string, selectedOpti
     modifiers.push({ groupCode: group.code, value: optionValue.value, type: optionValue.priceModifierType, amount });
   }
   const modifierTotal = modifiers.reduce((sum, item) => sum + item.amount, 0);
-  return { basePrice: variant.price, resolvedVariantPrice, modifiers, finalPrice: Math.round((variant.price + modifierTotal) * 100) / 100 };
+  const placementModifiers: Array<{ placementId: string; label: string; amount: number }> = [];
+  if (product.productType === 'T-Shirt Print') {
+    const requestedIds = [...new Set((Array.isArray(designedPlacements) ? designedPlacements : []).map((item) => String(typeof item === 'string' ? item : item?.id ?? '').trim().toLowerCase()).filter(Boolean))];
+    const configured = new Map((product.tshirt?.placements ?? []).map((placement: any) => [String(placement.id).toLowerCase(), placement]));
+    for (const placementId of requestedIds) {
+      const placement = configured.get(placementId) as any;
+      if (!placement) throw new ApiError(400, `Unknown T-shirt placement "${placementId}".`);
+      placementModifiers.push({ placementId: placement.id, label: placement.label, amount: Number(placement.additionalPrice ?? 0) });
+    }
+  }
+  const placementTotal = placementModifiers.reduce((sum, item) => sum + item.amount, 0);
+  return {
+    basePrice: variant.price,
+    resolvedVariantPrice,
+    modifiers,
+    placementModifiers,
+    placementTotal,
+    finalPrice: Math.round((variant.price + modifierTotal + placementTotal) * 100) / 100,
+  };
 }
 
 function stripIds<T>(value: T): T {

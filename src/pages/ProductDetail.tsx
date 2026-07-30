@@ -19,6 +19,7 @@ import { PreviewTab } from '../components/product/PreviewTab';
 import { DesignGeneralTab } from '../components/product/DesignGeneralTab';
 import { AiArtTab } from '../components/product/AiArtTab';
 import { LayoutSettingsTab } from '../components/product/LayoutSettingsTab';
+import { TShirtSettingsTab } from '../components/product/TShirtSettingsTab';
 
 export function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -98,6 +99,9 @@ export function ProductDetail() {
     { _id: 'basic', label: 'Basic Info', content: <BasicInfoTab product={product} products={products} onSave={updateProduct} /> },
     { _id: 'options', label: 'Options', content: <OptionsTab product={product} onSave={updateProduct} /> },
     { _id: 'variants', label: 'Variants', content: <VariantsTab product={product} onSave={updateProduct} /> },
+    ...(product.productType === 'T-Shirt Print'
+      ? [{ _id: 'tshirt-settings', label: 'T-Shirt Settings', content: <TShirtSettingsTab product={product} onSave={updateProduct} /> }]
+      : []),
     { _id: 'surfaces', label: 'Surfaces', content: <SurfacesTab product={product} onSave={updateProduct} /> },
     { _id: 'editor-rules', label: 'Editor Rules', content: <EditorRulesTab product={product} onSave={updateProduct} /> },
     { _id: 'export-rules', label: 'Export Rules', content: <ExportRulesTab product={product} onSave={updateProduct} /> },
@@ -178,7 +182,8 @@ function ProductReadinessPanel({ product }: { product: Product }) {
   const readiness = getProductReadiness(product);
   const isPillow = product.productType === 'Pillow Print';
   const isMug = product.productType === 'Mug Print';
-  const usesVariantPrintArea = isPillow || isMug;
+  const isTShirt = product.productType === 'T-Shirt Print';
+  const usesVariantPrintArea = isPillow || isMug || isTShirt;
   const checks = [
     { label: 'Has basic info', value: readiness.hasBasicInfo },
     { label: 'Has at least one active variant', value: readiness.hasActiveVariant },
@@ -193,6 +198,8 @@ function ProductReadinessPanel({ product }: { product: Product }) {
             { label: 'Mug editor settings are complete', value: readiness.mugSettingsValid },
             { label: 'Mug print areas and GLB models are valid', value: readiness.activeMugVariantsValid },
           ]
+        : isTShirt
+          ? [{ label: 'T-shirt placements, colors, and variants are valid', value: readiness.tshirtSettingsValid }]
       : [
           { label: 'Product surface exists', value: readiness.hasSurface },
           { label: 'Surface settings are valid', value: readiness.surfaceValid },

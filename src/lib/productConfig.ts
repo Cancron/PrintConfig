@@ -6,6 +6,7 @@ import {
   normalizePhotoBookConfig,
   normalizePillowProductConfig,
   normalizePillowVariantConfig,
+  normalizeTShirtProductConfig,
 } from './storage';
 import { createDefaultVariantOptionDefinitions } from './variantOptions';
 import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
@@ -43,7 +44,7 @@ const PRODUCT_TYPES: ProductType[] = [
   'Mug Print',
   'AI Art Generation',
   'Art Print',
-  'T-Shirt',
+  'T-Shirt Print',
   'Business Card',
   'Sticker',
 ];
@@ -124,6 +125,7 @@ function buildImportCandidate(input: Record<string, unknown>): Product {
     photoBook: normalizePhotoBookConfig(isRecord(input.photoBook) ? input.photoBook : undefined, input.productType === 'Photo Book Print'),
     pillow: normalizePillowProductConfig(isRecord(input.pillow) ? input.pillow : undefined, input.productType === 'Pillow Print'),
     mug: normalizeMugProductConfig(isRecord(input.mug) ? input.mug : undefined, input.productType === 'Mug Print'),
+    tshirt: normalizeTShirtProductConfig(isRecord(input.tshirt) ? input.tshirt : undefined, input.productType === 'T-Shirt Print'),
     createdAt: now,
     updatedAt: now,
   };

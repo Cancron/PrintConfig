@@ -3,7 +3,7 @@ import { Upload, X } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Textarea } from '../ui/Textarea';
-import type { ProductStatus, ProductUnit, ProductVariant, VariantOptionDefinition } from '../../types';
+import type { ProductStatus, ProductType, ProductUnit, ProductVariant, VariantOptionDefinition } from '../../types';
 
 interface BulkVariantInput {
   w?: unknown;
@@ -20,6 +20,9 @@ interface ParsedBatch {
 
 interface Props {
   productId: string;
+  productType: ProductType;
+  tshirtColorOptionKey: string;
+  tshirtSizeOptionKey: string;
   existingVariants: ProductVariant[];
   optionDefinitions: VariantOptionDefinition[];
   onClose: () => void;
@@ -39,8 +42,17 @@ const unitOptions = [
 
 const dpiOptions = ['72', '150', '300', '600'].map((value) => ({ value, label: `${value} DPI` }));
 
-export function BulkVariantsModal({ productId, existingVariants, optionDefinitions, onClose, onImport }: Props) {
-  const [json, setJson] = useState('[\n  { "w": 10, "h": 10, "price": 55 }\n]');
+export function BulkVariantsModal({
+  productId,
+  productType,
+  tshirtColorOptionKey,
+  tshirtSizeOptionKey,
+  existingVariants,
+  optionDefinitions,
+  onClose,
+  onImport,
+}: Props) {
+  const [json, setJson] = useState('[\n  { "w": 10, "h": 10, "price": 55, "options": { "Color": "white", "Size": "XS" } }\n]');
   const [namePrefix, setNamePrefix] = useState('');
   const [skuPrefix, setSkuPrefix] = useState('cpccd');
   const [status, setStatus] = useState<ProductStatus>('Draft');
@@ -48,8 +60,34 @@ export function BulkVariantsModal({ productId, existingVariants, optionDefinitio
   const [dpi, setDpi] = useState('300');
 
   const batch = useMemo(
-    () => parseBatch({ json, namePrefix, skuPrefix, status, unit, dpi: Number(dpi), productId, existingVariants, optionDefinitions }),
-    [dpi, existingVariants, json, namePrefix, optionDefinitions, productId, skuPrefix, status, unit],
+    () => parseBatch({
+      json,
+      namePrefix,
+      skuPrefix,
+      status,
+      unit,
+      dpi: Number(dpi),
+      productId,
+      productType,
+      tshirtColorOptionKey,
+      tshirtSizeOptionKey,
+      existingVariants,
+      optionDefinitions,
+    }),
+    [
+      dpi,
+      existingVariants,
+      json,
+      namePrefix,
+      optionDefinitions,
+      productId,
+      productType,
+      skuPrefix,
+      status,
+      tshirtColorOptionKey,
+      tshirtSizeOptionKey,
+      unit,
+    ],
   );
 
   return (
@@ -82,7 +120,10 @@ export function BulkVariantsModal({ productId, existingVariants, optionDefinitio
             className="font-mono"
             error={batch.errors.length ? batch.errors.join(' ') : undefined}
           />
-          <p className="text-sm text-gray-500">Expected format: an array of objects containing numeric <code>w</code>, <code>h</code>, and <code>price</code> values. Add an optional <code>options</code> object for custom values.</p>
+          <p className="text-sm text-gray-500">
+            Expected format: an array of objects containing numeric <code>w</code>, <code>h</code>, and <code>price</code> values.
+            T-shirt SKUs use the configured color and size values; other product SKUs use width and height.
+          </p>
 
           {!batch.errors.length && (
             <div className="rounded-md bg-gray-50 p-4 text-sm ring-1 ring-gray-200">
@@ -121,6 +162,9 @@ function parseBatch(input: {
   unit: ProductUnit;
   dpi: number;
   productId: string;
+  productType: ProductType;
+  tshirtColorOptionKey: string;
+  tshirtSizeOptionKey: string;
   existingVariants: ProductVariant[];
   optionDefinitions: VariantOptionDefinition[];
 }): ParsedBatch {
@@ -157,34 +201,55 @@ function parseBatch(input: {
     if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0 || !Number.isFinite(price) || price < 0) return;
 
     const size = `${formatNumber(width)} X ${formatNumber(height)}`;
-    const sku = `${prefix}-${toSkuSegment(formatNumber(width))}-${toSkuSegment(formatNumber(height))}`;
-    if (seenSkus.has(sku.toLowerCase())) {
-      skippedSkus.push(sku);
-      return;
-    }
-    seenSkus.add(sku.toLowerCase());
     const rowOptions = isStringRecord(row.options) ? row.options : {};
     if (row.options !== undefined && !isStringRecord(row.options)) {
       errors.push(`Row ${index + 1}: options must be an object containing text or numeric values.`);
       return;
     }
-    const options: Record<string, string> = {
-      Size: size,
-      Orientation: getOrientation(width, height),
-      Ratio: getRatio(width, height),
-      ...Object.fromEntries(Object.entries(rowOptions).map(([key, value]) => [key, String(value)])),
-    };
+    const isTShirt = input.productType === 'T-Shirt Print';
+    const colorValue = getOptionValue(rowOptions, input.tshirtColorOptionKey);
+    const clothingSizeValue = getOptionValue(rowOptions, input.tshirtSizeOptionKey);
+    if (isTShirt && !colorValue) {
+      errors.push(`Row ${index + 1}: options.${input.tshirtColorOptionKey} is required for the T-shirt SKU.`);
+      return;
+    }
+    if (isTShirt && !clothingSizeValue) {
+      errors.push(`Row ${index + 1}: options.${input.tshirtSizeOptionKey} is required for the T-shirt SKU.`);
+      return;
+    }
+    const sku = isTShirt
+      ? [prefix, toSkuSegment(colorValue), toSkuSegment(clothingSizeValue)].join('-')
+      : [prefix, toSkuSegment(formatNumber(width)), toSkuSegment(formatNumber(height))].join('-');
+    if (seenSkus.has(sku.toLowerCase())) {
+      skippedSkus.push(sku);
+      return;
+    }
+    seenSkus.add(sku.toLowerCase());
+    const normalizedRowOptions = Object.fromEntries(Object.entries(rowOptions).map(([key, value]) => [key, String(value)]));
+    const options: Record<string, string> = isTShirt
+      ? normalizedRowOptions
+      : {
+          Size: size,
+          Orientation: getOrientation(width, height),
+          Ratio: getRatio(width, height),
+          ...normalizedRowOptions,
+        };
     const missing = input.optionDefinitions.filter((definition) => definition.required && !String(options[definition.key] ?? '').trim());
     if (missing.length > 0) {
       errors.push(`Row ${index + 1}: missing required options ${missing.map((definition) => definition.name).join(', ')}.`);
       return;
     }
+    const variantName = isTShirt
+      ? `${namePrefix ? `${namePrefix} ` : ''}(${colorValue}) (${clothingSizeValue})`
+      : namePrefix
+        ? `${namePrefix} ${size}`
+        : size;
     const now = new Date().toISOString();
     variants.push({
       _id: '',
       clientId: crypto.randomUUID(),
       productId: input.productId,
-      name: namePrefix ? `${namePrefix} ${size}` : size,
+      name: variantName,
       sku,
       price,
       status: input.status,
@@ -205,6 +270,11 @@ function parseBatch(input: {
 
 function isStringRecord(value: unknown): value is Record<string, string | number> {
   return !!value && typeof value === 'object' && !Array.isArray(value) && Object.values(value).every((item) => typeof item === 'string' || typeof item === 'number');
+}
+
+function getOptionValue(options: Record<string, string | number>, key: string) {
+  const match = Object.entries(options).find(([optionKey]) => optionKey.trim().toLowerCase() === key.trim().toLowerCase());
+  return match ? String(match[1]).trim() : '';
 }
 
 function getOrientation(width: number, height: number) {

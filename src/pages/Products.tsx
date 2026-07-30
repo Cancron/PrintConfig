@@ -21,7 +21,7 @@ const productTypes: ProductType[] = [
   'Mug Print',
   'AI Art Generation',
   'Art Print',
-  'T-Shirt',
+  'T-Shirt Print',
   'Business Card', 
   'Sticker'
 ];

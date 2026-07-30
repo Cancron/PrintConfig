@@ -26,6 +26,10 @@ import type {
   ProductUnit,
   ProductVariant,
   SafeAreaSettings,
+  TShirtColorConfig,
+  TShirtMockupConfig,
+  TShirtPlacementConfig,
+  TShirtProductConfig,
 } from '../types';
 
 const PRODUCTS_KEY = 'print-config-products';
@@ -248,6 +252,108 @@ export function normalizeMugProductConfig(
   };
 }
 
+const tshirtInsets = (value: number) => ({ top: value, right: value, bottom: value, left: value });
+
+export function createDefaultTShirtMockupConfig(): TShirtMockupConfig {
+  return {
+    imageUrl: '',
+    thumbnailImageUrl: '',
+  };
+}
+
+export function createDefaultTShirtPlacementConfig(id = 'front', label = 'Front'): TShirtPlacementConfig {
+  return {
+    id,
+    label,
+    additionalPrice: 0,
+    designArea: { x: 34, y: 20, width: 32, height: 48, cornerRadius: 0 },
+    printArea: {
+      width: 12,
+      height: 16,
+      unit: 'inch',
+      bleed: tshirtInsets(0.125),
+      safeArea: tshirtInsets(0.25),
+    },
+  };
+}
+
+export function createDefaultTShirtProductConfig(enabled = false): TShirtProductConfig {
+  return {
+    enabled,
+    colorOptionKey: 'Color',
+    sizeOptionKey: 'Size',
+    defaultPlacementId: 'front',
+    placements: [createDefaultTShirtPlacementConfig()],
+    colors: [],
+  };
+}
+
+export function normalizeTShirtProductConfig(
+  input: Partial<TShirtProductConfig> | undefined | null,
+  enabledFallback = false,
+): TShirtProductConfig {
+  const defaults = createDefaultTShirtProductConfig(enabledFallback);
+  const normalizeInsets = (value: Partial<TShirtPlacementConfig['printArea']['bleed']> | undefined, fallback: number) => ({
+    top: numberOr(value?.top, fallback),
+    right: numberOr(value?.right, fallback),
+    bottom: numberOr(value?.bottom, fallback),
+    left: numberOr(value?.left, fallback),
+  });
+  const placements = (input?.placements?.length ? input.placements : defaults.placements).map((placement, index) => {
+    const id = String(placement.id ?? `placement-${index + 1}`).trim();
+    const legacyArea = input?.colors?.map((color) => color.mockups?.[id]?.designArea).find(Boolean);
+    const designArea = placement.designArea ?? legacyArea;
+    return {
+      id,
+      label: String(placement.label ?? `Placement ${index + 1}`).trim(),
+      additionalPrice: numberOr(placement.additionalPrice, 0),
+      designArea: {
+        x: numberOr(designArea?.x, 34),
+        y: numberOr(designArea?.y, 20),
+        width: numberOr(designArea?.width, 32),
+        height: numberOr(designArea?.height, 48),
+        cornerRadius: numberOr(designArea?.cornerRadius, 0),
+      },
+      printArea: {
+        width: numberOr(placement.printArea?.width, 12),
+        height: numberOr(placement.printArea?.height, 16),
+        unit: placement.printArea?.unit === 'cm' || placement.printArea?.unit === 'mm' ? placement.printArea.unit : 'inch',
+        bleed: normalizeInsets(placement.printArea?.bleed, 0.125),
+        safeArea: normalizeInsets(placement.printArea?.safeArea, 0.25),
+      },
+    };
+  });
+  const normalizeMockup = (value: Partial<TShirtMockupConfig> | undefined): TShirtMockupConfig => {
+    return {
+      imageUrl: String(value?.imageUrl ?? ''),
+      thumbnailImageUrl: String(value?.thumbnailImageUrl ?? ''),
+      imageAssetId: value?.imageAssetId,
+      thumbnailImageAssetId: value?.thumbnailImageAssetId,
+    };
+  };
+  const colors: TShirtColorConfig[] = (input?.colors ?? []).map((color) => ({
+    value: String(color.value ?? '').trim(),
+    label: String(color.label ?? '').trim(),
+    swatchColor: String(color.swatchColor ?? ''),
+    swatchImageUrl: String(color.swatchImageUrl ?? ''),
+    mockups: Object.fromEntries(placements.map((placement) => {
+      const entries = Object.entries(color.mockups ?? {});
+      const exact = color.mockups?.[placement.id]
+        ?? entries.find(([key]) => key.trim().toLowerCase() === placement.id.trim().toLowerCase())?.[1];
+      return [placement.id, normalizeMockup(exact)];
+    })),
+  }));
+  const requestedDefault = String(input?.defaultPlacementId ?? '').trim();
+  return {
+    enabled: input?.enabled ?? enabledFallback,
+    colorOptionKey: String(input?.colorOptionKey ?? 'Color').trim(),
+    sizeOptionKey: String(input?.sizeOptionKey ?? 'Size').trim(),
+    defaultPlacementId: placements.some((placement) => placement.id === requestedDefault) ? requestedDefault : placements[0]?.id ?? '',
+    placements,
+    colors,
+  };
+}
+
 export function createDefaultMugVariantConfig(
   width = 0,
   height = 0,
@@ -426,6 +532,7 @@ export function normalizeProduct(product: Product): Product {
     photoBook: normalizePhotoBookConfig(product.photoBook, product.productType === 'Photo Book Print'),
     pillow: normalizePillowProductConfig(product.pillow, product.productType === 'Pillow Print'),
     mug: normalizeMugProductConfig(product.mug, product.productType === 'Mug Print'),
+    tshirt: normalizeTShirtProductConfig(product.tshirt, product.productType === 'T-Shirt Print'),
   };
 }
 

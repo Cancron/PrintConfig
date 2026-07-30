@@ -9,9 +9,9 @@ import { ImageField } from '../components/gallery/ImageField';
 import { useProducts } from '../hooks/useProducts';
 import { useCategories } from '../hooks/useCategories';
 import { useWorkspace } from '../hooks/useWorkspace';
-import { createDefaultAiArtConfig, createDefaultEditorRules, createDefaultExportRules, createDefaultMugProductConfig, createDefaultPhotoBookConfig, createDefaultPillowProductConfig } from '../lib/storage';
+import { createDefaultAiArtConfig, createDefaultEditorRules, createDefaultExportRules, createDefaultMugProductConfig, createDefaultPhotoBookConfig, createDefaultPillowProductConfig, createDefaultTShirtProductConfig } from '../lib/storage';
 import { validateProductBasicInfo } from '../lib/validation';
-import { createDefaultVariantOptionDefinitions } from '../lib/variantOptions';
+import { createDefaultVariantOptionDefinitions, ensureTShirtVariantOptionDefinitions } from '../lib/variantOptions';
 import { createDefaultFrontendContent } from '../lib/frontendContent';
 import { createDefaultEditorProductSelection } from '../lib/productSelection';
 import type { Product, ProductScope, ProductType, ProductStatus } from '../types';
@@ -27,7 +27,7 @@ const productTypeOptions: { value: ProductType; label: ProductType }[] = [
   { value: 'Mug Print', label: 'Mug Print' },
   { value: 'AI Art Generation', label: 'AI Art Generation' },
   { value: 'Art Print', label: 'Art Print' },
-  { value: 'T-Shirt', label: 'T-Shirt' },
+  { value: 'T-Shirt Print', label: 'T-Shirt Print' },
   { value: 'Business Card', label: 'Business Card' },
   { value: 'Sticker', label: 'Sticker' },
 ];
@@ -96,7 +96,9 @@ export function CreateProduct() {
       exportRules: createDefaultExportRules(),
       surface: null,
       optionGroups: [],
-      variantOptionDefinitions: createDefaultVariantOptionDefinitions(),
+      variantOptionDefinitions: productType === 'T-Shirt Print'
+        ? ensureTShirtVariantOptionDefinitions(createDefaultVariantOptionDefinitions())
+        : createDefaultVariantOptionDefinitions(),
       roomPreviews: [],
       frontendContent: createDefaultFrontendContent(),
       editorProductSelection: createDefaultEditorProductSelection(),
@@ -106,6 +108,7 @@ export function CreateProduct() {
       photoBook: createDefaultPhotoBookConfig(productType === 'Photo Book Print'),
       pillow: createDefaultPillowProductConfig(productType === 'Pillow Print'),
       mug: createDefaultMugProductConfig(productType === 'Mug Print'),
+      tshirt: createDefaultTShirtProductConfig(productType === 'T-Shirt Print'),
       createdAt: now,
       updatedAt: now,
     };

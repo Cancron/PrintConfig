@@ -37,6 +37,40 @@ export function normalizeVariantOptionDefinitions(
   }));
 }
 
+export function ensureTShirtVariantOptionDefinitions(
+  definitions: VariantOptionDefinition[],
+  colorKey = 'Color',
+  sizeKey = 'Size',
+  previousColorKey = colorKey,
+  previousSizeKey = sizeKey,
+): VariantOptionDefinition[] {
+  const now = new Date().toISOString();
+  const result = definitions.map((definition) => ({ ...definition }));
+  for (const [name, key, previousKey] of [['Color', colorKey, previousColorKey], ['Size', sizeKey, previousSizeKey]] as const) {
+    const existing = result.find((definition) => definition.key.toLowerCase() === key.toLowerCase())
+      ?? result.find((definition) => definition.key.toLowerCase() === previousKey.toLowerCase());
+    if (existing) {
+      existing.key = key;
+      existing.name = name;
+      existing.required = true;
+      continue;
+    }
+    result.push({
+      _id: '',
+      clientId: crypto.randomUUID(),
+      productId: definitions[0]?.productId ?? '',
+      name,
+      key,
+      required: true,
+      groupBy: false,
+      sortOrder: result.length + 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+  return result;
+}
+
 export function missingRequiredVariantOptions(
   variant: Pick<ProductVariant, 'options'>,
   definitions: VariantOptionDefinition[],

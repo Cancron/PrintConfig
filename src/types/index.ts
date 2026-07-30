@@ -9,7 +9,7 @@ export type ProductType =
   | 'Mug Print'
   | 'AI Art Generation'
   | 'Art Print'
-  | 'T-Shirt'
+  | 'T-Shirt Print'
   | 'Business Card'
   | 'Sticker';
 
@@ -39,6 +39,7 @@ export type PhotoBookBindingType = 'perfect' | 'saddle_stitch' | 'spiral' | 'lay
 export type PillowPrintUnit = 'inch' | 'cm' | 'mm';
 export type PillowSide = 'front' | 'back';
 export type MugPrintUnit = 'inch' | 'cm' | 'mm';
+export type TShirtPrintUnit = 'inch' | 'cm' | 'mm';
 
 export interface ImageFolder {
   _id: string;
@@ -138,7 +139,7 @@ export interface DesignCartItem {
   orderStoragePrefix: string;
   orderId: string;
   image?: DesignStorageFile;
-  pagePreviews: Array<DesignStorageFile & { pageId?: string; pageNumber?: number }>;
+  pagePreviews: Array<DesignStorageFile & { pageId?: string; placementId?: string; pageNumber?: number }>;
   finalPrintFiles: DesignStorageFile[];
   printGenerationStatus: PrintGenerationStatus;
   printGenerationError: string;
@@ -711,6 +712,60 @@ export interface MugProductConfig {
   defaultLayout: 'blank';
 }
 
+export interface TShirtInsets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+export interface TShirtDesignArea {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  cornerRadius?: number;
+}
+
+export interface TShirtMockupConfig {
+  imageUrl: string;
+  thumbnailImageUrl?: string;
+  imageAssetId?: string;
+  thumbnailImageAssetId?: string;
+  designArea?: TShirtDesignArea;
+}
+
+export interface TShirtPlacementConfig {
+  id: string;
+  label: string;
+  additionalPrice: number;
+  designArea: TShirtDesignArea;
+  printArea: {
+    width: number;
+    height: number;
+    unit: TShirtPrintUnit;
+    bleed: TShirtInsets;
+    safeArea: TShirtInsets;
+  };
+}
+
+export interface TShirtColorConfig {
+  value: string;
+  label: string;
+  swatchColor?: string;
+  swatchImageUrl?: string;
+  mockups: Record<string, TShirtMockupConfig>;
+}
+
+export interface TShirtProductConfig {
+  enabled: boolean;
+  colorOptionKey: string;
+  sizeOptionKey: string;
+  defaultPlacementId: string;
+  placements: TShirtPlacementConfig[];
+  colors: TShirtColorConfig[];
+}
+
 export interface Product {
   _id: string;
   accountId: string;
@@ -740,6 +795,7 @@ export interface Product {
   photoBook: PhotoBookConfig;
   pillow: PillowProductConfig;
   mug: MugProductConfig;
+  tshirt: TShirtProductConfig;
   createdAt: string;
   updatedAt: string;
 }

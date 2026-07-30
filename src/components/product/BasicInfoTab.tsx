@@ -11,6 +11,7 @@ import { useCategories } from '../../hooks/useCategories';
 import { validateProductBasicInfo } from '../../lib/validation';
 import { createDefaultMugProductConfig, createDefaultPhotoBookConfig, createDefaultPillowProductConfig } from '../../lib/storage';
 import type { EditorProductSelectionMode, MugProductConfig, PhotoBookConfig, PillowProductConfig, Product, ProductScope, ProductType, ProductStatus } from '../../types';
+import { ensureTShirtVariantOptionDefinitions } from '../../lib/variantOptions';
 
 interface Props {
   product: Product;
@@ -29,7 +30,7 @@ const productTypeOptions: { value: ProductType; label: ProductType }[] = [
   { value: 'Mug Print', label: 'Mug Print' },
   { value: 'AI Art Generation', label: 'AI Art Generation' },
   { value: 'Art Print', label: 'Art Print' },
-  { value: 'T-Shirt', label: 'T-Shirt' },
+  { value: 'T-Shirt Print', label: 'T-Shirt Print' },
   { value: 'Business Card', label: 'Business Card' },
   { value: 'Sticker', label: 'Sticker' },
 ];
@@ -136,6 +137,9 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
         ...photoBook,
         enabled: productType === 'Photo Book Print',
       },
+      variantOptionDefinitions: productType === 'T-Shirt Print'
+        ? ensureTShirtVariantOptionDefinitions(product.variantOptionDefinitions, product.tshirt.colorOptionKey, product.tshirt.sizeOptionKey)
+        : product.variantOptionDefinitions,
       pillow: {
         ...pillow,
         enabled: productType === 'Pillow Print' && pillow.enabled,
@@ -146,6 +150,10 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
         ...mug,
         enabled: productType === 'Mug Print' && mug.enabled,
         defaultLayout: 'blank',
+      },
+      tshirt: {
+        ...product.tshirt,
+        enabled: productType === 'T-Shirt Print',
       },
     });
     setSaved(true);

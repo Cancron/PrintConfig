@@ -15,7 +15,7 @@ const PRODUCT_TYPES: ProductType[] = [
   'Mug Print',
   'AI Art Generation',
   'Art Print',
-  'T-Shirt',
+  'T-Shirt Print',
   'Business Card',
   'Sticker',
 ];
@@ -210,6 +210,34 @@ export function variantHasValidDimensions(variant: ProductVariant) {
   return variant.width > 0 && variant.height > 0 && isProductUnit(variant.unit) && variant.dpi > 0;
 }
 
+export function validateTShirtProduct(product: Product): ValidationErrors {
+  const errors: ValidationErrors = {};
+  if (product.productType !== 'T-Shirt Print') return errors;
+  const settings = product.tshirt;
+  if (!settings?.enabled) errors['tshirt.enabled'] = 'Enable the T-shirt editor.';
+  if (!settings?.colorOptionKey.trim()) errors['tshirt.colorOptionKey'] = 'Color option key is required.';
+  if (!settings?.sizeOptionKey.trim()) errors['tshirt.sizeOptionKey'] = 'Size option key is required.';
+  if (!settings?.placements.length) errors['tshirt.placements'] = 'Add at least one print placement.';
+  if (settings && !settings.placements.some((placement) => placement.id === settings.defaultPlacementId)) errors['tshirt.defaultPlacementId'] = 'Select a configured default placement.';
+  for (const placement of settings?.placements ?? []) {
+    if (!placement.id || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(placement.id)) errors[`tshirt.placement.${placement.id}.id`] = 'Placement ID must be URL-safe.';
+    if (!(placement.printArea.width > 0) || !(placement.printArea.height > 0)) errors[`tshirt.placement.${placement.id}.printArea`] = 'Print dimensions must be greater than zero.';
+    if (placement.designArea.x < 0 || placement.designArea.y < 0 || placement.designArea.width <= 0 || placement.designArea.height <= 0 || placement.designArea.x + placement.designArea.width > 100 || placement.designArea.y + placement.designArea.height > 100) {
+      errors[`tshirt.placement.${placement.id}.designArea`] = 'Placement design area must remain inside the mockup.';
+    }
+  }
+  for (const color of settings?.colors ?? []) {
+    for (const placement of settings.placements) {
+      if (!color.mockups[placement.id]?.imageUrl.trim()) errors[`tshirt.color.${color.value}.${placement.id}`] = `${color.label || color.value} needs a ${placement.label} mockup.`;
+    }
+  }
+  for (const variant of product.variants) {
+    const valueFor = (key: string) => Object.entries(variant.options ?? {}).find(([optionKey]) => optionKey.toLowerCase() === key.toLowerCase())?.[1]?.trim();
+    if (!valueFor(settings?.colorOptionKey ?? 'Color') || !valueFor(settings?.sizeOptionKey ?? 'Size')) errors[`tshirt.variant.${variant._id}`] = `${variant.name} needs color and size options.`;
+  }
+  return errors;
+}
+
 export function getProductReadiness(product: Product) {
   const missing: string[] = [];
   const basicErrors = validateProductBasicInfo({
@@ -222,7 +250,8 @@ export function getProductReadiness(product: Product) {
   const activeVariantsHaveDimensions = activeVariants.every(variantHasValidDimensions);
   const isPillow = product.productType === 'Pillow Print';
   const isMug = product.productType === 'Mug Print';
-  const usesVariantPrintArea = isPillow || isMug;
+  const isTShirt = product.productType === 'T-Shirt Print';
+  const usesVariantPrintArea = isPillow || isMug || isTShirt;
   const pillowSettingsValid = !isPillow || (
     product.pillow?.enabled === true
     && product.pillow.defaultLayout === 'full-bleed'
@@ -235,6 +264,7 @@ export function getProductReadiness(product: Product) {
   const mugSettingsValid = !isMug || (product.mug?.enabled === true && product.mug.defaultLayout === 'blank');
   const activeMugVariantsValid = !isMug
     || activeVariants.every((variant) => Object.keys(validateMugVariant(variant.mug)).length === 0);
+  const tshirtSettingsValid = !isTShirt || Object.keys(validateTShirtProduct(product)).length === 0;
   const previewVariant = activeVariants[0] ?? product.variants[0] ?? null;
   const hasSurface = usesVariantPrintArea ? activeVariants.length > 0 && activePillowVariantsValid && activeMugVariantsValid : !!product.surface;
   const surfaceValid = usesVariantPrintArea ? activePillowVariantsValid && activeMugVariantsValid : hasSurface && surfaceHasValidSettings(product.surface, previewVariant);
@@ -255,6 +285,7 @@ export function getProductReadiness(product: Product) {
   if (!activePillowVariantsValid) missing.push('Complete print areas and front/back mockups for every active pillow variant.');
   if (!mugSettingsValid) missing.push('Enable and complete the product-level mug settings.');
   if (!activeMugVariantsValid) missing.push('Complete print areas and GLB model settings for every active mug variant.');
+  if (!tshirtSettingsValid) missing.push('Complete T-shirt placements, color mockups, and variant Color/Size options.');
   if (!usesVariantPrintArea && !hasSurface) missing.push('Add a product surface configuration.');
   if (!usesVariantPrintArea && hasSurface && !surfaceValid) missing.push('Fix invalid surface bleed, safe area, code, or background color settings.');
   if (!hasExportRules) missing.push('Configure export rules.');
@@ -271,6 +302,7 @@ export function getProductReadiness(product: Product) {
     activePillowVariantsValid,
     mugSettingsValid,
     activeMugVariantsValid,
+    tshirtSettingsValid,
     hasSurface,
     surfaceValid,
     hasExportRules,

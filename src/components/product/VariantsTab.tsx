@@ -58,6 +58,14 @@ export function VariantsTab({ product, onSave }: Props) {
   const sortedDefinitions = useMemo(() => [...product.variantOptionDefinitions].sort((a, b) => a.sortOrder - b.sortOrder), [product.variantOptionDefinitions]);
   const definitionKeys = useMemo(() => new Set(product.variantOptionDefinitions.map((definition) => definition.key)), [product.variantOptionDefinitions]);
   const formOptions = useMemo(() => Object.fromEntries(form.options.filter((option) => option.key.trim()).map((option) => [option.key.trim(), option.value])), [form.options]);
+  const tshirtOptionErrors = useMemo(() => {
+    if (product.productType !== 'T-Shirt Print') return {};
+    const valueFor = (key: string) => Object.entries(formOptions).find(([optionKey]) => optionKey.toLowerCase() === key.toLowerCase())?.[1]?.trim();
+    const result: Record<string, string> = {};
+    if (!valueFor(product.tshirt.colorOptionKey)) result[`options.${product.tshirt.colorOptionKey}`] = `${product.tshirt.colorOptionKey} is required for T-shirt variants.`;
+    if (!valueFor(product.tshirt.sizeOptionKey)) result[`options.${product.tshirt.sizeOptionKey}`] = `${product.tshirt.sizeOptionKey} is required for T-shirt variants.`;
+    return result;
+  }, [formOptions, product.productType, product.tshirt]);
 
   const errors = useMemo(
     () => ({
@@ -75,8 +83,9 @@ export function VariantsTab({ product, onSave }: Props) {
       ...validateVariantOptions(formOptions, product.variantOptionDefinitions),
       ...(product.productType === 'Pillow Print' ? validatePillowVariant(form.pillow) : {}),
       ...(product.productType === 'Mug Print' ? validateMugVariant(form.mug) : {}),
+      ...tshirtOptionErrors,
     }),
-    [editingId, form.dpi, form.height, form.mug, form.name, form.pillow, form.price, form.sku, form.unit, form.width, formOptions, product.productType, product.variantOptionDefinitions, product.variants]
+    [editingId, form.dpi, form.height, form.mug, form.name, form.pillow, form.price, form.sku, form.unit, form.width, formOptions, product.productType, product.variantOptionDefinitions, product.variants, tshirtOptionErrors]
   );
   const isValid = Object.keys(errors).length === 0;
 
@@ -400,7 +409,18 @@ export function VariantsTab({ product, onSave }: Props) {
       )}
 
       {previewVariant && <VariantPreviewModal product={product} variant={previewVariant} onClose={() => setPreviewVariant(null)} />}
-      {bulkOpen && <BulkVariantsModal productId={product._id} existingVariants={product.variants} optionDefinitions={product.variantOptionDefinitions} onClose={() => setBulkOpen(false)} onImport={handleBulkImport} />}
+      {bulkOpen && (
+        <BulkVariantsModal
+          productId={product._id}
+          productType={product.productType}
+          tshirtColorOptionKey={product.tshirt.colorOptionKey}
+          tshirtSizeOptionKey={product.tshirt.sizeOptionKey}
+          existingVariants={product.variants}
+          optionDefinitions={product.variantOptionDefinitions}
+          onClose={() => setBulkOpen(false)}
+          onImport={handleBulkImport}
+        />
+      )}
     </div>
   );
 }

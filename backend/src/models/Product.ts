@@ -440,6 +440,52 @@ const mugProductSchema = new Schema(
   { _id: false }
 );
 
+const tshirtPlacementSchema = new Schema(
+  {
+    id: { type: String, required: true, trim: true },
+    label: { type: String, required: true, trim: true },
+    additionalPrice: { type: Number, default: 0, min: 0 },
+    designArea: { type: pillowDesignAreaSchema, default: () => ({ x: 34, y: 20, width: 32, height: 48, cornerRadius: 0 }) },
+    printArea: {
+      type: new Schema(
+        {
+          width: { type: Number, required: true, min: 0.0001 },
+          height: { type: Number, required: true, min: 0.0001 },
+          unit: { type: String, enum: ['inch', 'cm', 'mm'], default: 'inch' },
+          bleed: { type: pillowInsetsSchema, default: () => ({}) },
+          safeArea: { type: pillowInsetsSchema, default: () => ({}) },
+        },
+        { _id: false }
+      ),
+      required: true,
+    },
+  },
+  { _id: false }
+);
+
+const tshirtColorSchema = new Schema(
+  {
+    value: { type: String, required: true, trim: true },
+    label: { type: String, required: true, trim: true },
+    swatchColor: { type: String, default: '', trim: true },
+    swatchImageUrl: { type: String, default: '', trim: true },
+    mockups: { type: Schema.Types.Mixed, default: () => ({}) },
+  },
+  { _id: false }
+);
+
+const tshirtProductSchema = new Schema(
+  {
+    enabled: { type: Boolean, default: false },
+    colorOptionKey: { type: String, default: 'Color', trim: true },
+    sizeOptionKey: { type: String, default: 'Size', trim: true },
+    defaultPlacementId: { type: String, default: 'front', trim: true },
+    placements: { type: [tshirtPlacementSchema], default: [] },
+    colors: { type: [tshirtColorSchema], default: [] },
+  },
+  { _id: false }
+);
+
 const productSchema = new Schema(
   {
     accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
@@ -468,6 +514,7 @@ const productSchema = new Schema(
     photoBook: { type: photoBookSchema, default: () => ({}) },
     pillow: { type: pillowProductSchema, default: () => ({}) },
     mug: { type: mugProductSchema, default: () => ({}) },
+    tshirt: { type: tshirtProductSchema, default: () => ({}) },
   },
   { timestamps: true }
 );

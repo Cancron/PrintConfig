@@ -89,6 +89,7 @@ export async function calculatePrice(
         String(req.params.id),
         req.body.variantId,
         req.body.selectedOptions ?? {},
+        req.body.designedPlacementIds ?? req.body.tshirtPlacements ?? [],
       ),
     );
   } catch (e) {

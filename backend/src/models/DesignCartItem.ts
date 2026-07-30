@@ -18,6 +18,7 @@ const storageFileSchema = new Schema(
 const pagePreviewSchema = new Schema(
   {
     pageId: { type: String, default: '' },
+    placementId: { type: String, default: '' },
     pageNumber: { type: Number },
     url: { type: String, default: '' },
     publicUrl: { type: String, default: '' },
@@ -37,7 +38,7 @@ const designCartItemSchema = new Schema(
     accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
     merchantId: { type: Schema.Types.ObjectId, ref: 'Merchant', required: true, index: true },
     productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
-    productType: { type: String, enum: ['Photo Book Print', 'Photo Collage Print', 'Pillow Print', 'Mug Print'], default: 'Photo Book Print', index: true },
+    productType: { type: String, enum: ['Photo Book Print', 'Photo Collage Print', 'Pillow Print', 'Mug Print', 'T-Shirt Print'], default: 'Photo Book Print', index: true },
     userKey: { type: String, required: true, trim: true, index: true },
     projectId: { type: String, default: '', trim: true, index: true },
     status: { type: String, enum: ['cart', 'ordered', 'abandoned'], default: 'cart', index: true },
