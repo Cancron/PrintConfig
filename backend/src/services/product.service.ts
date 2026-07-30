@@ -1158,6 +1158,11 @@ export async function listDesignCartItems(filters: Record<string, string | undef
   }
   if (filters.status) query.status = filters.status;
   if (filters.printGenerationStatus) query.printGenerationStatus = filters.printGenerationStatus;
+  if (filters.productType) {
+    const allowedProductTypes = ['Photo Book Print', 'Photo Collage Print', 'Pillow Print', 'Mug Print', 'T-Shirt Print'];
+    if (!allowedProductTypes.includes(filters.productType)) throw new ApiError(400, 'Unsupported product type filter.');
+    query.productType = filters.productType;
+  }
   const items = await DesignCartItemModel.find(query).sort({ updatedAt: -1 }).limit(Math.min(Number(filters.limit ?? 100) || 100, 500)).lean();
   const productIds = [...new Set(items.map((item) => String(item.productId)))];
   const jobIds = items.map((item) => String(item._id));

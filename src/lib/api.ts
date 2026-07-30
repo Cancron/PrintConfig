@@ -259,11 +259,12 @@ function galleryQuery(input: { accountId: string; merchantId?: string; folderId?
   return params.toString();
 }
 
-function cartItemsQuery(input: { accountId: string; merchantId?: string; status?: string; printGenerationStatus?: string; limit?: number }) {
+function cartItemsQuery(input: { accountId: string; merchantId?: string; status?: string; printGenerationStatus?: string; productType?: string; limit?: number }) {
   const params = new URLSearchParams({ accountId: input.accountId });
   if (input.merchantId) params.set('merchantId', input.merchantId);
   if (input.status) params.set('status', input.status);
   if (input.printGenerationStatus) params.set('printGenerationStatus', input.printGenerationStatus);
+  if (input.productType) params.set('productType', input.productType);
   if (input.limit) params.set('limit', String(input.limit));
   return params.toString();
 }
@@ -372,7 +373,7 @@ export const api = {
   updateImageAsset: (asset: ImageAsset) => request<any>(`/image-assets/${asset._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(asset))) }).then(normalizeAsset),
   deleteImageAsset: (id: string) => request(`/image-assets/${id}`, { method: 'DELETE' }),
   moveImageAsset: (id: string, folderId?: string | null) => request<any>(`/image-assets/${id}/move`, { method: 'POST', body: JSON.stringify({ folderId: folderId || null }) }).then(normalizeAsset),
-  listDesignCartItems: (filters: { accountId: string; merchantId?: string; status?: string; printGenerationStatus?: string; limit?: number }) => request<DesignCartItem[]>(`/products/cart-items?${cartItemsQuery(filters)}`),
+  listDesignCartItems: (filters: { accountId: string; merchantId?: string; status?: string; printGenerationStatus?: string; productType?: string; limit?: number }) => request<DesignCartItem[]>(`/products/cart-items?${cartItemsQuery(filters)}`),
   getDesignCartItem: (id: string) => request<DesignCartItem>(`/products/cart-items/${id}`),
   processDesignCartItem: (id: string, input: { orderId?: string; force?: boolean } = {}) => request<any>(`/products/cart-items/${id}/process-admin`, { method: 'POST', body: JSON.stringify(input) }),
   markDesignCartItemOrdered: (id: string, input: { orderId?: string; force?: boolean } = {}) => request<any>(`/products/cart-items/${id}/mark-ordered`, { method: 'POST', body: JSON.stringify(input) }),

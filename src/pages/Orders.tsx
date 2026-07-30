@@ -24,22 +24,32 @@ const printStatusOptions = [
   { value: 'failed', label: 'Failed' },
 ];
 
+const productTypeOptions = [
+  { value: '', label: 'All product types' },
+  { value: 'Photo Book Print', label: 'Photo Book Print' },
+  { value: 'Photo Collage Print', label: 'Photo Collage Print' },
+  { value: 'Pillow Print', label: 'Pillow Print' },
+  { value: 'Mug Print', label: 'Mug Print' },
+  { value: 'T-Shirt Print', label: 'T-Shirt Print' },
+];
+
 export function Orders() {
   const { account, selectedMerchantId } = useWorkspace();
   const [items, setItems] = useState<DesignCartItem[]>([]);
   const [status, setStatus] = useState('ordered');
   const [printStatus, setPrintStatus] = useState('');
+  const [productType, setProductType] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(() => {
     setLoading(true);
     setError('');
-    api.listDesignCartItems({ accountId: account._id, merchantId: selectedMerchantId, status, printGenerationStatus: printStatus, limit: 200 })
+    api.listDesignCartItems({ accountId: account._id, merchantId: selectedMerchantId, status, printGenerationStatus: printStatus, productType, limit: 200 })
       .then(setItems)
       .catch((reason) => setError(reason instanceof Error ? reason.message : 'Could not load orders.'))
       .finally(() => setLoading(false));
-  }, [account._id, printStatus, selectedMerchantId, status]);
+  }, [account._id, printStatus, productType, selectedMerchantId, status]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -53,6 +63,7 @@ export function Orders() {
       <div className="mb-4 grid gap-3 rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200 sm:grid-cols-2 lg:grid-cols-4">
         <Select label="Order Status" value={status} onChange={(event) => setStatus(event.target.value)} options={statusOptions} />
         <Select label="Generation Status" value={printStatus} onChange={(event) => setPrintStatus(event.target.value)} options={printStatusOptions} />
+        <Select label="Product Type" value={productType} onChange={(event) => setProductType(event.target.value)} options={productTypeOptions} />
       </div>
       {error && <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700 ring-1 ring-red-200">{error}</div>}
       {items.length === 0 && !loading ? <EmptyState title="No orders found" description="Saved cart designs and processed jobs will appear here." /> : (
