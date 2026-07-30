@@ -243,7 +243,7 @@ export function TShirtSettingsTab({ product, onSave }: Props) {
               <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Mockup Design Region</h3>
-                  <p className="mt-1 text-sm text-gray-500">Draw on empty image space, drag the rectangle, or resize it from a corner.</p>
+                  <p className="mt-1 text-sm text-gray-500">Draw on empty image space, drag the rectangle, or resize it from a corner. Its shape follows the placement print ratio.</p>
                 </div>
                 <div className="w-full sm:w-64">
                   <Select label="Garment Color" value={color ? String(colorIndex) : ''} onChange={(event) => setColorIndex(Number(event.target.value))} options={draft.colors.map((item, index) => ({ value: String(index), label: item.label || item.value }))} />
@@ -254,7 +254,13 @@ export function TShirtSettingsTab({ product, onSave }: Props) {
                 <div className="border-y border-dashed border-gray-300 py-10 text-center text-sm text-gray-500">Add a garment color before configuring placement mockups.</div>
               ) : (
                 <div className="grid grid-cols-1 overflow-hidden border-y border-gray-200 lg:grid-cols-[minmax(0,1fr)_340px]">
-                  <PercentageRectangleEditor imageUrl={mockup.imageUrl} imageAlt={`${color.label} ${placement.label} T-shirt mockup`} value={placement.designArea} onChange={(designArea) => updatePlacement({ ...placement, designArea })} />
+                  <PercentageRectangleEditor
+                    imageUrl={mockup.imageUrl}
+                    imageAlt={`${color.label} ${placement.label} T-shirt mockup`}
+                    value={placement.designArea}
+                    aspectRatio={placement.printArea.width / placement.printArea.height}
+                    onChange={(designArea) => updatePlacement({ ...placement, designArea })}
+                  />
                   <aside className="space-y-4 border-t border-gray-200 p-5 lg:border-l lg:border-t-0">
                     <ImageField label="Mockup Image URL" url={mockup.imageUrl} assetId={mockup.imageAssetId} onChange={(imageUrl, imageAssetId) => updateMockup({ ...mockup, imageUrl, imageAssetId })} />
                     {errors[`mockup.${colorIndex}.${placementIndex}.imageUrl`] && <p className="-mt-3 text-sm text-red-600">{errors[`mockup.${colorIndex}.${placementIndex}.imageUrl`]}</p>}

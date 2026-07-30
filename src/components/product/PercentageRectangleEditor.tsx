@@ -12,6 +12,7 @@ interface Props {
   imageUrl: string;
   imageAlt: string;
   value: PercentageRectangle;
+  aspectRatio?: number;
   onChange: (value: PercentageRectangle) => void;
 }
 
@@ -24,15 +25,32 @@ type Interaction = {
   corner?: Corner;
 };
 
-export function PercentageRectangleEditor({ imageUrl, imageAlt, value, onChange }: Props) {
+export function PercentageRectangleEditor({ imageUrl, imageAlt, value, aspectRatio, onChange }: Props) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const interactionRef = useRef<Interaction | null>(null);
+  const lastConstrainedRef = useRef<PercentageRectangle>(value);
   const [loadedUrl, setLoadedUrl] = useState('');
+  const [imageAspectRatio, setImageAspectRatio] = useState(0);
 
   useEffect(() => {
     setLoadedUrl('');
+    setImageAspectRatio(0);
     interactionRef.current = null;
   }, [imageUrl]);
+
+  const rectangleAspectRatio = validRatio(aspectRatio) && validRatio(imageAspectRatio)
+    ? aspectRatio / imageAspectRatio
+    : undefined;
+
+  useEffect(() => {
+    if (!rectangleAspectRatio || loadedUrl !== imageUrl) return;
+    const previous = lastConstrainedRef.current;
+    const widthChange = Math.abs(Number(value.width) - Number(previous.width));
+    const heightChange = Math.abs(Number(value.height) - Number(previous.height));
+    const next = fitRectangleToAspect(value, rectangleAspectRatio, heightChange > widthChange ? 'height' : 'width');
+    lastConstrainedRef.current = { ...value, ...next };
+    if (!sameRectangle(value, next)) onChange({ ...value, ...next });
+  }, [imageUrl, loadedUrl, onChange, rectangleAspectRatio, value]);
 
   function pointerPercent(event: React.PointerEvent) {
     const rect = wrapperRef.current?.getBoundingClientRect();
@@ -73,11 +91,18 @@ export function PercentageRectangleEditor({ imageUrl, imageAlt, value, onChange 
     if (!interaction || !point) return;
 
     if (interaction.type === 'draw') {
-      const left = Math.min(interaction.startX, point.x);
-      const right = Math.max(interaction.startX, point.x);
-      const top = Math.min(interaction.startY, point.y);
-      const bottom = Math.max(interaction.startY, point.y);
-      onChange({ ...value, x: left, y: top, width: Math.max(1, right - left), height: Math.max(1, bottom - top) });
+      if (rectangleAspectRatio) {
+        onChange({
+          ...value,
+          ...rectangleFromAnchor(interaction.startX, interaction.startY, point.x, point.y, rectangleAspectRatio),
+        });
+      } else {
+        const left = Math.min(interaction.startX, point.x);
+        const right = Math.max(interaction.startX, point.x);
+        const top = Math.min(interaction.startY, point.y);
+        const bottom = Math.max(interaction.startY, point.y);
+        onChange({ ...value, x: left, y: top, width: Math.max(1, right - left), height: Math.max(1, bottom - top) });
+      }
       return;
     }
 
@@ -94,6 +119,12 @@ export function PercentageRectangleEditor({ imageUrl, imageAlt, value, onChange 
 
     const initialRight = interaction.initial.x + interaction.initial.width;
     const initialBottom = interaction.initial.y + interaction.initial.height;
+    if (rectangleAspectRatio) {
+      const anchorX = interaction.corner?.includes('w') ? initialRight : interaction.initial.x;
+      const anchorY = interaction.corner?.includes('n') ? initialBottom : interaction.initial.y;
+      onChange({ ...value, ...rectangleFromAnchor(anchorX, anchorY, point.x, point.y, rectangleAspectRatio) });
+      return;
+    }
     const left = interaction.corner?.includes('w') ? clamp(point.x, 0, initialRight - 1) : interaction.initial.x;
     const right = interaction.corner?.includes('e') ? clamp(point.x, interaction.initial.x + 1, 100) : initialRight;
     const top = interaction.corner?.includes('n') ? clamp(point.y, 0, initialBottom - 1) : interaction.initial.y;
@@ -124,7 +155,10 @@ export function PercentageRectangleEditor({ imageUrl, imageAlt, value, onChange 
           <img
             src={imageUrl}
             alt={imageAlt}
-            onLoad={() => setLoadedUrl(imageUrl)}
+            onLoad={(event) => {
+              setLoadedUrl(imageUrl);
+              setImageAspectRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight);
+            }}
             className="block h-auto max-h-[70vh] w-auto max-w-full object-contain"
             draggable={false}
           />
@@ -175,6 +209,56 @@ function normalizeRectangle(value: PercentageRectangle) {
     width,
     height,
   };
+}
+
+function rectangleFromAnchor(anchorX: number, anchorY: number, pointerX: number, pointerY: number, aspectRatio: number) {
+  const directionX = pointerX < anchorX ? -1 : 1;
+  const directionY = pointerY < anchorY ? -1 : 1;
+  const availableWidth = directionX < 0 ? anchorX : 100 - anchorX;
+  const availableHeight = directionY < 0 ? anchorY : 100 - anchorY;
+  const pointerWidth = Math.abs(pointerX - anchorX);
+  const pointerHeight = Math.abs(pointerY - anchorY);
+
+  let width = Math.max(pointerWidth, pointerHeight * aspectRatio, Math.min(1, availableWidth));
+  let height = width / aspectRatio;
+  const scale = Math.min(1, availableWidth / width, availableHeight / height);
+  width = Math.max(0.1, width * scale);
+  height = Math.max(0.1, height * scale);
+
+  return {
+    x: directionX < 0 ? anchorX - width : anchorX,
+    y: directionY < 0 ? anchorY - height : anchorY,
+    width,
+    height,
+  };
+}
+
+function fitRectangleToAspect(value: PercentageRectangle, aspectRatio: number, driver: 'width' | 'height') {
+  const centerX = clamp(finite(value.x, 0) + finite(value.width, 1) / 2, 0, 100);
+  const centerY = clamp(finite(value.y, 0) + finite(value.height, 1) / 2, 0, 100);
+  let width = driver === 'height'
+    ? clamp(finite(value.height, 1), 0.1, 100) * aspectRatio
+    : clamp(finite(value.width, 1), 0.1, 100);
+  let height = driver === 'height'
+    ? clamp(finite(value.height, 1), 0.1, 100)
+    : width / aspectRatio;
+  const scale = Math.min(1, 100 / width, 100 / height);
+  width *= scale;
+  height *= scale;
+  return {
+    x: clamp(centerX - width / 2, 0, 100 - width),
+    y: clamp(centerY - height / 2, 0, 100 - height),
+    width,
+    height,
+  };
+}
+
+function sameRectangle(current: PercentageRectangle, next: PercentageRectangle) {
+  return (['x', 'y', 'width', 'height'] as const).every((key) => Math.abs(Number(current[key]) - Number(next[key])) < 0.001);
+}
+
+function validRatio(value: number | undefined): value is number {
+  return Number.isFinite(value) && Number(value) > 0;
 }
 
 function finite(value: number, fallback: number) {
