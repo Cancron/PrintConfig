@@ -102,6 +102,13 @@ export async function renderDesignPageToImageBuffer(input: RenderDesignPageInput
   const design = isRecord(input.design) ? input.design : {};
   const styleScale = input.widthPx / EDITOR_PAGE_REFERENCE_WIDTH;
   const photoUrlById = getPhotoUrlMap(design, input.cartItem);
+  const transparentBackground = input.format !== 'jpeg' && input.transparentBackground === true;
+
+  // JPEG has no alpha channel, so establish a white matte before page artwork.
+  if (input.format === 'jpeg') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, input.widthPx, input.heightPx);
+  }
 
   await drawPageBackground(
     ctx,
@@ -110,7 +117,7 @@ export async function renderDesignPageToImageBuffer(input: RenderDesignPageInput
     input.widthPx,
     input.heightPx,
     styleScale,
-    input.transparentBackground === true,
+    transparentBackground,
   );
 
   const elements = Array.isArray(input.page.elements) ? input.page.elements.filter(isRecord) : [];
@@ -305,18 +312,34 @@ function drawPhotoBookText(ctx: CanvasRenderingContext2D, element: Record<string
   const content = stringValue(element.content, '').trim();
   if (!content || EMPTY_TEXT_VALUES.has(content)) return;
   const style = isRecord(element.style) ? element.style : {};
+  const opacity = clamp(numberValue(style.opacity, 1), 0, 1);
   const fontSize = numberValue(style.fontSize, 24) * styleScale;
   const lineHeight = fontSize * numberValue(style.lineHeight, 1.2);
   const fontWeight = style.bold ? '700' : stringValue(style.fontWeight, '400');
   const fontFamily = quoteFontFamily(stringValue(style.fontFamily, 'Arial'));
+  const backgroundColor = stringValue(style.backgroundColor, '#ffffff');
+  const backgroundOpacity = clamp(numberValue(style.backgroundOpacity, 0), 0, 1);
+  const padding = Math.max(0, numberValue(style.backgroundPadding, 0) * styleScale);
+  const radius = Math.max(0, numberValue(style.backgroundRadius, 0) * styleScale);
   const lines = content.split(/\r?\n/);
+  const contentWidth = Math.max(0, width - padding * 2);
+  const contentHeight = Math.max(0, height - padding * 2);
   const totalHeight = lines.length * lineHeight;
-  const startY = (height - totalHeight) / 2 + fontSize * 0.82;
+  const startY = padding + (contentHeight - totalHeight) / 2 + fontSize * 0.82;
   const align = normalizeTextAlign(stringValue(style.textAlign, 'left'));
-  const textX = align === 'center' ? width / 2 : align === 'right' ? width : 0;
+  const textX = align === 'center' ? width / 2 : align === 'right' ? width - padding : padding;
+
+  if (backgroundOpacity > 0) {
+    ctx.save();
+    ctx.globalAlpha *= opacity * backgroundOpacity;
+    ctx.fillStyle = backgroundColor;
+    roundedRect(ctx, 0, 0, width, height, radius);
+    ctx.fill();
+    ctx.restore();
+  }
 
   ctx.save();
-  ctx.globalAlpha *= numberValue(style.opacity, 1);
+  ctx.globalAlpha *= opacity;
   ctx.beginPath();
   ctx.rect(0, 0, width, height);
   ctx.clip();
@@ -324,7 +347,9 @@ function drawPhotoBookText(ctx: CanvasRenderingContext2D, element: Record<string
   ctx.fillStyle = stringValue(style.color, '#111827');
   ctx.textAlign = align;
   ctx.textBaseline = 'alphabetic';
-  lines.forEach((lineText, index) => ctx.fillText(lineText, textX, startY + index * lineHeight, width));
+  if (contentWidth > 0 && contentHeight > 0) {
+    lines.forEach((lineText, index) => ctx.fillText(lineText, textX, startY + index * lineHeight, contentWidth));
+  }
   ctx.restore();
 }
 
