@@ -1935,6 +1935,7 @@ async function generateFinalPrintImages(cartItem: Record<string, any>, orderPref
   const rasterOutput = resolveFinalPrintRasterOutput(design, product);
   const supabase = getSupabaseAdmin();
   const output = [];
+  const generationVersion = Date.now().toString(36);
   cartItem.printGenerationTotalPages = pages.length;
   cartItem.printGenerationCompletedPages = 0;
   cartItem.printGenerationCurrentPage = 0;
@@ -1966,9 +1967,10 @@ async function generateFinalPrintImages(cartItem: Record<string, any>, orderPref
     });
     if (error) throw new ApiError(502, `Final print generation upload failed: ${error.message}`);
     const { data } = supabase.storage.from(galleryBucket).getPublicUrl(storagePath);
+    const publicUrl = appendUrlQuery(data.publicUrl, 'v', generationVersion);
     const file = {
-      url: data.publicUrl,
-      publicUrl: data.publicUrl,
+      url: publicUrl,
+      publicUrl,
       storageProvider: 'supabase',
       bucket: galleryBucket,
       storagePath,
@@ -2034,6 +2036,11 @@ function resolveFinalPrintRasterOutput(design: unknown, product: any) {
 function replaceFilenameExtension(filename: string, extension: string) {
   const normalized = String(filename || 'final-print').replace(/\.[^.]+$/, '');
   return `${normalized}.${extension}`;
+}
+
+function appendUrlQuery(url: string, key: string, value: string) {
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
 }
 
 async function readDesignJsonFromStorage(storagePath: string) {
