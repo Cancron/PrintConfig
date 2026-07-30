@@ -680,9 +680,51 @@ export async function listProducts(filters: Record<string, string | undefined>) 
   const accountId = resolveAccountId(filters.accountId);
   const query: Record<string, unknown> = visibleQuery(accountId, filters.merchantId);
   if (filters.categoryId) query.categoryId = filters.categoryId;
-  if (filters.status) query.status = filters.status;
+  if (filters.status) query.status = filters.status.toLowerCase();
   if (filters.scope) query.scope = filters.scope;
-  if (filters.search) query.name = { $regex: filters.search, $options: 'i' };
+  if (filters.productType) query.productType = filters.productType;
+  if (filters.search) {
+    const search = filters.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (search) query.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { slug: { $regex: search, $options: 'i' } },
+    ];
+  }
+
+  if (filters.summary === 'true') {
+    const requestedPage = Number(filters.page ?? 1);
+    const requestedPageSize = Number(filters.pageSize ?? 25);
+    const pageSize = Math.min(500, Math.max(1, Number.isFinite(requestedPageSize) ? Math.floor(requestedPageSize) : 25));
+    const total = await ProductModel.countDocuments(query);
+    const pageCount = Math.max(1, Math.ceil(total / pageSize));
+    const page = Math.min(pageCount, Math.max(1, Number.isFinite(requestedPage) ? Math.floor(requestedPage) : 1));
+    const products = await ProductModel.find(query)
+      .select('_id accountId merchantId scope name slug productType status basePrice thumbnailUrl categoryId variants._id optionGroups._id createdAt updatedAt')
+      .sort({ updatedAt: -1, name: 1 })
+      .skip((page - 1) * pageSize)
+      .limit(pageSize)
+      .lean();
+    return {
+      items: products.map((product: any) => ({
+        _id: product._id,
+        accountId: product.accountId,
+        merchantId: product.merchantId ?? null,
+        scope: product.scope,
+        name: product.name,
+        slug: product.slug,
+        productType: product.productType,
+        status: product.status,
+        basePrice: product.basePrice,
+        thumbnailUrl: product.thumbnailUrl,
+        categoryId: product.categoryId,
+        variantCount: Array.isArray(product.variants) ? product.variants.length : 0,
+        optionGroupCount: Array.isArray(product.optionGroups) ? product.optionGroups.length : 0,
+        createdAt: product.createdAt,
+        updatedAt: product.updatedAt,
+      })),
+      pagination: { page, pageSize, total, pageCount },
+    };
+  }
   return ProductModel.find(query).sort({ categoryId: 1, name: 1 });
 }
 
@@ -1162,6 +1204,117 @@ export async function listDesignCartItems(filters: Record<string, string | undef
     const allowedProductTypes = ['Photo Book Print', 'Photo Collage Print', 'Pillow Print', 'Mug Print', 'T-Shirt Print'];
     if (!allowedProductTypes.includes(filters.productType)) throw new ApiError(400, 'Unsupported product type filter.');
     query.productType = filters.productType;
+  }
+  if (filters.summary === 'true') {
+    const requestedPage = Number(filters.page ?? 1);
+    const requestedPageSize = Number(filters.pageSize ?? 25);
+    const pageSize = Math.min(100, Math.max(1, Number.isFinite(requestedPageSize) ? Math.floor(requestedPageSize) : 25));
+    const total = await DesignCartItemModel.countDocuments(query);
+    const pageCount = Math.max(1, Math.ceil(total / pageSize));
+    const page = Math.min(pageCount, Math.max(1, Number.isFinite(requestedPage) ? Math.floor(requestedPage) : 1));
+    const aggregateQuery: Record<string, unknown> = {
+      ...query,
+      accountId: new Types.ObjectId(accountId),
+      ...(filters.merchantId ? { merchantId: new Types.ObjectId(filters.merchantId) } : {}),
+    };
+    const items = await DesignCartItemModel.aggregate([
+      { $match: aggregateQuery },
+      { $sort: { updatedAt: -1 } },
+      { $skip: (page - 1) * pageSize },
+      { $limit: pageSize },
+      {
+        $project: {
+          accountId: 1,
+          merchantId: 1,
+          productId: 1,
+          productType: 1,
+          userKey: 1,
+          projectId: 1,
+          status: 1,
+          orderId: 1,
+          printGenerationStatus: 1,
+          printGenerationError: 1,
+          printGenerationTotalPages: 1,
+          printGenerationCompletedPages: 1,
+          printGenerationCurrentPage: 1,
+          pagePreviews: {
+            $map: {
+              input: { $slice: [{ $ifNull: ['$pagePreviews', []] }, 1] },
+              as: 'preview',
+              in: {
+                publicUrl: '$$preview.publicUrl',
+                url: '$$preview.url',
+                filename: '$$preview.filename',
+              },
+            },
+          },
+          pagePreviewCount: { $size: { $ifNull: ['$pagePreviews', []] } },
+          finalPrintFiles: {
+            $map: {
+              input: { $slice: [{ $ifNull: ['$finalPrintFiles', []] }, 1] },
+              as: 'print',
+              in: {
+                publicUrl: '$$print.publicUrl',
+                url: '$$print.url',
+                filename: '$$print.filename',
+              },
+            },
+          },
+          finalPrintCount: { $size: { $ifNull: ['$finalPrintFiles', []] } },
+          addedToCartAt: 1,
+          orderedAt: 1,
+          lastActivityAt: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+    ]);
+    const productIds = [...new Set(items.map((item) => String(item.productId)))];
+    const cartItemIds = items.map((item) => item._id);
+    const [products, jobs] = await Promise.all([
+      ProductModel.find({ _id: { $in: productIds } }).select('name slug productType').lean(),
+      DesignProcessingJobModel.find({ cartItemId: { $in: cartItemIds } })
+        .select('cartItemId status attempts error createdAt updatedAt startedAt completedAt')
+        .sort({ createdAt: -1 })
+        .lean(),
+    ]);
+    const productMap = new Map(products.map((product: any) => [String(product._id), product]));
+    const latestJobMap = new Map<string, any>();
+    for (const job of jobs) {
+      const key = String(job.cartItemId);
+      if (!latestJobMap.has(key)) latestJobMap.set(key, job);
+    }
+    return {
+      items: items.map((item) => {
+        const product: any = productMap.get(String(item.productId));
+        const finalPrintCount = Number(item.finalPrintCount ?? 0);
+        const pagePreviewCount = Number(item.pagePreviewCount ?? 0);
+        const totalPages = Number(item.printGenerationTotalPages ?? 0) > 0
+          ? Number(item.printGenerationTotalPages)
+          : item.printGenerationStatus === 'complete' && finalPrintCount > 0
+            ? finalPrintCount
+            : Math.max(finalPrintCount, pagePreviewCount);
+        return {
+          ...item,
+          _id: String(item._id),
+          accountId: String(item.accountId),
+          merchantId: String(item.merchantId),
+          productId: String(item.productId),
+          productType: normalizeDesignProductType(product?.productType, item.productType),
+          projectId: String(item.projectId ?? ''),
+          product: product ? { _id: String(product._id), name: product.name, slug: product.slug, productType: product.productType } : null,
+          pagePreviewCount,
+          finalPrintCount,
+          printGenerationTotalPages: totalPages,
+          printGenerationCompletedPages: Number(item.printGenerationCompletedPages ?? 0) > 0
+            ? Number(item.printGenerationCompletedPages)
+            : finalPrintCount,
+          printGenerationCurrentPage: Number(item.printGenerationCurrentPage ?? 0),
+          latestJob: normalizeLeanJob(latestJobMap.get(String(item._id))),
+        };
+      }),
+      pagination: { page, pageSize, total, pageCount },
+    };
   }
   const items = await DesignCartItemModel.find(query).sort({ updatedAt: -1 }).limit(Math.min(Number(filters.limit ?? 100) || 100, 500)).lean();
   const productIds = [...new Set(items.map((item) => String(item.productId)))];

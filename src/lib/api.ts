@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Collage, DesignCartItem, ImageAsset, ImageFolder, LayoutCategory, LayoutElement, LayoutTemplate, LayoutTemplatePage, Merchant, Product, ProductCategory } from '../types';
+import type { Collage, DesignCartItem, DesignCartItemSummary, ImageAsset, ImageFolder, LayoutCategory, LayoutElement, LayoutTemplate, LayoutTemplatePage, Merchant, Product, ProductCategory, ProductSummary, ProductType } from '../types';
 import { normalizeVariantOptionDefinitions } from './variantOptions';
 import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPreview';
 import { normalizeFrontendContent } from './frontendContent';
@@ -259,13 +259,17 @@ function galleryQuery(input: { accountId: string; merchantId?: string; folderId?
   return params.toString();
 }
 
-function cartItemsQuery(input: { accountId: string; merchantId?: string; status?: string; printGenerationStatus?: string; productType?: string; limit?: number }) {
-  const params = new URLSearchParams({ accountId: input.accountId });
+function cartItemsQuery(input: { accountId: string; merchantId?: string; status?: string; printGenerationStatus?: string; productType?: string; page: number; pageSize: number }) {
+  const params = new URLSearchParams({
+    accountId: input.accountId,
+    summary: 'true',
+    page: String(input.page),
+    pageSize: String(input.pageSize),
+  });
   if (input.merchantId) params.set('merchantId', input.merchantId);
   if (input.status) params.set('status', input.status);
   if (input.printGenerationStatus) params.set('printGenerationStatus', input.printGenerationStatus);
   if (input.productType) params.set('productType', input.productType);
-  if (input.limit) params.set('limit', String(input.limit));
   return params.toString();
 }
 
@@ -312,6 +316,42 @@ function normalizeProduct(raw: any): Product {
   product.roomPreviews = liftLegacyRoomPreviews(product);
   product.variants = product.variants.map((variant) => ({ ...variant, roomPreviews: undefined }));
   return product;
+}
+
+function normalizeProductSummary(raw: any): ProductSummary {
+  return {
+    _id: idOf(raw),
+    accountId: String(raw.accountId ?? ''),
+    merchantId: raw.merchantId ? String(raw.merchantId) : null,
+    scope: raw.scope === 'merchant' ? 'merchant' : 'shared',
+    name: String(raw.name ?? ''),
+    slug: String(raw.slug ?? ''),
+    productType: raw.productType as ProductType,
+    status: raw.status === 'active' || raw.status === 'Active' ? 'Active' : 'Draft',
+    basePrice: Number(raw.basePrice ?? 0),
+    thumbnailUrl: String(raw.thumbnailUrl ?? ''),
+    categoryId: String(raw.categoryId ?? ''),
+    variantCount: Number(raw.variantCount ?? 0),
+    optionGroupCount: Number(raw.optionGroupCount ?? 0),
+    createdAt: raw.createdAt ?? '',
+    updatedAt: raw.updatedAt ?? '',
+  };
+}
+
+function productSummaryQuery(input: { accountId: string; merchantId?: string; search?: string; productType?: string; status?: string; scope?: string; categoryId?: string; page: number; pageSize: number }) {
+  const params = new URLSearchParams({
+    accountId: input.accountId,
+    summary: 'true',
+    page: String(input.page),
+    pageSize: String(input.pageSize),
+  });
+  if (input.merchantId) params.set('merchantId', input.merchantId);
+  if (input.search) params.set('search', input.search);
+  if (input.productType) params.set('productType', input.productType);
+  if (input.status) params.set('status', input.status);
+  if (input.scope) params.set('scope', input.scope);
+  if (input.categoryId) params.set('categoryId', input.categoryId);
+  return params.toString();
 }
 
 function normalizeProductLayoutSettings(raw: any) {
@@ -373,7 +413,16 @@ export const api = {
   updateImageAsset: (asset: ImageAsset) => request<any>(`/image-assets/${asset._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(asset))) }).then(normalizeAsset),
   deleteImageAsset: (id: string) => request(`/image-assets/${id}`, { method: 'DELETE' }),
   moveImageAsset: (id: string, folderId?: string | null) => request<any>(`/image-assets/${id}/move`, { method: 'POST', body: JSON.stringify({ folderId: folderId || null }) }).then(normalizeAsset),
-  listDesignCartItems: (filters: { accountId: string; merchantId?: string; status?: string; printGenerationStatus?: string; productType?: string; limit?: number }) => request<DesignCartItem[]>(`/products/cart-items?${cartItemsQuery(filters)}`),
+  listDesignCartItems: (filters: { accountId: string; merchantId?: string; status?: string; printGenerationStatus?: string; productType?: string; page: number; pageSize: number }) =>
+    request<any>(`/products/cart-items?${cartItemsQuery(filters)}`).then((result) => ({
+      items: (result.items ?? []) as DesignCartItemSummary[],
+      pagination: {
+        page: Number(result.pagination?.page ?? filters.page),
+        pageSize: Number(result.pagination?.pageSize ?? filters.pageSize),
+        total: Number(result.pagination?.total ?? 0),
+        pageCount: Number(result.pagination?.pageCount ?? 1),
+      },
+    })),
   getDesignCartItem: (id: string) => request<DesignCartItem>(`/products/cart-items/${id}`),
   processDesignCartItem: (id: string, input: { orderId?: string; force?: boolean } = {}) => request<any>(`/products/cart-items/${id}/process-admin`, { method: 'POST', body: JSON.stringify(input) }),
   markDesignCartItemOrdered: (id: string, input: { orderId?: string; force?: boolean } = {}) => request<any>(`/products/cart-items/${id}/mark-ordered`, { method: 'POST', body: JSON.stringify(input) }),
@@ -420,6 +469,17 @@ export const api = {
   deleteCategory: (id: string) => request(`/categories/${id}`, { method: 'DELETE' }),
   duplicateCategory: (id: string, includeProducts: boolean) => request<any>(`/categories/${id}/duplicate`, { method: 'POST', body: JSON.stringify({ includeProducts }) }).then((result) => ({ category: normalizeCategory(result.category), products: (result.products ?? []).map(normalizeProduct) })),
   listProducts: (accountId: string, merchantId: string) => request<any[]>(`/products?accountId=${encodeURIComponent(accountId)}&merchantId=${encodeURIComponent(merchantId)}`).then((items) => items.map(normalizeProduct)),
+  listProductSummaries: (filters: { accountId: string; merchantId?: string; search?: string; productType?: string; status?: string; scope?: string; categoryId?: string; page: number; pageSize: number }) =>
+    request<any>(`/products?${productSummaryQuery(filters)}`).then((result) => ({
+      items: (result.items ?? []).map(normalizeProductSummary),
+      pagination: {
+        page: Number(result.pagination?.page ?? filters.page),
+        pageSize: Number(result.pagination?.pageSize ?? filters.pageSize),
+        total: Number(result.pagination?.total ?? 0),
+        pageCount: Number(result.pagination?.pageCount ?? 1),
+      },
+    })),
+  getProduct: (id: string) => request<any>(`/products/${id}`).then(normalizeProduct),
   createProduct: (product: Product) => request<any>('/products', { method: 'POST', body: JSON.stringify(productPayload(product)) }).then(normalizeProduct),
   updateProduct: (product: Product) => request<any>(`/products/${product._id}`, { method: 'PUT', body: JSON.stringify(productPayload(product)) }).then(normalizeProduct),
   deleteProduct: (id: string) => request(`/products/${id}`, { method: 'DELETE' }),

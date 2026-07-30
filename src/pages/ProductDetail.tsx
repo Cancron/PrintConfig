@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Copy, Download, Upload, X, XCircle } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
-import type { Product, ProductScope } from '../types';
+import type { Product, ProductScope, ProductSummary } from '../types';
 import { Tabs } from '../components/ui/Tabs';
 import { Badge } from '../components/ui/Badge';
-import { useProducts } from '../hooks/useProducts';
 import { useWorkspace } from '../hooks/useWorkspace';
+import { api } from '../lib/api';
 import { parseImportedProduct } from '../lib/productConfig';
 import { getProductReadiness } from '../lib/validation';
 import { BasicInfoTab } from '../components/product/BasicInfoTab';
@@ -25,20 +25,79 @@ export function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { products, addProduct, updateProduct, duplicateProduct, account, selectedMerchantId } = useProducts();
-  const { merchants, selectedMerchant } = useWorkspace();
+  const { account, selectedMerchantId, merchants, selectedMerchant } = useWorkspace();
+  const [product, setProduct] = useState<Product | null>(null);
+  const [products, setProducts] = useState<ProductSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importJson, setImportJson] = useState('');
   const [importError, setImportError] = useState('');
   const [importScope, setImportScope] = useState<ProductScope>('shared');
 
-  const product = products.find((p) => p._id === id);
+  useEffect(() => {
+    let cancelled = false;
+    if (!id) {
+      setLoading(false);
+      setLoadError('Product ID is missing.');
+      return;
+    }
+    setLoading(true);
+    setLoadError('');
+    Promise.all([
+      api.getProduct(id),
+      api.listProductSummaries({ accountId: account._id, merchantId: selectedMerchantId, page: 1, pageSize: 500 }),
+    ])
+      .then(([loadedProduct, summaries]) => {
+        if (cancelled) return;
+        setProduct(loadedProduct);
+        setProducts(summaries.items);
+      })
+      .catch((reason) => {
+        if (!cancelled) setLoadError(reason instanceof Error ? reason.message : 'Could not load product.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [account._id, id, selectedMerchantId]);
+
+  const updateProduct = useCallback((updated: Product) => {
+    setProduct(updated);
+    api.updateProduct(updated)
+      .then((saved) => {
+        setProduct(saved);
+        setProducts((current) => current.map((item) => item._id === saved._id
+          ? {
+              ...item,
+              name: saved.name,
+              slug: saved.slug,
+              productType: saved.productType,
+              status: saved.status,
+              scope: saved.scope,
+              merchantId: saved.merchantId,
+              basePrice: saved.basePrice,
+              thumbnailUrl: saved.thumbnailUrl,
+              categoryId: saved.categoryId,
+              variantCount: saved.variants.length,
+              optionGroupCount: saved.optionGroups.length,
+              updatedAt: saved.updatedAt,
+            }
+          : item));
+      })
+      .catch((reason) => showMessage('error', reason instanceof Error ? reason.message : 'Could not update product.'));
+  }, []);
+
+  if (loading && !product) {
+    return <div className="rounded-lg bg-white p-6 text-sm text-gray-500 shadow-sm ring-1 ring-gray-200">Loading product configuration...</div>;
+  }
 
   if (!product) {
     return (
       <div className="text-center py-12">
         <h2 className="text-lg font-semibold text-gray-900">Product not found</h2>
+        {loadError && <p className="mt-2 text-sm text-red-600">{loadError}</p>}
         <button onClick={() => navigate('/products')} className="mt-4 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">Back to Products</button>
       </div>
     );
@@ -68,13 +127,14 @@ export function ProductDetail() {
 
   async function handleDuplicateProduct() {
     const targetScope: ProductScope = currentProduct.scope === 'shared' && !confirm('Duplicate as shared product? Choose Cancel to duplicate as merchant custom for the selected merchant.') ? 'merchant' : currentProduct.scope;
-    const newId = await duplicateProduct(currentProduct._id, targetScope);
-    if (!newId) {
+    try {
+      const duplicated = await api.duplicateProduct(currentProduct._id, targetScope, targetScope === 'merchant' ? selectedMerchantId : null);
+      showMessage('success', 'Product duplicated as draft.');
+      navigate(`/products/${duplicated._id}`);
+    } catch (reason) {
       showMessage('error', 'Could not duplicate product.');
-      return;
+      if (reason instanceof Error) setLoadError(reason.message);
     }
-    showMessage('success', 'Product duplicated as draft.');
-    navigate(`/products/${newId}`);
   }
 
   async function handleImportJson() {
@@ -87,7 +147,7 @@ export function ProductDetail() {
       setImportError(result.error ?? 'Import failed.');
       return;
     }
-    const saved = await addProduct(result.product);
+    const saved = await api.createProduct(result.product);
     setImportOpen(false);
     setImportJson('');
     setImportError('');

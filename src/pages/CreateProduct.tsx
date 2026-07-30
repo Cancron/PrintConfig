@@ -6,9 +6,9 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { ImageField } from '../components/gallery/ImageField';
-import { useProducts } from '../hooks/useProducts';
 import { useCategories } from '../hooks/useCategories';
 import { useWorkspace } from '../hooks/useWorkspace';
+import { api } from '../lib/api';
 import { createDefaultAiArtConfig, createDefaultEditorRules, createDefaultExportRules, createDefaultMugProductConfig, createDefaultPhotoBookConfig, createDefaultPillowProductConfig, createDefaultTShirtProductConfig } from '../lib/storage';
 import { validateProductBasicInfo } from '../lib/validation';
 import { createDefaultVariantOptionDefinitions, ensureTShirtVariantOptionDefinitions } from '../lib/variantOptions';
@@ -45,9 +45,8 @@ const scopeOptions = [
 export function CreateProduct() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { addProduct, account } = useProducts();
   const { categories } = useCategories();
-  const { selectedMerchant } = useWorkspace();
+  const { account, selectedMerchant } = useWorkspace();
 
   const initialCategoryId = searchParams.get('categoryId') ?? categories[0]?._id ?? '';
   const [name, setName] = useState('');
@@ -113,7 +112,7 @@ export function CreateProduct() {
       updatedAt: now,
     };
 
-    const saved = await addProduct(product);
+    const saved = await api.createProduct(product);
     navigate(`/products/${saved._id}`);
   }
 

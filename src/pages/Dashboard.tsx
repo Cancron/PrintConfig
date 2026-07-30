@@ -13,7 +13,7 @@ export function Dashboard() {
   const custom = products.filter((product) => product.scope === 'merchant').length;
   const active = products.filter((product) => product.status === 'Active').length;
   const draft = products.filter((product) => product.status === 'Draft').length;
-  const variants = products.reduce((sum, product) => sum + product.variants.length, 0);
+  const variants = products.reduce((sum, product) => sum + product.variantCount, 0);
   const sharedCategories = categories.filter((category) => category.scope === 'shared').length;
   const merchantCategories = categories.filter((category) => category.scope === 'merchant').length;
 

@@ -766,6 +766,52 @@ export interface TShirtProductConfig {
   colors: TShirtColorConfig[];
 }
 
+export interface ProductSummary {
+  _id: string;
+  accountId: string;
+  merchantId?: string | null;
+  scope: ProductScope;
+  name: string;
+  slug: string;
+  productType: ProductType;
+  status: ProductStatus;
+  basePrice: number;
+  thumbnailUrl: string;
+  categoryId: string;
+  variantCount: number;
+  optionGroupCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DesignCartItemSummary {
+  _id: string;
+  accountId: string;
+  merchantId: string;
+  productId: string;
+  productType: ProductType;
+  product?: { _id: string; name: string; slug: string; productType: string } | null;
+  userKey: string;
+  projectId: string;
+  status: DesignCartItemStatus;
+  orderId: string;
+  pagePreviews: Array<{ publicUrl?: string; url?: string; filename?: string }>;
+  pagePreviewCount: number;
+  finalPrintFiles: Array<{ publicUrl?: string; url?: string; filename?: string }>;
+  finalPrintCount: number;
+  printGenerationStatus: PrintGenerationStatus;
+  printGenerationError: string;
+  printGenerationTotalPages: number;
+  printGenerationCompletedPages: number;
+  printGenerationCurrentPage: number;
+  latestJob?: DesignProcessingJob | null;
+  addedToCartAt: string;
+  orderedAt?: string;
+  lastActivityAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Product {
   _id: string;
   accountId: string;

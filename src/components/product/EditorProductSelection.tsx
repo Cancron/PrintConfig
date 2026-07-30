@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Plus, Search, X } from 'lucide-react';
-import type { EditorProductSelectionMode, Product } from '../../types';
+import type { EditorProductSelectionMode, ProductSummary } from '../../types';
 import { Select } from '../ui/Select';
 
 interface Props {
   currentProductId: string;
   categoryId: string;
-  products: Product[];
+  products: ProductSummary[];
   mode: EditorProductSelectionMode;
   specificProductIds: string[];
   onModeChange: (mode: EditorProductSelectionMode) => void;

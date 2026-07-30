@@ -7,7 +7,7 @@ import { Select } from '../components/ui/Select';
 import { Table, TableBody, TableCell, TableHead, TableHeader } from '../components/ui/Table';
 import { api } from '../lib/api';
 import { useWorkspace } from '../hooks/useWorkspace';
-import type { DesignCartItem } from '../types';
+import type { DesignCartItem, DesignCartItemSummary } from '../types';
 
 const statusOptions = [
   { value: '', label: 'All order statuses' },
@@ -35,21 +35,32 @@ const productTypeOptions = [
 
 export function Orders() {
   const { account, selectedMerchantId } = useWorkspace();
-  const [items, setItems] = useState<DesignCartItem[]>([]);
+  const [items, setItems] = useState<DesignCartItemSummary[]>([]);
   const [status, setStatus] = useState('ordered');
   const [printStatus, setPrintStatus] = useState('');
   const [productType, setProductType] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 25, total: 0, pageCount: 1 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(() => {
     setLoading(true);
     setError('');
-    api.listDesignCartItems({ accountId: account._id, merchantId: selectedMerchantId, status, printGenerationStatus: printStatus, productType, limit: 200 })
-      .then(setItems)
+    api.listDesignCartItems({ accountId: account._id, merchantId: selectedMerchantId, status, printGenerationStatus: printStatus, productType, page, pageSize })
+      .then((result) => {
+        setItems(result.items);
+        setPagination(result.pagination);
+        if (result.pagination.page !== page) setPage(result.pagination.page);
+      })
       .catch((reason) => setError(reason instanceof Error ? reason.message : 'Could not load orders.'))
       .finally(() => setLoading(false));
-  }, [account._id, printStatus, productType, selectedMerchantId, status]);
+  }, [account._id, page, pageSize, printStatus, productType, selectedMerchantId, status]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize, printStatus, productType, selectedMerchantId, status]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -100,8 +111,8 @@ export function Orders() {
                     {item.latestJob && <p className="mt-1 text-xs text-gray-500">Attempts: {item.latestJob.attempts}</p>}
                     {item.printGenerationError && <p className="mt-1 max-w-56 text-xs text-red-600">{item.printGenerationError}</p>}
                   </TableCell>
-                  <TableCell><PreviewSummary files={item.pagePreviews} /></TableCell>
-                  <TableCell><PreviewSummary files={item.finalPrintFiles} emptyLabel="None" moreLabel="final prints" /></TableCell>
+                  <TableCell><PreviewSummary files={item.pagePreviews} totalCount={item.pagePreviewCount} /></TableCell>
+                  <TableCell><PreviewSummary files={item.finalPrintFiles} totalCount={item.finalPrintCount} emptyLabel="None" moreLabel="final prints" /></TableCell>
                   <TableCell className="text-sm text-gray-500">{new Date(item.updatedAt).toLocaleString()}</TableCell>
                   <TableCell>
                     <Link to={`/orders/${item._id}`} className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50">
@@ -112,6 +123,23 @@ export function Orders() {
               );})}
             </TableBody>
           </Table>
+          {pagination.total > 0 && (
+            <div className="flex flex-col gap-3 border-t border-gray-200 px-4 py-3 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
+              <p>
+                Showing <span className="font-medium text-gray-900">{(pagination.page - 1) * pagination.pageSize + 1}</span> to{' '}
+                <span className="font-medium text-gray-900">{Math.min(pagination.total, pagination.page * pagination.pageSize)}</span> of{' '}
+                <span className="font-medium text-gray-900">{pagination.total}</span> orders
+              </p>
+              <div className="flex items-center gap-3">
+                <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} aria-label="Orders per page" className="rounded-md border-0 px-3 py-2 shadow-sm ring-1 ring-inset ring-gray-300">
+                  {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} per page</option>)}
+                </select>
+                <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={pagination.page <= 1 || loading} className="rounded-md px-3 py-2 font-medium ring-1 ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300">Previous</button>
+                <span className="min-w-24 text-center">Page {pagination.page} of {pagination.pageCount}</span>
+                <button type="button" onClick={() => setPage((current) => Math.min(pagination.pageCount, current + 1))} disabled={pagination.page >= pagination.pageCount || loading} className="rounded-md px-3 py-2 font-medium ring-1 ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300">Next</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -206,11 +234,11 @@ export function OrderDetailPage() {
   );
 }
 
-function PreviewSummary({ files, emptyLabel = 'None', moreLabel = 'previews' }: { files: Array<{ publicUrl?: string; url?: string; filename?: string }>; emptyLabel?: string; moreLabel?: string }) {
+function PreviewSummary({ files, totalCount = files.length, emptyLabel = 'None', moreLabel = 'previews' }: { files: Array<{ publicUrl?: string; url?: string; filename?: string }>; totalCount?: number; emptyLabel?: string; moreLabel?: string }) {
   if (!files || files.length === 0) return <span className="text-sm text-gray-400">{emptyLabel}</span>;
   const first = files[0];
   const url = first.publicUrl || first.url || '';
-  const remaining = files.length - 1;
+  const remaining = Math.max(0, totalCount - 1);
   return (
     <div className="flex items-center gap-3">
       <a href={url} target="_blank" rel="noreferrer" className="block h-16 w-16 overflow-hidden rounded-md bg-gray-100 ring-1 ring-gray-200">
@@ -224,9 +252,10 @@ function PreviewSummary({ files, emptyLabel = 'None', moreLabel = 'previews' }: 
   );
 }
 
-function getPrintProgress(item: DesignCartItem) {
-  const finalCount = item.finalPrintFiles?.length ?? 0;
-  const total = item.printGenerationTotalPages || (item.printGenerationStatus === 'complete' && finalCount > 0 ? finalCount : Math.max(finalCount, item.pagePreviews?.length ?? 0));
+function getPrintProgress(item: DesignCartItem | DesignCartItemSummary) {
+  const finalCount = 'finalPrintCount' in item ? item.finalPrintCount : item.finalPrintFiles?.length ?? 0;
+  const previewCount = 'pagePreviewCount' in item ? item.pagePreviewCount : item.pagePreviews?.length ?? 0;
+  const total = item.printGenerationTotalPages || (item.printGenerationStatus === 'complete' && finalCount > 0 ? finalCount : Math.max(finalCount, previewCount));
   const completed = item.printGenerationCompletedPages || finalCount;
   return { completed, total };
 }

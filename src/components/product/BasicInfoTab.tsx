@@ -10,12 +10,12 @@ import { useWorkspace } from '../../hooks/useWorkspace';
 import { useCategories } from '../../hooks/useCategories';
 import { validateProductBasicInfo } from '../../lib/validation';
 import { createDefaultMugProductConfig, createDefaultPhotoBookConfig, createDefaultPillowProductConfig } from '../../lib/storage';
-import type { EditorProductSelectionMode, MugProductConfig, PhotoBookConfig, PillowProductConfig, Product, ProductScope, ProductType, ProductStatus } from '../../types';
+import type { EditorProductSelectionMode, MugProductConfig, PhotoBookConfig, PillowProductConfig, Product, ProductScope, ProductSummary, ProductType, ProductStatus } from '../../types';
 import { ensureTShirtVariantOptionDefinitions } from '../../lib/variantOptions';
 
 interface Props {
   product: Product;
-  products: Product[];
+  products: ProductSummary[];
   onSave: (product: Product) => void;
 }
 
