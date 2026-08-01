@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LogIn, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { clearAuthRedirect, resolveAuthRedirect } from '../lib/authRedirect';
 
 export function SignIn() {
   const { signIn } = useAuth();
@@ -16,10 +17,12 @@ export function SignIn() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    const redirectPath = resolveAuthRedirect(location.state);
     setLoading(true);
     try {
       await signIn(email, password);
-      navigate(getAuthRedirectPath(location.state), { replace: true });
+      clearAuthRedirect();
+      navigate(redirectPath, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign in failed.');
     } finally {
@@ -100,10 +103,4 @@ export function SignIn() {
       </div>
     </div>
   );
-}
-
-function getAuthRedirectPath(state: unknown) {
-  if (!state || typeof state !== 'object' || !('from' in state)) return '/';
-  const from = String((state as { from?: unknown }).from ?? '/');
-  return from.startsWith('/') && !from.startsWith('//') && from !== '/signin' && from !== '/signup' ? from : '/';
 }

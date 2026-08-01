@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
@@ -16,10 +17,25 @@ import { SignIn } from './pages/SignIn';
 import { SignUp } from './pages/SignUp';
 import { WorkspaceProvider } from './hooks/useWorkspace';
 import { AuthProvider, useAuth } from './hooks/useAuth';
+import { consumeAuthRedirect, rememberAuthRedirect } from './lib/authRedirect';
+
+function SignInRedirect() {
+  const location = useLocation();
+  const intendedPath = `${location.pathname}${location.search}${location.hash}`;
+  const destination = rememberAuthRedirect(intendedPath);
+
+  return <Navigate to="/signin" state={{ from: destination }} replace />;
+}
+
+function AuthenticatedAuthRedirect() {
+  const location = useLocation();
+  const [destination] = useState(() => consumeAuthRedirect(location.state));
+
+  return <Navigate to={destination} replace />;
+}
 
 function AppRoutes() {
   const { user, loading } = useAuth();
-  const location = useLocation();
 
   if (loading) {
     return (
@@ -30,13 +46,11 @@ function AppRoutes() {
   }
 
   if (!user) {
-    const intendedPath = `${location.pathname}${location.search}${location.hash}`;
-    const authPath = location.pathname === '/signin' || location.pathname === '/signup';
     return (
       <Routes>
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
-        <Route path="*" element={<Navigate to="/signin" state={{ from: authPath ? '/' : intendedPath }} replace />} />
+        <Route path="*" element={<SignInRedirect />} />
       </Routes>
     );
   }
@@ -61,8 +75,8 @@ function AppRoutes() {
           <Route path="/layouts/collages" element={<Collages />} />
           <Route path="/layouts/collages/:id" element={<CollageEditor />} />
           <Route path="/layouts/templates/:id" element={<LayoutTemplateEditor />} />
-          <Route path="/signin" element={<Navigate to="/" replace />} />
-          <Route path="/signup" element={<Navigate to="/" replace />} />
+          <Route path="/signin" element={<AuthenticatedAuthRedirect />} />
+          <Route path="/signup" element={<AuthenticatedAuthRedirect />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

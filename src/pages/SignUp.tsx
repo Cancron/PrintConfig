@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { UserPlus, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { clearAuthRedirect, resolveAuthRedirect } from '../lib/authRedirect';
 
 export function SignUp() {
   const { signUp } = useAuth();
@@ -18,6 +19,7 @@ export function SignUp() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    const redirectPath = resolveAuthRedirect(location.state);
 
     if (password !== confirmPassword) {
       setError('Passwords do not match.');
@@ -31,7 +33,8 @@ export function SignUp() {
     setLoading(true);
     try {
       await signUp(email, password, name);
-      navigate(getAuthRedirectPath(location.state), { replace: true });
+      clearAuthRedirect();
+      navigate(redirectPath, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign up failed.');
     } finally {
@@ -138,10 +141,4 @@ export function SignUp() {
       </div>
     </div>
   );
-}
-
-function getAuthRedirectPath(state: unknown) {
-  if (!state || typeof state !== 'object' || !('from' in state)) return '/';
-  const from = String((state as { from?: unknown }).from ?? '/');
-  return from.startsWith('/') && !from.startsWith('//') && from !== '/signin' && from !== '/signup' ? from : '/';
 }
