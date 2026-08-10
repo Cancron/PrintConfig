@@ -1421,6 +1421,59 @@ export async function processDesignCartItemForAdmin(input: { cartItemId: string;
   return queueDesignCartItemProcessing(cartItem, { ...input, markOrdered: false });
 }
 
+export async function processPublicDesignFinalPrint(input: {
+  productId: string;
+  apiPrivateKey: string;
+  cartItemId?: unknown;
+  projectId?: unknown;
+  force?: unknown;
+}) {
+  const merchant = await authenticateApiPrivateKey(input.apiPrivateKey);
+  if (!merchant) throw new ApiError(401, 'A valid merchant API private key is required.');
+  if (!Types.ObjectId.isValid(input.productId)) throw new ApiError(400, 'productId must be a valid MongoDB ObjectId.');
+
+  const rawCartItemId = String(input.cartItemId ?? '').trim();
+  const rawProjectId = String(input.projectId ?? '').trim();
+  const projectId = sanitizeProjectId(input.projectId);
+  if (!rawCartItemId && !projectId) throw new ApiError(400, 'cartItemId or projectId is required.');
+  if (rawCartItemId && !Types.ObjectId.isValid(rawCartItemId)) {
+    throw new ApiError(400, 'cartItemId must be a valid MongoDB ObjectId.');
+  }
+  if (rawProjectId && !projectId) throw new ApiError(400, 'projectId must be valid.');
+
+  const cartItemQuery: Record<string, unknown> = {
+    merchantId: merchant._id,
+    accountId: merchant.accountId,
+    productId: input.productId,
+    status: { $in: ['cart', 'ordered'] },
+  };
+  if (rawCartItemId) cartItemQuery._id = rawCartItemId;
+  else cartItemQuery.projectId = projectId;
+
+  const cartItem = await DesignCartItemModel.findOne(cartItemQuery);
+  if (!cartItem) throw new ApiError(404, 'Design cart item was not found for this merchant and product.');
+
+  if (projectId && String(cartItem.projectId) !== projectId) {
+    throw new ApiError(403, 'The design project does not belong to this cart item.');
+  }
+
+  const result = await queueDesignCartItemProcessing(cartItem, {
+    orderId: cartItem.orderId || String(cartItem._id),
+    force: input.force,
+    markOrdered: false,
+  });
+
+  return {
+    projectId: String(cartItem.projectId ?? ''),
+    cartItemId: String(cartItem._id),
+    jobId: result.job?._id ? String(result.job._id) : null,
+    queued: Boolean(result.queued),
+    processed: Boolean(result.processed),
+    printGenerationStatus: result.printGenerationStatus ?? cartItem.printGenerationStatus,
+    message: result.message,
+  };
+}
+
 export async function markDesignCartItemOrderedForAdmin(input: { cartItemId: string; accountId?: string; orderId?: unknown; force?: unknown }) {
   if (!Types.ObjectId.isValid(input.cartItemId)) throw new ApiError(400, 'cartItemId must be a valid MongoDB ObjectId.');
   const query: Record<string, unknown> = { _id: input.cartItemId };

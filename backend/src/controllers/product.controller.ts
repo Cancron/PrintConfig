@@ -268,6 +268,26 @@ export async function publicDesign(
   }
 }
 
+export async function publicFinalPrint(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    res.status(202).json(
+      await service.processPublicDesignFinalPrint({
+        productId: String(req.params.productId),
+        apiPrivateKey: String(req.header("x-api-key") ?? ""),
+        cartItemId: req.body?.cartItemId,
+        projectId: req.body?.projectId,
+        force: req.body?.force,
+      }),
+    );
+  } catch (e) {
+    next(e);
+  }
+}
+
 export async function publicConfig(
   req: Request,
   res: Response,

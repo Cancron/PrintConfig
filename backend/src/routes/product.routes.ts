@@ -24,6 +24,7 @@ productRoutes.post('/public/:productId/design-upload', designUpload.fields([
   { name: 'pagePreviews', maxCount: 100 },
 ]), controller.publicDesignUpload);
 productRoutes.get('/public/:productId/design', controller.publicDesign);
+productRoutes.post('/public/:productId/final-print', controller.publicFinalPrint);
 productRoutes.get('/public/:id/config', controller.publicConfig);
 productRoutes.get('/cart-items', controller.listCartItems);
 productRoutes.get('/cart-items/:cartItemId', requireAuth, controller.getCartItem);

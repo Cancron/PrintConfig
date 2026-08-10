@@ -25,6 +25,7 @@ interface ImageMaskDefinition {
   label: string;
   viewBox: string;
   aspectRatio?: number;
+  layoutFitMode?: 'contain' | 'stretch';
   elements: SvgMaskElement[];
 }
 
@@ -590,6 +591,7 @@ function parseCustomMask(value: unknown): ImageMaskDefinition | undefined {
     label: stringValue(value.label, 'Custom mask'),
     viewBox: `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`,
     aspectRatio: positiveNumber(value.aspectRatio, viewBox.width / viewBox.height),
+    layoutFitMode: value.layoutFitMode === 'stretch' ? 'stretch' : 'contain',
     elements,
   };
 }
@@ -612,8 +614,9 @@ function createMaskGeometry(mask: ImageMaskDefinition, frameWidth: number, frame
   const viewBoxAspect = viewBox.width / viewBox.height;
   const maskAspect = positiveNumber(mask.aspectRatio, viewBoxAspect);
   const frameAspect = frameWidth / frameHeight;
-  const width = frameAspect > maskAspect ? frameHeight * maskAspect : frameWidth;
-  const height = frameAspect > maskAspect ? frameHeight : frameWidth / maskAspect;
+  const stretchesToFrame = mask.layoutFitMode === 'stretch';
+  const width = stretchesToFrame ? frameWidth : frameAspect > maskAspect ? frameHeight * maskAspect : frameWidth;
+  const height = stretchesToFrame ? frameHeight : frameAspect > maskAspect ? frameHeight : frameWidth / maskAspect;
   const x = (frameWidth - width) / 2;
   const y = (frameHeight - height) / 2;
   const transform = {
