@@ -299,7 +299,7 @@ export function normalizeTShirtProductConfig(
     bottom: numberOr(value?.bottom, fallback),
     left: numberOr(value?.left, fallback),
   });
-  const placements = (input?.placements?.length ? input.placements : defaults.placements).map((placement, index) => {
+  const placements: TShirtPlacementConfig[] = (input?.placements?.length ? input.placements : defaults.placements).map((placement, index): TShirtPlacementConfig => {
     const id = String(placement.id ?? `placement-${index + 1}`).trim();
     const legacyArea = input?.colors?.map((color) => color.mockups?.[id]?.designArea).find(Boolean);
     const designArea = placement.designArea ?? legacyArea;

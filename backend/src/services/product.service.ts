@@ -21,7 +21,18 @@ import { visibleQuery } from './category.service.js';
 import { resolveAccountId } from './account.service.js';
 import { authenticateApiPrivateKey } from './merchant.service.js';
 import { signDownloadToken, verifyDownloadToken } from './auth.service.js';
-import { galleryBucket, getSupabaseAdmin } from '../config/supabase.js';
+import { galleryBucket } from '../config/supabase.js';
+import {
+  copyObject,
+  deleteObjects,
+  downloadObject,
+  listLegacySupabaseObjects,
+  listObjects,
+  r2Bucket,
+  r2PublicUrl,
+  uploadObject,
+  type StorageProvider,
+} from '../config/storage.js';
 
 export type DependencyCondition = 'equals' | 'not_equals' | 'in' | 'not_in';
 
@@ -1550,10 +1561,11 @@ export async function streamFinalPrintsZip(input: { cartItemId: string; download
   for (const [index, file] of files.entries()) {
     const storagePath = String(file?.storagePath ?? '');
     if (!storagePath) continue;
-    const { data, error } = await getSupabaseAdmin().storage.from(galleryBucket).download(storagePath);
-    if (error || !data) throw new ApiError(502, `Final print download failed: ${error?.message ?? storagePath}`);
-    const arrayBuffer = await data.arrayBuffer();
-    archive.append(Buffer.from(arrayBuffer), {
+    const data = await downloadObject(storagePath, {
+      provider: String(file?.storageProvider ?? 'supabase') as StorageProvider,
+      bucket: String(file?.bucket ?? '') || undefined,
+    }).catch((error) => { throw new ApiError(502, `Final print download failed: ${error instanceof Error ? error.message : storagePath}`); });
+    archive.append(data, {
       name: sanitizeZipEntryName(String(file?.filename ?? `final-print-${index + 1}.svg`)),
     });
   }
@@ -1734,8 +1746,7 @@ async function runDesignCartItemProcessing(jobId: string) {
     const copiedFiles = await copyStoragePrefix(sourcePrefix, orderPrefix);
     if (!copiedFiles.some((file) => file.destination === `${orderPrefix}/design.json`)) throw new ApiError(400, 'Cart item has no saved design.json to process.');
 
-    const { data: basePublicData } = getSupabaseAdmin().storage.from(galleryBucket).getPublicUrl(`${orderPrefix}/`);
-    const designPublicBaseUrl = basePublicData.publicUrl;
+    const designPublicBaseUrl = `${r2PublicUrl(orderPrefix)}/`;
     const designPublicUrl = `${designPublicBaseUrl}design.json`;
     const shouldMarkOrdered = Boolean((job as any).markOrdered);
     if (shouldMarkOrdered) cartItem.status = 'ordered';
@@ -1847,28 +1858,23 @@ export async function savePublicDesignUpload(input: {
   const { merchant, product, userKey } = await resolvePublicDesignContext(input.productId, input.merchantId, input.userKey);
   const productType = normalizeDesignProductType(input.productType, product.productType);
   const project = await resolveDesignProject({ merchant, product, userKey, requestedProjectId: input.projectId });
-  const supabase = getSupabaseAdmin();
   const prefix = project.tempStoragePrefix;
-  const { data: prefixPublicData } = supabase.storage.from(galleryBucket).getPublicUrl(`${prefix}/`);
-  const publicPathPrefix = prefixPublicData.publicUrl;
+  const publicPathPrefix = `${r2PublicUrl(prefix)}/`;
 
   let image: Record<string, unknown> | null = null;
   if (input.file) {
     const extension = DESIGN_UPLOAD_MIME_EXTENSIONS[input.file.mimetype];
     const filename = `${Date.now()}-${randomBytes(8).toString('hex')}${extension}`;
     const storagePath = `${prefix}/images/${filename}`;
-    const { error: uploadError } = await supabase.storage.from(galleryBucket).upload(storagePath, input.file.buffer, {
-      contentType: input.file.mimetype,
-      upsert: false,
-      cacheControl: '3600',
+    await uploadObject({ storagePath, body: input.file.buffer, contentType: input.file.mimetype, upsert: false, cacheControl: '3600' }).catch((error) => {
+      throw new ApiError(502, `R2 image upload failed: ${error instanceof Error ? error.message : 'Unknown storage error'}`);
     });
-    if (uploadError) throw new ApiError(502, `Supabase image upload failed: ${uploadError.message}`);
-    const { data } = supabase.storage.from(galleryBucket).getPublicUrl(storagePath);
+    const publicUrl = r2PublicUrl(storagePath);
     image = {
-      url: data.publicUrl,
-      publicUrl: data.publicUrl,
-      storageProvider: 'supabase',
-      bucket: galleryBucket,
+      url: publicUrl,
+      publicUrl,
+      storageProvider: 'r2',
+      bucket: r2Bucket,
       storagePath,
       filename,
       originalName: input.file.originalname,
@@ -1879,12 +1885,13 @@ export async function savePublicDesignUpload(input: {
 
   if (designData !== undefined) {
     const designStoragePath = `${prefix}/design.json`;
-    const { error: designUploadError } = await supabase.storage.from(galleryBucket).upload(
-      designStoragePath,
-      Buffer.from(JSON.stringify(designData, null, 2), 'utf8'),
-      { contentType: 'application/json', upsert: true, cacheControl: '0' }
-    );
-    if (designUploadError) throw new ApiError(502, `Supabase design save failed: ${designUploadError.message}`);
+    await uploadObject({
+      storagePath: designStoragePath,
+      body: Buffer.from(JSON.stringify(designData, null, 2), 'utf8'),
+      contentType: 'application/json',
+      upsert: true,
+      cacheControl: '0',
+    }).catch((error) => { throw new ApiError(502, `R2 design save failed: ${error instanceof Error ? error.message : 'Unknown storage error'}`); });
   }
 
   const pagePreviews = [];
@@ -1895,19 +1902,15 @@ export async function savePublicDesignUpload(input: {
     const requestedFilename = sanitizeUploadFilename(String(meta.filename ?? file.originalname ?? `page-${index + 1}${extension}`), extension);
     const filename = requestedFilename || `page-${index + 1}${extension}`;
     const storagePath = `${prefix}/page-previews/${filename}`;
-    const { error: previewUploadError } = await supabase.storage.from(galleryBucket).upload(storagePath, file.buffer, {
-      contentType: file.mimetype,
-      upsert: true,
-      cacheControl: '0',
-    });
-    if (previewUploadError) throw new ApiError(502, `Supabase page preview upload failed: ${previewUploadError.message}`);
-    const { data } = supabase.storage.from(galleryBucket).getPublicUrl(storagePath);
+    await uploadObject({ storagePath, body: file.buffer, contentType: file.mimetype, upsert: true, cacheControl: '0' })
+      .catch((error) => { throw new ApiError(502, `R2 page preview upload failed: ${error instanceof Error ? error.message : 'Unknown storage error'}`); });
+    const publicUrl = r2PublicUrl(storagePath);
     pagePreviews.push({
       ...meta,
-      url: data.publicUrl,
-      publicUrl: data.publicUrl,
-      storageProvider: 'supabase',
-      bucket: galleryBucket,
+      url: publicUrl,
+      publicUrl,
+      storageProvider: 'r2',
+      bucket: r2Bucket,
       storagePath,
       filename,
       originalName: file.originalname,
@@ -1963,19 +1966,10 @@ export async function getPublicDesignWithProduct(input: { productId: string; mer
   let designStoragePath = `${project.tempStoragePrefix}/design.json`;
   let designData: unknown = null;
   let designExists = false;
-  const { data, error } = await getSupabaseAdmin().storage.from(galleryBucket).download(designStoragePath);
-  if (error) {
-    const exists = await storageObjectExists(designStoragePath);
-    if (exists) {
-      project = await createDesignProject({ merchant, product, userKey }, {
-        requestedProjectLocked: false,
-        projectResolutionReason: 'design_read_failed',
-      });
-      designStoragePath = `${project.tempStoragePrefix}/design.json`;
-    }
-  } else if (data) {
+  try {
+    const data = await downloadObject(designStoragePath);
     try {
-      designData = JSON.parse(await data.text());
+      designData = JSON.parse(data.toString('utf8'));
       designExists = true;
     } catch {
       project = await createDesignProject({ merchant, product, userKey }, {
@@ -1986,6 +1980,8 @@ export async function getPublicDesignWithProduct(input: { productId: string; mer
       designData = null;
       designExists = false;
     }
+  } catch {
+    designExists = false;
   }
   return {
     product: productData,
@@ -2253,57 +2249,39 @@ function designOrderPrefix(merchantId: string, orderId: string, productId: strin
 }
 
 async function copyStoragePrefix(sourcePrefix: string, destinationPrefix: string) {
-  const files = await listStorageFiles(sourcePrefix);
+  let files = (await listObjects(sourcePrefix)).map((file) => file.key);
+  let sourceProvider: StorageProvider = 'r2';
+  if (files.length === 0 && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    files = await listLegacySupabaseObjects(sourcePrefix);
+    sourceProvider = 'supabase';
+  }
   if (files.length === 0) throw new ApiError(400, 'No design files found to process.');
-  const supabase = getSupabaseAdmin();
   const copiedFiles: Array<{ source: string; destination: string }> = [];
   for (const source of files) {
     const relativePath = source.slice(sourcePrefix.length).replace(/^\/+/, '');
     const destination = `${destinationPrefix}/${relativePath}`;
-    await supabase.storage.from(galleryBucket).remove([destination]);
-    const { error } = await supabase.storage.from(galleryBucket).copy(source, destination);
-    if (error) throw new ApiError(502, `Supabase design file copy failed: ${error.message}`);
+    await deleteObjects([destination]);
+    if (sourceProvider === 'r2') await copyObject(source, destination);
+    else {
+      const body = await downloadObject(source, { provider: 'supabase', bucket: galleryBucket });
+      await uploadObject({ storagePath: destination, body, upsert: true });
+    }
     copiedFiles.push({ source, destination });
   }
   return copiedFiles;
-}
-
-async function listStorageFiles(prefix: string) {
-  const output: string[] = [];
-  await listStorageFilesRecursive(prefix.replace(/\/+$/, ''), output);
-  return output;
-}
-
-async function listStorageFilesRecursive(folder: string, output: string[]) {
-  const { data, error } = await getSupabaseAdmin().storage.from(galleryBucket).list(folder, { limit: 1000 });
-  if (error) throw new ApiError(502, `Supabase design file list failed: ${error.message}`);
-  for (const item of data ?? []) {
-    const fullPath = `${folder}/${item.name}`;
-    if ((item as any).id || (item as any).metadata) output.push(fullPath);
-    else await listStorageFilesRecursive(fullPath, output);
-  }
-}
-
-async function storageObjectExists(storagePath: string) {
-  const cleanPath = storagePath.replace(/^\/+|\/+$/g, '');
-  const slashIndex = cleanPath.lastIndexOf('/');
-  const folder = slashIndex >= 0 ? cleanPath.slice(0, slashIndex) : '';
-  const filename = slashIndex >= 0 ? cleanPath.slice(slashIndex + 1) : cleanPath;
-  if (!filename) return false;
-  const { data, error } = await getSupabaseAdmin().storage.from(galleryBucket).list(folder, { limit: 1000 });
-  if (error) return false;
-  return (data ?? []).some((item) => item.name === filename);
 }
 
 function rewriteStoredFile(file: Record<string, any>, sourcePrefix: string, destinationPrefix: string) {
   const storagePath = String(file.storagePath ?? '');
   if (!storagePath.startsWith(sourcePrefix)) return file;
   const nextStoragePath = `${destinationPrefix}${storagePath.slice(sourcePrefix.length)}`;
-  const { data } = getSupabaseAdmin().storage.from(galleryBucket).getPublicUrl(nextStoragePath);
+  const publicUrl = r2PublicUrl(nextStoragePath);
   return {
     ...file,
-    url: data.publicUrl,
-    publicUrl: data.publicUrl,
+    url: publicUrl,
+    publicUrl,
+    storageProvider: 'r2',
+    bucket: r2Bucket,
     storagePath: nextStoragePath,
   };
 }
@@ -2314,7 +2292,6 @@ async function generateFinalPrintImages(cartItem: Record<string, any>, orderPref
   const pages = resolveFinalPrintPages(design, cartItem, product);
   if (pages.length === 0) throw new ApiError(400, 'No pages are available for final print generation.');
   const rasterOutput = resolveFinalPrintRasterOutput(design, product);
-  const supabase = getSupabaseAdmin();
   const output = [];
   const generationVersion = Date.now().toString(36);
   cartItem.printGenerationTotalPages = pages.length;
@@ -2340,20 +2317,15 @@ async function generateFinalPrintImages(cartItem: Record<string, any>, orderPref
       page.filename,
       rasterOutput.extension === 'jpg' ? 'png' : 'jpg',
     )}`;
-    await supabase.storage.from(galleryBucket).remove([storagePath, alternateStoragePath]);
-    const { error } = await supabase.storage.from(galleryBucket).upload(storagePath, buffer, {
-      contentType: rasterOutput.mimeType,
-      upsert: true,
-      cacheControl: '0',
-    });
-    if (error) throw new ApiError(502, `Final print generation upload failed: ${error.message}`);
-    const { data } = supabase.storage.from(galleryBucket).getPublicUrl(storagePath);
-    const publicUrl = appendUrlQuery(data.publicUrl, 'v', generationVersion);
+    await deleteObjects([storagePath, alternateStoragePath]);
+    await uploadObject({ storagePath, body: buffer, contentType: rasterOutput.mimeType, upsert: true, cacheControl: '0' })
+      .catch((error) => { throw new ApiError(502, `Final print generation upload failed: ${error instanceof Error ? error.message : 'Unknown storage error'}`); });
+    const publicUrl = appendUrlQuery(r2PublicUrl(storagePath), 'v', generationVersion);
     const file = {
       url: publicUrl,
       publicUrl,
-      storageProvider: 'supabase',
-      bucket: galleryBucket,
+      storageProvider: 'r2',
+      bucket: r2Bucket,
       storagePath,
       filename,
       originalName: filename,
@@ -2425,11 +2397,12 @@ function appendUrlQuery(url: string, key: string, value: string) {
 }
 
 async function readDesignJsonFromStorage(storagePath: string) {
-  const { data, error } = await getSupabaseAdmin().storage.from(galleryBucket).download(storagePath);
-  if (error) throw new ApiError(502, `Supabase design read failed: ${error.message} ${storagePath}`);
-  if (!data) throw new ApiError(400, 'Saved design file is empty.');
+  const data = await downloadObject(storagePath).catch((error) => {
+    throw new ApiError(502, `Design storage read failed: ${error instanceof Error ? error.message : 'Unknown storage error'} ${storagePath}`);
+  });
+  if (!data.length) throw new ApiError(400, 'Saved design file is empty.');
   try {
-    return JSON.parse(await data.text());
+    return JSON.parse(data.toString('utf8'));
   } catch {
     throw new ApiError(400, 'Saved design JSON is invalid.');
   }
@@ -2709,11 +2682,6 @@ function clamp(value: number, minimum: number, maximum: number) {
 
 function isRecordLike(value: unknown): value is Record<string, any> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
-}
-
-
-function escapeXml(value: string) {
-  return value.replace(/[<>&'"]/g, (char) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[char] ?? char));
 }
 
 

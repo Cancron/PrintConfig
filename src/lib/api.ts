@@ -410,6 +410,27 @@ export const api = {
   listImageAssets: (filters: { accountId: string; merchantId?: string; folderId?: string | null; scope?: string; search?: string }) => request<any[]>(`/image-assets?${galleryQuery(filters)}`).then((items) => items.map(normalizeAsset)),
   getImageAsset: (id: string) => request<any>(`/image-assets/${id}`).then(normalizeAsset),
   createImageAsset: (asset: ImageAsset) => request<any>('/image-assets', { method: 'POST', body: JSON.stringify(apiPayload(withoutRootId(asset))) }).then(normalizeAsset),
+  uploadImageAsset: async (file: File, metadata: Omit<ImageAsset, '_id' | 'url' | 'publicUrl' | 'storageProvider' | 'bucket' | 'storagePath' | 'createdAt' | 'updatedAt'>, overwriteAssetId?: string) => {
+    const intent = await request<{ uploadUrl: string; storagePath: string; bucket: string; publicUrl: string; requiredHeaders: Record<string, string> }>('/image-assets/upload-intent', {
+      method: 'POST',
+      body: JSON.stringify({
+        accountId: metadata.accountId,
+        merchantId: metadata.merchantId,
+        scope: metadata.scope,
+        folderId: metadata.folderId,
+        filename: metadata.filename,
+        mimeType: file.type,
+        sizeBytes: file.size,
+        overwriteAssetId,
+      }),
+    });
+    const uploadResponse = await fetch(intent.uploadUrl, { method: 'PUT', headers: intent.requiredHeaders, body: file });
+    if (!uploadResponse.ok) throw new Error(`R2 upload failed: ${uploadResponse.status}`);
+    return request<any>('/image-assets/upload-complete', {
+      method: 'POST',
+      body: JSON.stringify({ ...metadata, overwriteAssetId, storagePath: intent.storagePath, bucket: intent.bucket, mimeType: file.type, sizeBytes: file.size }),
+    }).then(normalizeAsset);
+  },
   updateImageAsset: (asset: ImageAsset) => request<any>(`/image-assets/${asset._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(asset))) }).then(normalizeAsset),
   deleteImageAsset: (id: string) => request(`/image-assets/${id}`, { method: 'DELETE' }),
   moveImageAsset: (id: string, folderId?: string | null) => request<any>(`/image-assets/${id}/move`, { method: 'POST', body: JSON.stringify({ folderId: folderId || null }) }).then(normalizeAsset),

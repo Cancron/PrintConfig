@@ -4,7 +4,7 @@ const storageFileSchema = new Schema(
   {
     url: { type: String, default: '' },
     publicUrl: { type: String, default: '' },
-    storageProvider: { type: String, enum: ['supabase'], default: 'supabase' },
+    storageProvider: { type: String, enum: ['supabase', 'r2'], default: 'r2' },
     bucket: { type: String, default: '' },
     storagePath: { type: String, default: '' },
     filename: { type: String, default: '' },
@@ -22,7 +22,7 @@ const pagePreviewSchema = new Schema(
     pageNumber: { type: Number },
     url: { type: String, default: '' },
     publicUrl: { type: String, default: '' },
-    storageProvider: { type: String, enum: ['supabase'], default: 'supabase' },
+    storageProvider: { type: String, enum: ['supabase', 'r2'], default: 'r2' },
     bucket: { type: String, default: '' },
     storagePath: { type: String, default: '' },
     filename: { type: String, default: '' },

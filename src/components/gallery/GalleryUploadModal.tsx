@@ -3,8 +3,7 @@ import { Loader2, Upload, X } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { api } from '../../lib/api';
-import { ALLOWED_IMAGE_TYPES, buildGalleryStoragePath, formatFileSize, readImageDimensions, sanitizeFilename, validateGalleryFile } from '../../lib/gallery';
-import { GALLERY_BUCKET, supabase } from '../../lib/supabase';
+import { ALLOWED_IMAGE_TYPES, formatFileSize, readImageDimensions, sanitizeFilename, validateGalleryFile } from '../../lib/gallery';
 import type { ImageAsset, ImageFolder, ProductScope } from '../../types';
 
 interface Props {
@@ -48,24 +47,13 @@ export function GalleryUploadModal({ folderId, defaultScope, folders, accountId,
     setUploading(true);
     setError('');
     try {
-      const storagePath = buildGalleryStoragePath({ accountId, merchantId, scope, folderId: targetFolderId || null, filename: file.name });
-      const { error: uploadError } = await supabase.storage.from(GALLERY_BUCKET).upload(storagePath, file, { upsert: true });
-      if (uploadError) throw new Error(`Supabase upload failed: ${uploadError.message}`);
-      // TODO: Switch to signed URLs if the gallery bucket becomes private.
-      const { data } = supabase.storage.from(GALLERY_BUCKET).getPublicUrl(storagePath);
-      const now = new Date().toISOString();
-      const metadata: ImageAsset = {
-        _id: '', accountId, merchantId: scope === 'merchant' ? merchantId : null, scope,
+      const metadata = {
+        accountId, merchantId: scope === 'merchant' ? merchantId : null, scope,
         folderId: targetFolderId || null, name: name.trim(), filename: sanitizeFilename(file.name), originalFilename: file.name,
-        url: data.publicUrl, publicUrl: data.publicUrl, storageProvider: 'supabase', bucket: GALLERY_BUCKET, storagePath,
         mimeType: file.type, sizeBytes: file.size, width: dimensions.width, height: dimensions.height,
-        altText: altText.trim(), tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean), createdAt: now, updatedAt: now,
+        altText: altText.trim(), tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean),
       };
-      try { onUploaded(await api.createImageAsset(metadata)); }
-      catch (reason) {
-        // TODO: Optionally remove the uploaded Supabase object if metadata saving fails.
-        throw new Error(`Backend metadata save failed: ${reason instanceof Error ? reason.message : 'Unknown error'}`);
-      }
+      onUploaded(await api.uploadImageAsset(file, metadata));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Upload failed.');
     } finally { setUploading(false); }

@@ -1,6 +1,5 @@
 import previewImageUrl from "../assets/img-preview.jpg";
 import { api } from "./api";
-import { GALLERY_BUCKET, supabase } from "./supabase";
 import type { Collage, ImageAsset, LayoutElement, ProductScope } from "../types";
 
 const TARGET_BYTES = 10 * 1024;
@@ -24,21 +23,8 @@ export async function generateAndUploadCollagePreview(input: {
   const filename = `${collage._id}-preview.webp`;
   const scope: ProductScope = collage.scope;
   const merchantId = scope === "merchant" ? (collage.merchantId || selectedMerchantId) : null;
-  const storagePath = scope === "merchant"
-    ? `accounts/${accountId}/merchants/${merchantId}/root/collage-previews/${filename}`
-    : `accounts/${accountId}/shared/root/collage-previews/${filename}`;
   const file = new File([rendered.blob], filename, { type: rendered.blob.type || "image/webp" });
-  await supabase.storage.from(GALLERY_BUCKET).remove([storagePath]);
-  const { error: uploadError } = await supabase.storage.from(GALLERY_BUCKET).upload(storagePath, file, {
-    upsert: true,
-    cacheControl: "0",
-  });
-  if (uploadError) throw new Error(`Supabase upload failed: ${uploadError.message}`);
-  const { data } = supabase.storage.from(GALLERY_BUCKET).getPublicUrl(storagePath);
-  const publicUrl = `${data.publicUrl}?v=${Date.now()}`;
-  const now = new Date().toISOString();
-  const metadata: ImageAsset = {
-    _id: "",
+  const metadata = {
     accountId,
     merchantId,
     scope,
@@ -46,24 +32,18 @@ export async function generateAndUploadCollagePreview(input: {
     name: `${collage.name || "Collage"} Preview`,
     filename,
     originalFilename: filename,
-    url: publicUrl,
-    publicUrl,
-    thumbnailUrl: publicUrl,
-    storageProvider: "supabase",
-    bucket: GALLERY_BUCKET,
-    storagePath,
+    thumbnailUrl: "",
     mimeType: file.type,
     sizeBytes: file.size,
     width: rendered.width,
     height: rendered.height,
     altText: `${collage.name || "Collage"} preview`,
     tags: ["collage-preview"],
-    createdAt: now,
-    updatedAt: now,
   };
-  const asset = collage.thumbnailAssetId
-    ? await api.updateImageAsset({ ...metadata, _id: collage.thumbnailAssetId }).catch(() => api.createImageAsset(metadata))
-    : await api.createImageAsset(metadata);
+  const uploaded = await api.uploadImageAsset(file, metadata, collage.thumbnailAssetId);
+  const versionedUrl = `${uploaded.publicUrl.split('?')[0]}?v=${Date.now()}`;
+  const asset: ImageAsset = { ...uploaded, url: versionedUrl, publicUrl: versionedUrl, thumbnailUrl: versionedUrl };
+  if (collage.thumbnailAssetId) await api.updateImageAsset(asset);
   return { ...rendered, asset };
 }
 

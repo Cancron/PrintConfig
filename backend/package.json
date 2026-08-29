@@ -10,9 +10,12 @@
         "typecheck": "tsc --noEmit -p tsconfig.json",
         "import:mediaclip-collages": "tsx src/scripts/importMediaclipCollages.ts",
         "migrate:shared-rooms": "tsx src/scripts/migrateSharedRooms.ts",
-        "migrate:shared-rooms:apply": "tsx src/scripts/migrateSharedRooms.ts --apply"
+        "migrate:shared-rooms:apply": "tsx src/scripts/migrateSharedRooms.ts --apply",
+        "migrate:supabase-to-r2": "tsx src/scripts/migrateSupabaseToR2.ts"
     },
     "dependencies": {
+        "@aws-sdk/client-s3": "^3.1120.0",
+        "@aws-sdk/s3-request-presigner": "^3.1120.0",
         "@supabase/supabase-js": "^2.57.4",
         "@types/sanitize-html": "^2.16.1",
         "archiver": "^8.0.0",

@@ -3,7 +3,6 @@ import { Save } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Textarea } from '../ui/Textarea';
-// import { ThumbnailUpload } from './ThumbnailUpload';
 import { ImageField } from '../gallery/ImageField';
 import { EditorProductSelection } from './EditorProductSelection';
 import { useWorkspace } from '../../hooks/useWorkspace';
@@ -219,7 +218,6 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
       {scope === 'merchant' && selectedMerchant && <p className="rounded-md bg-purple-50 p-3 text-sm text-purple-700 ring-1 ring-inset ring-purple-200">This product will belong to {selectedMerchant.name}.</p>}
       <Select label="Status" value={status} onChange={(e) => setStatus(e.target.value as ProductStatus)} options={statusOptions} />
       <Input label="Base Price" type="number" step="0.01" min="0" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} error={errors.basePrice} placeholder="0.00" />
-      {/* <ThumbnailUpload value={thumbnailUrl} onChange={(url) => { setThumbnailUrl(url); setThumbnailAssetId(undefined); }} productId={product._id} /> */}
       <ImageField label="Thumbnail Image URL" url={thumbnailUrl} assetId={thumbnailAssetId} onChange={(url, assetId) => { setThumbnailUrl(url); setThumbnailAssetId(assetId); }} />
 
       <EditorProductSelection

@@ -26,6 +26,16 @@ projects:
             sync: false
           - key: SUPABASE_GALLERY_BUCKET
             value: gallery
+          - key: CLOUDFLARE_ACCOUNT_ID
+            sync: false
+          - key: CLOUDFLARE_R2_ACCESS_KEY_ID
+            sync: false
+          - key: CLOUDFLARE_R2_SECRET_ACCESS_KEY
+            sync: false
+          - key: CLOUDFLARE_PUBLIC_DEV_URL
+            sync: false
+          - key: CLOUDFLARE_R2_BUCKET
+            value: canadaprintstudio
 
       - type: web
         name: canadaprintstudio-admin
@@ -43,9 +53,3 @@ projects:
             value: "22"
           - key: VITE_API_URL
             sync: false
-          - key: VITE_SUPABASE_URL
-            sync: false
-          - key: VITE_SUPABASE_ANON_KEY
-            sync: false
-          - key: VITE_SUPABASE_GALLERY_BUCKET
-            value: gallery

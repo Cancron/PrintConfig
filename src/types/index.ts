@@ -22,6 +22,7 @@ export interface EditorProductSelection {
 export type ProductStatus = 'Draft' | 'Active';
 export type MerchantStatus = 'Draft' | 'Active';
 export type ProductScope = 'shared' | 'merchant';
+export type StorageProvider = 'supabase' | 'r2';
 export type ProductCategoryStatus = 'active' | 'draft' | 'archived';
 export type LayoutStatus = 'active' | 'draft' | 'archived';
 export type ProductLayoutTemplateMode = 'none' | 'all' | 'specific' | 'by-tags';
@@ -66,7 +67,7 @@ export interface ImageAsset {
   url: string;
   publicUrl: string;
   thumbnailUrl?: string;
-  storageProvider: 'supabase';
+  storageProvider: StorageProvider;
   bucket: string;
   storagePath: string;
   mimeType: string;
@@ -94,7 +95,7 @@ export type PrintGenerationStatus = 'not_ready' | 'pending' | 'processing' | 'co
 export interface DesignStorageFile {
   url: string;
   publicUrl: string;
-  storageProvider: 'supabase';
+  storageProvider: StorageProvider;
   bucket: string;
   storagePath: string;
   filename: string;

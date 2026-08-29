@@ -14,7 +14,7 @@ const imageAssetSchema = new Schema(
     url: { type: String, required: true },
     publicUrl: { type: String, required: true },
     thumbnailUrl: { type: String, default: '' },
-    storageProvider: { type: String, enum: ['supabase'], default: 'supabase', required: true },
+    storageProvider: { type: String, enum: ['supabase', 'r2'], default: 'r2', required: true },
     bucket: { type: String, required: true },
     storagePath: { type: String, required: true },
     mimeType: { type: String, enum: IMAGE_MIME_TYPES, required: true },
