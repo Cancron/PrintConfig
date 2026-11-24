@@ -23,4 +23,12 @@ const merchantSchema = new Schema(
 
 merchantSchema.index({ accountId: 1, slug: 1 }, { unique: true });
 merchantSchema.index({ apiPrivateKeyHash: 1 }, { unique: true, sparse: true });
+merchantSchema.set('toJSON', {
+  transform(_document, result) {
+    Reflect.deleteProperty(result, 'apiPrivateKeyHash');
+    Reflect.deleteProperty(result, 'apiPrivateKeySecret');
+    return result;
+  },
+});
+
 export const MerchantModel = model('Merchant', merchantSchema);

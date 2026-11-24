@@ -16,6 +16,7 @@ export async function getMerchant(id: string) {
 export async function createMerchant(data: Record<string, unknown>) {
   const payload = { ...data };
   delete payload.apiPrivateKeyHash;
+  delete payload.apiPrivateKeySecret;
   delete payload.apiPrivateKeyLastFour;
   delete payload.apiPrivateKeyCreatedAt;
   return MerchantModel.create({ ...payload, accountId: resolveAccountId(String(payload.accountId ?? '')) });
@@ -24,6 +25,7 @@ export async function createMerchant(data: Record<string, unknown>) {
 export async function updateMerchant(id: string, data: Record<string, unknown>) {
   const payload = { ...data };
   delete payload.apiPrivateKeyHash;
+  delete payload.apiPrivateKeySecret;
   delete payload.apiPrivateKeyLastFour;
   delete payload.apiPrivateKeyCreatedAt;
   if (payload.accountId) payload.accountId = resolveAccountId(String(payload.accountId));
@@ -57,7 +59,7 @@ export async function authenticateApiPrivateKey(apiPrivateKey: string) {
   return MerchantModel.findOne({
     apiPrivateKeyHash: hashApiKey(apiPrivateKey),
     status: 'active',
-  }).select('+apiPrivateKeyHash');
+  });
 }
 export async function getMerchantPublicConfig(apiPrivateKey: string) {
   const merchant = await authenticateApiPrivateKey(apiPrivateKey);

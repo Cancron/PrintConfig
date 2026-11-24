@@ -1,11 +1,11 @@
 version: "1"
 projects:
-- name: KodaNorth's Project
+- name: PrintConfig
   environments:
   - name: Production
     services:
       - type: web
-        name: canadaprintstudio-api
+        name: printconfig-api
         runtime: node
         rootDir: backend
         plan: free
@@ -20,6 +20,8 @@ projects:
             sync: false
           - key: FRONTEND_URL
             sync: false
+          - key: JWT_SECRET
+            generateValue: true
           - key: SUPABASE_URL
             sync: false
           - key: SUPABASE_SERVICE_ROLE_KEY
@@ -35,10 +37,10 @@ projects:
           - key: CLOUDFLARE_PUBLIC_DEV_URL
             sync: false
           - key: CLOUDFLARE_R2_BUCKET
-            value: canadaprintstudio
+            value: printconfig
 
       - type: web
-        name: canadaprintstudio-admin
+        name: printconfig-admin
         runtime: static
         plan: free
         buildCommand: npm ci && npm run build

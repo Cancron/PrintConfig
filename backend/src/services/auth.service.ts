@@ -3,7 +3,11 @@ import jwt from 'jsonwebtoken';
 import { UserModel } from '../models/User.js';
 import { ApiError } from '../middleware/errorHandler.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+function jwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error('JWT_SECRET must be configured.');
+  return secret;
+}
 const JWT_EXPIRES_IN = '7d';
 const DOWNLOAD_TOKEN_EXPIRES_IN = '5m';
 
@@ -18,25 +22,25 @@ export interface AuthUser {
 export function signToken(user: { _id: string; email: string; name: string; role: string; accountId?: string }): string {
   return jwt.sign(
     { sub: String(user._id), email: user.email, name: user.name, role: user.role, accountId: user.accountId ? String(user.accountId) : undefined },
-    JWT_SECRET,
+    jwtSecret(),
     { expiresIn: JWT_EXPIRES_IN }
   );
 }
 
 export function verifyToken(token: string): jwt.JwtPayload {
-  return jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+  return jwt.verify(token, jwtSecret()) as jwt.JwtPayload;
 }
 
 export function signDownloadToken(input: { sub: string; accountId?: string; cartItemId: string; scope: 'final-prints-download' }): string {
   return jwt.sign(
     { sub: input.sub, accountId: input.accountId, cartItemId: input.cartItemId, scope: input.scope },
-    JWT_SECRET,
+    jwtSecret(),
     { expiresIn: DOWNLOAD_TOKEN_EXPIRES_IN }
   );
 }
 
 export function verifyDownloadToken(token: string): jwt.JwtPayload {
-  return jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+  return jwt.verify(token, jwtSecret()) as jwt.JwtPayload;
 }
 
 export async function signUp(email: string, password: string, name: string): Promise<{ user: AuthUser; token: string }> {
@@ -74,7 +78,7 @@ export async function signIn(email: string, password: string): Promise<{ user: A
   if (!normalizedEmail) throw new ApiError(400, 'Email is required.');
   if (!password) throw new ApiError(400, 'Password is required.');
 
-  const user = await UserModel.findOne({ email: normalizedEmail });
+  const user = await UserModel.findOne({ email: normalizedEmail }).select('+passwordHash');
   if (!user || !user.isActive) {
     throw new ApiError(401, 'Invalid email or password.');
   }

@@ -15,9 +15,7 @@
       "allowed": {
         "origins": [
           "http://localhost:5173",
-          "http://127.0.0.1:5173",
-          "https://canadaprintstudio-admin.onrender.com",
-          "https://cps-o4gs.onrender.com"
+          "http://127.0.0.1:5173"
         ],
         "methods": ["PUT", "HEAD"],
         "headers": ["Content-Type"]

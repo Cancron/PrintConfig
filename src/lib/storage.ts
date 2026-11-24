@@ -40,7 +40,7 @@ const SELECTED_MERCHANT_KEY = 'print-config-selected-merchant';
 
 export const CURRENT_ACCOUNT_ID = '6a3ec80a97741e7afc64d62b';
 
-export const defaultAccount: Account = { _id: CURRENT_ACCOUNT_ID, name: 'Koda North Account' };
+export const defaultAccount: Account = { _id: CURRENT_ACCOUNT_ID, name: 'PrintConfig Account' };
 
 export const defaultMerchants: Merchant[] = [];
 

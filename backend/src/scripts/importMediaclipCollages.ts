@@ -338,7 +338,7 @@ function loadOptions(cliArgs: Record<string, string | boolean>) {
 }
 
 function printHelp() {
-  console.log(`Import Mediaclip collages as KodaPrints draft collages.
+  console.log(`Import Mediaclip collages as PrintConfig draft collages.
 
 Required:
   --url=<third-party-json-url>

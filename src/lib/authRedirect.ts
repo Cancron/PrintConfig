@@ -1,6 +1,6 @@
-const AUTH_REDIRECT_STORAGE_KEY = 'kodaprints.authRedirect';
+const AUTH_REDIRECT_STORAGE_KEY = 'printconfig.authRedirect';
 const AUTH_PATHS = new Set(['/signin', '/signup']);
-const URL_BASE = 'https://kodaprints.local';
+const URL_BASE = 'https://printconfig.local';
 
 function readStatePath(state: unknown): { found: boolean; value?: unknown } {
   if (!state || typeof state !== 'object' || !('from' in state)) {

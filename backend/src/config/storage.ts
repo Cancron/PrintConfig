@@ -13,7 +13,7 @@ import { galleryBucket, getSupabaseAdmin } from './supabase.js';
 
 export type StorageProvider = 'supabase' | 'r2';
 
-export const r2Bucket = process.env.CLOUDFLARE_R2_BUCKET || 'canadaprintstudio';
+export const r2Bucket = process.env.CLOUDFLARE_R2_BUCKET || 'printconfig';
 
 let r2Client: S3Client | undefined;
 

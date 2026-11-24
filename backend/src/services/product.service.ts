@@ -22,6 +22,7 @@ import { resolveAccountId } from './account.service.js';
 import { authenticateApiPrivateKey } from './merchant.service.js';
 import { signDownloadToken, verifyDownloadToken } from './auth.service.js';
 import { galleryBucket } from '../config/supabase.js';
+import { apiBasePath } from '../config/api.js';
 import {
   copyObject,
   deleteObjects,
@@ -1528,7 +1529,7 @@ export async function createFinalPrintsDownloadToken(input: { cartItemId: string
   const origin = String(input.origin ?? '').replace(/\/+$/, '');
   return {
     expiresInSeconds: 300,
-    url: `${origin}/api/products/cart-items/${cartItem._id}/final-prints.zip?downloadToken=${encodeURIComponent(token)}`,
+    url: `${origin}${apiBasePath}/api/products/cart-items/${cartItem._id}/final-prints.zip?downloadToken=${encodeURIComponent(token)}`,
   };
 }
 

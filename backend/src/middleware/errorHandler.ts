@@ -13,7 +13,7 @@ export class ApiError extends Error {
 }
 
 export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
-  void _next;
+  if (res.headersSent) { _next(error); return; }
   if (error instanceof multer.MulterError) {
     const message = error.code === 'LIMIT_FILE_SIZE' ? 'Image file must be 12 MB or smaller.' : error.message;
     res.status(400).json({ error: message });
@@ -21,8 +21,8 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   }
   const statusCode = error instanceof ApiError ? error.statusCode : 500;
   res.status(statusCode).json({
-    error: error.message || 'Internal server error',
-    details: error instanceof ApiError ? error.details : undefined,
+    error: statusCode >= 500 ? 'Internal server error' : error.message || 'Request failed',
+    details: statusCode < 500 && error instanceof ApiError ? error.details : undefined,
   });
 };
 

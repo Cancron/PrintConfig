@@ -1,102 +1,99 @@
-# Deploy Canadaprintstudio to Render
+# Deploy PrintConfig
 
-## Prerequisites
+## Backend With Embedded Admin
 
-- Push this repository to GitHub, GitLab, or Bitbucket.
-- Create a MongoDB Atlas database or another publicly reachable MongoDB deployment.
-- Create the Cloudflare R2 bucket `canadaprintstudio` and enable its public development URL (or attach a production custom domain).
-- Keep the existing Supabase project temporarily if legacy files still need to be migrated.
+Configure `backend/.env` using `backend/.env.example`. Use a real MongoDB URI,
+a generated `JWT_SECRET`, the existing R2 bucket name, and public asset base URL.
+Set `FRONTEND_URL` to your admin/editor browser origins.
 
-## Deploy with the Blueprint
+From the repository root:
 
-1. Open the Render Dashboard.
-2. Select **New > Blueprint**.
-3. Connect this repository.
-4. Render detects `render.yaml` and creates:
-   - `canadaprintstudio-api`: Node/Express web service
-   - `canadaprintstudio-admin`: Vite static site
-5. Enter all environment variables marked `sync: false`.
-
-## Backend environment variables
-
-Set these on `canadaprintstudio-api`:
-
-```text
-MONGODB_URI=mongodb+srv://USER:PASSWORD@CLUSTER/DATABASE
-FRONTEND_URL=https://canadaprintstudio-admin.onrender.com
-SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
-SUPABASE_GALLERY_BUCKET=gallery
-CLOUDFLARE_ACCOUNT_ID=YOUR_CLOUDFLARE_ACCOUNT_ID
-CLOUDFLARE_R2_ACCESS_KEY_ID=YOUR_R2_ACCESS_KEY_ID
-CLOUDFLARE_R2_SECRET_ACCESS_KEY=YOUR_R2_SECRET_ACCESS_KEY
-CLOUDFLARE_PUBLIC_DEV_URL=https://pub-YOUR_ID.r2.dev
-CLOUDFLARE_R2_BUCKET=canadaprintstudio
-R2_SIGNED_UPLOAD_TTL_SECONDS=900
+```sh
+npm ci
+npm --prefix backend ci
+npm run build:deploy
 ```
 
-Cloudflare R2 credentials and `SUPABASE_SERVICE_ROLE_KEY` belong only on the backend service. `CLOUDFLARE_TOKEN` is not required for normal S3-compatible storage operations.
+Upload `backend/`, including `dist/` and `public/admin/`, without local
+`node_modules`, local credentials, or diagnostic logs. Configure server secrets
+through the hosting environment, or a backend-only `.env` file.
 
-If the database name is not included in `MONGODB_URI`, also set:
+Install dependencies on the target operating system:
 
-```text
-DB_NAME=your_database_name
+```sh
+npm ci --omit=dev
+npm start
 ```
 
-## Frontend environment variables
+Use `dist/server.js` as the cPanel startup file. Skia Canvas installation scripts
+must run on the server to download its Linux native binary from GitHub releases.
+The package checks the downloaded binary against its published SHA-256 hash.
+A Windows binary causes
+an `invalid ELF header` startup failure. Do not overwrite a cPanel-managed
+`node_modules` symlink with an uploaded folder.
 
-Set these on `canadaprintstudio-admin`:
+## URL Prefixes
 
-```text
-VITE_API_URL=https://canadaprintstudio-api.onrender.com/api
+Leave `API_BASE_PATH` empty to use `/admin/` and `/api/health`.
+If your host forwards a prefix such as `/printconfig`, set
+`API_BASE_PATH=/printconfig` before building and on the server. URLs become
+`/printconfig/admin/` and `/printconfig/api/health`.
+
+`npm run build:deploy` derives frontend asset, router, and API paths from this
+backend setting. Restart Node after deployment. The deployment build serves
+extensionless asset URLs through Express and stores files under
+`backend/public/admin/_assets`. Upload the entire build together.
+
+## Separate Frontend
+
+For separate static hosting, configure frontend `VITE_API_URL` with the API URL
+including `/api`, and `VITE_BASE_PATH` with its hosting prefix or an empty value.
+Run `npm run build` and deploy `dist/`. Configure an SPA fallback to `index.html`.
+The included `.htaccess` supports Apache-compatible static hosting.
+
+## Render
+
+The example `render.yaml` defines `printconfig-api` and `printconfig-admin`.
+Service names are examples; renaming existing services requires a deliberate
+hosting change. Set frontend `VITE_API_URL` to the deployed API address and backend
+`FRONTEND_URL` to the frontend origin. Supply all environment values marked
+`sync: false`; keep secrets in backend environment settings only.
+
+## R2 and Legacy Supabase
+
+Set `CLOUDFLARE_R2_BUCKET` explicitly to your existing bucket; the example default
+is `printconfig`. This does not rename any existing Cloudflare bucket.
+New uploads use R2. Supabase variables are optional and only needed for legacy
+read/delete/copy operations and migration.
+
+Edit `cloudflare-r2-cors.json` to include production admin origins before applying:
+
+```sh
+npx wrangler r2 bucket cors set YOUR_BUCKET --file cloudflare-r2-cors.json
+npx wrangler r2 bucket cors list YOUR_BUCKET
 ```
 
-Vite variables are embedded during the build. Redeploy the static site after changing them.
+This requires Cloudflare bucket-configuration permission. Browser uploads require
+`PUT` and `Content-Type`; image display requires `GET`/`HEAD`. The sample permits
+public reads; it does not make customer files private. Use a custom asset domain
+for production and keep storage credentials on the backend.
 
-## Final URL pass
+Before migrating Supabase data, back up MongoDB and run:
 
-Render service names must be globally unique. If Render changes either service name:
-
-1. Copy the actual API URL into frontend `VITE_API_URL`, adding `/api`.
-2. Copy the actual static-site URL into backend `FRONTEND_URL`.
-3. Redeploy both services.
-
-## External service checks
-
-- In MongoDB Atlas Network Access, allow connections from Render's outbound IP ranges.
-- Confirm the MongoDB user has access to the selected database.
-- Configure R2 bucket CORS to allow `PUT` from the admin frontend and `GET`/`HEAD` from sites that display the assets. Allow the `Content-Type` request header.
-- Confirm `CLOUDFLARE_PUBLIC_DEV_URL` does not end with a slash.
-- Never add R2 access keys, Cloudflare tokens, or the Supabase service-role key to frontend environment variables.
-
-Apply the included policy with a Cloudflare token that can edit R2 bucket configuration:
-
-```powershell
-npx wrangler r2 bucket cors set canadaprintstudio --file cloudflare-r2-cors.json
-npx wrangler r2 bucket cors list canadaprintstudio
+```sh
+npm --prefix backend run migrate:supabase-to-r2 -- --dryRun
+npm --prefix backend run migrate:supabase-to-r2 -- --apply
+npm --prefix backend run migrate:supabase-to-r2 -- --verify
 ```
 
-Add any additional production admin domains to `cloudflare-r2-cors.json` before applying it. Object read access remains available to all origins because the bucket stores public product assets.
+Retain Supabase credentials/files until production verification is complete.
 
-## Supabase migration
+## Troubleshooting
 
-Run from the repository root after deploying the R2 configuration:
-
-```powershell
-npm.cmd --prefix backend run migrate:supabase-to-r2 -- --dryRun
-npm.cmd --prefix backend run migrate:supabase-to-r2 -- --apply
-npm.cmd --prefix backend run migrate:supabase-to-r2 -- --verify
-```
-
-Back up MongoDB before `--apply`. The migration copies and verifies all files before changing database references. Keep the Supabase backend variables during the fallback period; remove them after migration verification.
-
-## Smoke tests
-
-```text
-https://YOUR_API.onrender.com/api/health
-https://YOUR_FRONTEND.onrender.com
-https://YOUR_FRONTEND.onrender.com/products
-https://YOUR_FRONTEND.onrender.com/image-library
-```
-
-The API health endpoint should return HTTP 200. Refreshing a nested frontend route should load the app instead of returning 404.
+- `503`: inspect Node startup logs; verify dependencies, native binaries,
+  MongoDB access, startup file, and hosting process configuration.
+- API returns HTML: verify proxy mapping and the frontend API base URL.
+- Asset `404`: upload the complete matching admin build and compiled backend.
+- MongoDB failures: run `npm run test:mongo` and `npm run test:mongo-network`
+  inside `backend`. The host must permit outbound TCP to the Atlas cluster.
+- Browser CORS failure: configure both backend `FRONTEND_URL` and R2 bucket CORS.
