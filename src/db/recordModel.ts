@@ -214,8 +214,8 @@ async function syncPages(client: Client, template: Data) {
   for (const [index, page] of (template.pages ?? []).entries()) {
     page.id ??= randomUUID();
     await client.query(
-      'INSERT INTO layout_template_pages (id, template_id, collage_id, page_number, payload) VALUES ($1,$2,$3,$4,$5)',
-      [page.id, template.id, page.collageId || null, index + 1, JSON.stringify(page)],
+      'INSERT INTO layout_template_pages (id, template_id, account_id, collage_id, page_number, payload) VALUES ($1,$2,$3,$4,$5,$6)',
+      [page.id, template.id, template.accountId, page.collageId || null, index + 1, JSON.stringify(page)],
     );
   }
 }
@@ -257,9 +257,11 @@ export function recordModel(table: string) {
         const result = await client.query(
           `INSERT INTO ${table} (id, payload${job ? ', available_at' : ''}) VALUES ($1, $2::jsonb${job ? ', $3::timestamptz' : ''})
            ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = now()${job ? ', available_at = EXCLUDED.available_at' : ''}
+           ${table === 'accounts' ? '' : `WHERE ${table}.account_id = EXCLUDED.account_id`}
            RETURNING *`,
           job ? [data.id, JSON.stringify(stripSystemFields(data)), data.availableAt ?? new Date()] : [data.id, JSON.stringify(stripSystemFields(data))],
         );
+        if (!result.rows.length) throw new ApiError(403, 'Record belongs to another account.');
         const saved = fromRow(result.rows[0]);
         if (table === 'layout_templates') await syncPages(client, saved);
         return new RecordModel(saved);
@@ -293,9 +295,10 @@ export function recordModel(table: string) {
         next.id = current.id ?? randomUUID();
         const job = table === 'design_processing_jobs';
         const saved = await client.query(
-          `INSERT INTO ${table} (id, payload${job ? ', available_at' : ''}) VALUES ($1,$2::jsonb${job ? ', $3::timestamptz' : ''}) ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = now()${job ? ', available_at = EXCLUDED.available_at' : ''} RETURNING *`,
+          `INSERT INTO ${table} (id, payload${job ? ', available_at' : ''}) VALUES ($1,$2::jsonb${job ? ', $3::timestamptz' : ''}) ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = now()${job ? ', available_at = EXCLUDED.available_at' : ''} ${table === 'accounts' ? '' : `WHERE ${table}.account_id = EXCLUDED.account_id`} RETURNING *`,
           job ? [next.id, JSON.stringify(stripSystemFields(next)), next.availableAt ?? new Date()] : [next.id, JSON.stringify(stripSystemFields(next))],
         );
+        if (!saved.rows.length) throw new ApiError(403, 'Record belongs to another account.');
         const record = fromRow(saved.rows[0]);
         if (table === 'layout_templates') await syncPages(client, record);
         return new RecordModel(record);

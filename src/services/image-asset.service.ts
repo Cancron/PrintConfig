@@ -60,6 +60,7 @@ export async function createUploadIntent(payload: Record<string, unknown>, authe
   if (scope === 'merchant' && !isUuid(merchantId)) throw new ApiError(400, 'merchantId is required for merchant images.');
   const folderId = payload.folderId ? String(payload.folderId) : null;
   if (folderId && !isUuid(folderId)) throw new ApiError(400, 'folderId must be a valid UUID.');
+  await assertFolderAvailable({ accountId, scope, merchantId: merchantId || null, folderId });
   const mimeType = String(payload.mimeType ?? '');
   if (!IMAGE_MIME_TYPES.includes(mimeType as typeof IMAGE_MIME_TYPES[number])) throw new ApiError(400, 'Unsupported image mimeType.');
   const sizeBytes = Number(payload.sizeBytes ?? 0);
@@ -70,7 +71,7 @@ export async function createUploadIntent(payload: Record<string, unknown>, authe
   if (overwriteAssetId) {
     if (!isUuid(overwriteAssetId)) throw new ApiError(400, 'overwriteAssetId must be a valid UUID.');
     const asset = await ImageAssetModel.findById(overwriteAssetId);
-    if (!asset || String(asset.accountId) !== accountId) throw new ApiError(404, 'Image asset to overwrite was not found.');
+    if (!asset || String(asset.accountId) !== accountId || asset.scope !== scope || String(asset.merchantId ?? '') !== merchantId || String(asset.folderId ?? '') !== String(folderId ?? '')) throw new ApiError(404, 'Image asset to overwrite was not found.');
     storagePath = String(asset.storagePath);
   } else {
     const filename = `${Date.now()}-${randomBytes(4).toString('hex')}-${safeFilename(String(payload.filename ?? 'image'))}`;
@@ -86,6 +87,23 @@ export async function completeUpload(payload: Record<string, unknown>, authentic
   if (authenticatedAccountId && accountId !== authenticatedAccountId) throw new ApiError(403, 'Cannot complete uploads for another account.');
   const storagePath = String(payload.storagePath ?? '').replace(/^\/+|\/+$/g, '');
   if (!storagePath.startsWith(`accounts/${accountId}/`)) throw new ApiError(403, 'Storage path does not belong to this account.');
+  const scope = payload.scope === 'merchant' ? 'merchant' : payload.scope === 'shared' ? 'shared' : '';
+  if (!scope) throw new ApiError(400, 'Image scope is required.');
+  const merchantId = scope === 'merchant' ? String(payload.merchantId ?? '') : '';
+  if (scope === 'merchant' && !isUuid(merchantId)) throw new ApiError(400, 'merchantId is required for merchant images.');
+  const folderId = payload.folderId ? String(payload.folderId) : null;
+  if (folderId && !isUuid(folderId)) throw new ApiError(400, 'folderId must be a valid UUID.');
+  const overwriteAssetId = String(payload.overwriteAssetId ?? '');
+  if (overwriteAssetId) {
+    if (!isUuid(overwriteAssetId)) throw new ApiError(400, 'overwriteAssetId must be a valid UUID.');
+    const asset = await ImageAssetModel.findOne({ id: overwriteAssetId, accountId });
+    if (!asset || asset.scope !== scope || String(asset.merchantId ?? '') !== merchantId || String(asset.folderId ?? '') !== String(folderId ?? '') || asset.storagePath !== storagePath) throw new ApiError(403, 'Overwrite does not match the existing image asset.');
+  } else {
+    const prefix = scope === 'merchant'
+      ? `accounts/${accountId}/merchants/${merchantId}/${folderId || 'root'}/`
+      : `accounts/${accountId}/shared/${folderId || 'root'}/`;
+    if (!storagePath.startsWith(prefix) || !storagePath.slice(prefix.length) || storagePath.slice(prefix.length).includes('/')) throw new ApiError(403, 'Storage path does not match image scope and folder.');
+  }
   const metadata = await headObject(storagePath, r2Bucket).catch(() => null);
   if (!metadata) throw new ApiError(400, 'Uploaded R2 object was not found.');
   const expectedSize = Number(payload.sizeBytes ?? 0);
@@ -106,7 +124,6 @@ export async function completeUpload(payload: Record<string, unknown>, authentic
   delete assetPayload.overwriteAssetId;
   normalizeAsset(assetPayload);
   await assertFolderAvailable(assetPayload);
-  const overwriteAssetId = String(payload.overwriteAssetId ?? '');
   if (overwriteAssetId) {
     const updated = await ImageAssetModel.findOneAndUpdate({ id: overwriteAssetId, accountId }, assetPayload, { new: true, runValidators: true });
     if (!updated) throw new ApiError(404, 'Image asset to update was not found.');

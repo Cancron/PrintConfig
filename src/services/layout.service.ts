@@ -140,7 +140,7 @@ export async function importLayoutCategory(payload: Record<string, unknown>) {
   return { category, templates: [] };
 }
 
-async function normalizePages(data: Record<string, unknown>, merchantContextId?: string) {
+async function normalizePages(data: Record<string, unknown>) {
   const pages = Array.isArray(data.pages) ? data.pages as Record<string, unknown>[] : [];
   if (pages.length === 0) {
     data.pages = [{ pageNumber: 1, name: 'Page 1', width: data.canvasWidth, height: data.canvasHeight, backgroundColor: data.backgroundColor || '#ffffff', collageId: null, elements: [] }];
@@ -159,7 +159,7 @@ async function normalizePages(data: Record<string, unknown>, merchantContextId?:
       if (!isUuidValue(normalized.collageId)) throw new ApiError(400, 'Page collage must be a valid UUID.');
       const collage = await CollageModel.findOne({
         id: normalized.collageId,
-        ...layoutVisibleQuery(String(data.accountId), merchantContextId ?? (data.merchantId ? String(data.merchantId) : undefined)),
+        ...layoutVisibleQuery(String(data.accountId), data.scope === 'merchant' ? String(data.merchantId) : undefined),
       });
       if (!collage) throw new ApiError(400, 'Selected collage is not visible for this account and merchant.');
     }
@@ -209,7 +209,6 @@ async function normalizeTemplatePayload(payload: Record<string, unknown>, id?: s
   if (!String(payload.name ?? '').trim()) throw new ApiError(400, 'Layout template name is required.');
   payload.slug = validateSlug(payload.slug || slugify(String(payload.name ?? 'layout-template')));
   validateStatus(payload.status ?? 'draft');
-  const merchantContextId = payload.merchantContextId ? String(payload.merchantContextId) : undefined;
   delete payload.merchantContextId;
   payload.categoryId = null;
   if (!TEMPLATE_TYPES.includes(String(payload.templateType))) throw new ApiError(400, 'Template type is required.');
@@ -222,7 +221,7 @@ async function normalizeTemplatePayload(payload: Record<string, unknown>, id?: s
   payload.sortOrder = Number(payload.sortOrder ?? 0);
   if (Number.isNaN(payload.sortOrder)) throw new ApiError(400, 'Sort order must be numeric.');
   payload.tags = Array.isArray(payload.tags) ? payload.tags.map((tag) => String(tag).trim()).filter(Boolean) : String(payload.tags ?? '').split(',').map((tag) => tag.trim()).filter(Boolean);
-  await normalizePages(payload, merchantContextId);
+  await normalizePages(payload);
   payload.pageCount = Math.max(Number(payload.pageCount), (payload.pages as unknown[]).length);
   await assertTemplateSlugUnique(payload, id);
 }
@@ -289,11 +288,10 @@ async function normalizeCollagePayload(payload: Record<string, unknown>, id?: st
   payload.slug = validateSlug(payload.slug || slugify(String(payload.name ?? 'collage')));
   validateStatus(payload.status ?? 'draft');
   if (!payload.categoryId || !isUuidValue(payload.categoryId)) throw new ApiError(400, 'Layout category is required.');
-  const merchantContextId = payload.merchantContextId ? String(payload.merchantContextId) : undefined;
   delete payload.merchantContextId;
   const category = await LayoutCategoryModel.findOne({
     id: payload.categoryId,
-    ...layoutVisibleQuery(String(payload.accountId), merchantContextId ?? (payload.merchantId ? String(payload.merchantId) : undefined)),
+    ...layoutVisibleQuery(String(payload.accountId), payload.scope === 'merchant' ? String(payload.merchantId) : undefined),
   });
   if (!category) throw new ApiError(400, 'Layout category is not visible for this account and merchant.');
   if (!ORIENTATIONS.includes(String(payload.orientation))) throw new ApiError(400, 'Orientation is required.');

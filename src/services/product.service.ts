@@ -28,8 +28,10 @@ import {
   copyObject,
   deleteObjects,
   downloadObject,
+  getObjectStream,
   listLegacySupabaseObjects,
   listObjects,
+  objectExists,
   r2Bucket,
   r2PublicUrl,
   uploadObject,
@@ -158,6 +160,14 @@ async function normalizeRefs(data: Record<string, unknown>) {
   if (data.scope === 'shared') data.merchantId = null;
   if (data.merchantId && !isUuid(String(data.merchantId))) throw new ApiError(400, 'merchantId must be a valid UUID.');
   if (!data.categoryId || !isUuid(String(data.categoryId))) throw new ApiError(400, 'Product must have a valid categoryId.');
+  const category = await ProductCategoryModel.findOne({
+    id: String(data.categoryId),
+    accountId: data.accountId,
+    $or: data.scope === 'merchant'
+      ? [{ scope: 'shared' }, { scope: 'merchant', merchantId: data.merchantId }]
+      : [{ scope: 'shared' }],
+  }).lean();
+  if (!category) throw new ApiError(400, 'Category is not visible for this product scope and merchant.');
 }
 
 function normalizeEditorProductSelection(data: Record<string, any>) {
@@ -173,18 +183,11 @@ async function validateEditorProductSelection(data: Record<string, any>, product
   if (new Set(ids).size !== ids.length) throw new ApiError(400, 'Specific product selections must be unique.');
   if (ids.some((id: string) => !isUuid(id))) throw new ApiError(400, 'Specific product selections must contain valid product UUIDs.');
   if (productId && ids.includes(productId)) throw new ApiError(400, 'A product cannot select itself.');
-  let existingIds = new Set<string>();
-  if (productId) {
-    const current = await ProductModel.findById(productId).select('editorProductSelection.specificProductIds').lean();
-    existingIds = new Set((current?.editorProductSelection?.specificProductIds ?? []).map(String));
-  }
-  const addedIds = ids.filter((id: string) => !existingIds.has(id));
-  if (addedIds.length === 0) return;
+  if (ids.length === 0) return;
   const visibility: Record<string, unknown>[] = [{ scope: 'shared' }];
   if (data.scope === 'merchant' && data.merchantId) visibility.push({ scope: 'merchant', merchantId: data.merchantId });
-  else visibility.push({ scope: 'merchant' });
-  const count = await ProductModel.countDocuments({ id: { $in: addedIds }, accountId: data.accountId, status: 'active', $or: visibility });
-  if (count !== addedIds.length) throw new ApiError(400, 'New specific product selections must be active and visible within this account.');
+  const count = await ProductModel.countDocuments({ id: { $in: ids }, accountId: data.accountId, status: 'active', $or: visibility });
+  if (count !== ids.length) throw new ApiError(400, 'Specific product selections must be active and visible to this product.');
 }
 function normalizeFrontendContent(data: Record<string, any>) {
   data.frontendContent = normalizeFrontendContentPayload(data.frontendContent);
@@ -534,7 +537,6 @@ async function validateLayoutSettings(data: Record<string, any>) {
     if (ids.some((id: string) => !isUuid(id))) throw new ApiError(400, 'Layout template selections must contain valid UUIDs.');
     const visibility: Record<string, unknown>[] = [{ scope: 'shared' }];
     if (data.scope === 'merchant' && data.merchantId) visibility.push({ scope: 'merchant', merchantId: data.merchantId });
-    else visibility.push({ scope: 'merchant' });
     const count = await LayoutTemplateModel.countDocuments({ id: { $in: ids }, accountId: data.accountId, status: 'active', $or: visibility });
     if (count !== ids.length) throw new ApiError(400, 'Selected layout templates must be active and visible within this account.');
   }
@@ -698,10 +700,10 @@ export async function listProducts(filters: Record<string, string | undefined>) 
   if (filters.productType) query.productType = filters.productType;
   if (filters.search) {
     const search = filters.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    if (search) query.$or = [
+    if (search) query.$and = [{ $or: [
       { name: { $regex: search, $options: 'i' } },
       { slug: { $regex: search, $options: 'i' } },
-    ];
+    ] }];
   }
 
   if (filters.summary === 'true') {
@@ -793,7 +795,7 @@ export async function duplicateProduct(id: string, payload: { scope?: 'shared' |
   const scope = payload.scope ?? product.scope;
   const sharedRoomData = liftLegacyProductRooms(product);
   const source = { ...product, roomPreviews: sharedRoomData.roomPreviews, variants: sharedRoomData.variants };
-  const copy = new ProductModel({
+  return createProduct({
     ...stripIds(source),
     name: `${product.name} Copy`,
     slug: `${product.slug}-copy-${Date.now()}`,
@@ -801,7 +803,6 @@ export async function duplicateProduct(id: string, payload: { scope?: 'shared' |
     scope,
     merchantId: scope === 'shared' ? null : payload.merchantId ?? product.merchantId,
   });
-  return copy.save();
 }
 
 export async function exportProduct(id: string) {
@@ -1170,7 +1171,9 @@ export async function verifyPublicDesignToken(input: { authorization?: string; r
 
   const identityParts = identity.split(':');
   const [userKeyRaw, merchantId, productId, wpProductId] = identityParts;
-  if (!userKeyRaw || !merchantId || !productId || !wpProductId || identityParts.length !== 4) throw new ApiError(401, 'Invalid design authorization token identity.');
+  if (!userKeyRaw || !merchantId || !productId || (identityParts.length !== 3 && identityParts.length !== 4) || (identityParts.length === 4 && !wpProductId)) {
+    throw new ApiError(401, 'Invalid design authorization token identity.');
+  }
   if (!isUuid(merchantId)) throw new ApiError(401, 'Invalid design authorization merchant.');
   if (!isUuid(productId)) throw new ApiError(401, 'Invalid design authorization product.');
   if (String(productId) !== String(input.routeProductId)) throw new ApiError(403, 'Design authorization token does not match this product.');
@@ -1214,7 +1217,11 @@ export async function listDesignCartItems(filters: Record<string, string | undef
   if (filters.status) query.status = filters.status;
   if (filters.printGenerationStatus) query.printGenerationStatus = filters.printGenerationStatus;
   if (filters.productType) {
-    const allowedProductTypes = ['Photo Book Print', 'Photo Collage Print', 'Pillow Print', 'Mug Print', 'T-Shirt Print'];
+    const allowedProductTypes = [
+      'Canvas Print', 'Framed Print', 'Metal Print', 'Photo Print', 'Photo Collage Print',
+      'Photo Book Print', 'Pillow Print', 'Mug Print', 'AI Art Generation', 'Art Print',
+      'T-Shirt Print', 'Business Card', 'Sticker',
+    ];
     if (!allowedProductTypes.includes(filters.productType)) throw new ApiError(400, 'Unsupported product type filter.');
     query.productType = filters.productType;
   }
@@ -1517,7 +1524,7 @@ export async function streamFinalPrintsZip(input: { cartItemId: string; download
   for (const [index, file] of files.entries()) {
     const storagePath = String(file?.storagePath ?? '');
     if (!storagePath) continue;
-    const data = await downloadObject(storagePath, {
+    const data = await getObjectStream(storagePath, {
       provider: String(file?.storageProvider ?? 'supabase') as StorageProvider,
       bucket: String(file?.bucket ?? '') || undefined,
     }).catch((error) => { throw new ApiError(502, `Final print download failed: ${error instanceof Error ? error.message : storagePath}`); });
@@ -1585,7 +1592,7 @@ function publicTShirtConfig(tshirt: any, productType: string) {
 async function markCartItemAndProjectOrdered(cartItem: any, requestedOrderId?: unknown) {
   const orderId = sanitizeUploadSegment(String(requestedOrderId ?? cartItem.orderId ?? cartItem.id));
   if (!orderId) throw new ApiError(400, 'orderId is required to mark a design cart item as ordered.');
-  const orderPrefix = designOrderPrefix(String(cartItem.merchantId), orderId, String(cartItem.productId));
+  const orderPrefix = String(cartItem.orderStoragePrefix || designOrderPrefix(String(cartItem.merchantId), orderId, String(cartItem.productId), String(cartItem.id)));
   const now = new Date();
   cartItem.status = 'ordered';
   cartItem.orderId = orderId;
@@ -1626,7 +1633,7 @@ async function queueDesignCartItemProcessing(cartItem: any, input: { orderId?: u
     cartItemId: cartItem.id,
     status: { $in: ['pending', 'processing'] },
   }).lean();
-  if ((existingJob || designProcessingJobs.has(String(cartItem.id))) && !force) {
+  if (existingJob || designProcessingJobs.has(String(cartItem.id))) {
     return {
       cartItem,
       job: existingJob,
@@ -1638,7 +1645,7 @@ async function queueDesignCartItemProcessing(cartItem: any, input: { orderId?: u
 
   const orderId = sanitizeUploadSegment(String(markedOrderId ?? input.orderId ?? cartItem.orderId ?? cartItem.id));
   if (!orderId) throw new ApiError(400, 'orderId is required to process a design cart item.');
-  const orderPrefix = designOrderPrefix(String(cartItem.merchantId), orderId, String(cartItem.productId));
+  const orderPrefix = String(cartItem.orderStoragePrefix || designOrderPrefix(String(cartItem.merchantId), orderId, String(cartItem.productId), String(cartItem.id)));
   if (input.markOrdered) cartItem.status = 'ordered';
   cartItem.orderId = orderId;
   cartItem.orderStoragePrefix = orderPrefix;
@@ -1698,7 +1705,7 @@ async function runDesignCartItemProcessing(jobId: string) {
     const orderId = sanitizeUploadSegment(String(job.orderId || cartItem.orderId || cartItem.id));
     const sourcePrefix = String(cartItem.tempStoragePrefix || '');
     if (!sourcePrefix) throw new ApiError(400, 'Cart item is missing a temporary design storage prefix.');
-    const orderPrefix = String(job.orderPrefix || designOrderPrefix(String(cartItem.merchantId), orderId, String(cartItem.productId)));
+    const orderPrefix = String(job.orderPrefix || cartItem.orderStoragePrefix || designOrderPrefix(String(cartItem.merchantId), orderId, String(cartItem.productId), String(cartItem.id)));
     const copiedFiles = await copyStoragePrefix(sourcePrefix, orderPrefix);
     if (!copiedFiles.some((file) => file.destination === `${orderPrefix}/design.json`)) throw new ApiError(400, 'Cart item has no saved design.json to process.');
 
@@ -1812,10 +1819,13 @@ export async function savePublicDesignUpload(input: {
   }
 
   const { merchant, product, userKey } = await resolvePublicDesignContext(input.productId, input.merchantId, input.userKey);
-  const productType = normalizeDesignProductType(input.productType, product.productType);
+  const productType = normalizeDesignProductType(product.productType, input.productType);
   const project = await resolveDesignProject({ merchant, product, userKey, requestedProjectId: input.projectId });
   const prefix = project.tempStoragePrefix;
   const publicPathPrefix = `${r2PublicUrl(prefix)}/`;
+  if (addToCart && designData === undefined && !await objectExists(`${prefix}/design.json`)) {
+    throw new ApiError(400, 'Save designData before adding this project to cart.');
+  }
 
   let image: Record<string, unknown> | null = null;
   if (input.file) {
@@ -1936,8 +1946,20 @@ export async function getPublicDesignWithProduct(input: { productId: string; mer
       designData = null;
       designExists = false;
     }
-  } catch {
+  } catch (error) {
     designExists = false;
+    const storageError = error as { name?: string; statusCode?: number | string; $metadata?: { httpStatusCode?: number } };
+    const missing = storageError.$metadata?.httpStatusCode === 404
+      || Number(storageError.statusCode) === 404
+      || storageError.name === 'NotFound'
+      || storageError.name === 'NoSuchKey';
+    if (!missing) {
+      project = await createDesignProject({ merchant, product, userKey }, {
+        sourceProjectId: project.projectId,
+        projectResolutionReason: 'design_read_failed',
+      });
+      designStoragePath = `${project.tempStoragePrefix}/design.json`;
+    }
   }
   return {
     product: productData,
@@ -2018,16 +2040,14 @@ function parseBoolean(value: unknown) {
 }
 
 function normalizeDesignProductType(value: unknown, fallback: unknown = 'Photo Book Print') {
-  for (const candidate of [value, fallback]) {
-    const raw = String(candidate ?? '').trim().toLowerCase();
-    if (!raw) continue;
-    if (raw.includes('t-shirt') || raw.includes('tshirt') || raw.includes('tee shirt')) return 'T-Shirt Print';
-    if (raw.includes('pillow')) return 'Pillow Print';
-    if (raw.includes('mug')) return 'Mug Print';
-    if (raw.includes('collage')) return 'Photo Collage Print';
-    if (raw.includes('book')) return 'Photo Book Print';
-  }
-  return 'Photo Book Print';
+  const candidate = String(value ?? '').trim() || String(fallback ?? '').trim() || 'Photo Book Print';
+  const raw = candidate.toLowerCase();
+  if (raw.includes('t-shirt') || raw.includes('tshirt') || raw.includes('tee shirt')) return 'T-Shirt Print';
+  if (raw.includes('pillow')) return 'Pillow Print';
+  if (raw.includes('mug')) return 'Mug Print';
+  if (raw.includes('collage')) return 'Photo Collage Print';
+  if (raw.includes('book')) return 'Photo Book Print';
+  return candidate;
 }
 
 async function resolveDesignProject(input: { merchant: any; product: any; userKey: string; requestedProjectId?: unknown }) {
@@ -2164,46 +2184,53 @@ async function saveDesignCartItem(input: {
     designPublicBaseUrl: input.designPublicBaseUrl,
     designPublicUrl: input.designPublicUrl,
     tempStoragePrefix: input.tempStoragePrefix,
-    image: input.image ?? undefined,
-    pagePreviews: input.pagePreviews,
+    ...(input.image ? { image: input.image } : {}),
+    ...(input.pagePreviews.length ? { pagePreviews: input.pagePreviews } : {}),
     printGenerationStatus: 'pending',
     printGenerationError: '',
     addedToCartAt: now,
     lastActivityAt: now,
   };
-  return withTransaction(async () => {
-    const cartItem = await DesignCartItemModel.findOneAndUpdate(
-    {
-      merchantId: payload.merchantId,
-      productId: payload.productId,
-      userKey: input.userKey,
-      projectId: input.projectId,
-      status: 'cart',
-    },
-    { $set: payload },
-    { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-    );
-    if (!cartItem) throw new ApiError(500, 'Could not save cart item.');
-    await DesignProjectModel.findOneAndUpdate(
-      { projectId: input.projectId },
-      {
-        $set: {
-          cartItemId: cartItem.id,
-          status: 'cart',
-          lastActivityAt: new Date(),
-        },
-      }
-    );
-    return cartItem;
-  });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await withTransaction(async () => {
+        const cartItem = await DesignCartItemModel.findOneAndUpdate(
+          {
+            merchantId: payload.merchantId,
+            productId: payload.productId,
+            userKey: input.userKey,
+            projectId: input.projectId,
+            status: 'cart',
+          },
+          { $set: payload },
+          { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+        );
+        if (!cartItem) throw new ApiError(500, 'Could not save cart item.');
+        await DesignProjectModel.findOneAndUpdate(
+          { projectId: input.projectId },
+          {
+            $set: {
+              cartItemId: cartItem.id,
+              status: 'cart',
+              lastActivityAt: new Date(),
+            },
+          }
+        );
+        return cartItem;
+      });
+    } catch (error: any) {
+      if (error?.code !== '23505' || attempt === 1) throw error;
+    }
+  }
+  throw new ApiError(500, 'Could not save cart item.');
 }
 
 function designTempPrefix(merchantId: string, projectId: string) {
   return `designs/tmp/${merchantId}/${projectId}`;
 }
 
-function designOrderPrefix(merchantId: string, orderId: string, productId: string) {
-  return `designs/orders/${merchantId}/${orderId}/${productId}`;
+function designOrderPrefix(merchantId: string, orderId: string, productId: string, cartItemId: string) {
+  return `designs/orders/${merchantId}/${orderId}/${productId}/${cartItemId}`;
 }
 
 async function copyStoragePrefix(sourcePrefix: string, destinationPrefix: string) {
@@ -2492,6 +2519,27 @@ function resolveFinalPrintPages(design: unknown, cartItem: Record<string, any>, 
       };
     });
   }
+  if (productType !== 'Photo Book Print') {
+    return sourcePages.map((page, index) => {
+      const pageNumber = positiveInteger(page.pageNumber, index + 1);
+      const pageId = String(page.pageId ?? page.id ?? `page-${pageNumber}`);
+      const preview = previews.find((item) => String(item.pageId ?? '') === pageId)
+        ?? previews.find((item) => Number(item.pageNumber) === pageNumber)
+        ?? previews[index];
+      return {
+        ...page,
+        pageNumber,
+        printPageNumber: index + 1,
+        pageRole: 'artwork',
+        filename: finalPrintFilename('artwork', index + 1, pageNumber),
+        pageId,
+        previewUrl: String(preview?.publicUrl ?? preview?.url ?? ''),
+        dpi,
+        backgroundColor: typeof page.backgroundColor === 'string' ? page.backgroundColor : typeof (designRecord as any).backgroundColor === 'string' ? (designRecord as any).backgroundColor : '#ffffff',
+        ...finalPrintDimensions(page, designRecord, dpi, selectedVariant),
+      };
+    });
+  }
   const pages = [];
   for (let index = 0; index < sourcePages.length; index += 1) {
     const page = sourcePages[index];
@@ -2565,7 +2613,12 @@ function resolveFinalPrintVariant(design: Record<string, unknown>, product: any)
       ?? nestedDesign.selectedVariantId
       ?? ''
   ).trim();
-  if (!selectedVariantId) return undefined;
+  if (!selectedVariantId) {
+    const activeVariants = Array.isArray(product?.variants)
+      ? product.variants.filter((variant: any) => variant?.status === 'active' && hasValidVariantDimensions(variant))
+      : [];
+    return activeVariants.length === 1 ? activeVariants[0] : undefined;
+  }
 
   const currentVariant = Array.isArray(product?.variants)
     ? product.variants.find((variant: any) => String(variant?.id ?? variant?.id ?? '') === selectedVariantId)

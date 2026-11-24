@@ -125,10 +125,16 @@ npm run frontend:lint
 npm test
 ```
 
-`npm test` runs backend unit/API and frontend logic tests. Set `TEST_DATABASE_URL`
-to the local `printconfig_test` database. PostgreSQL API tests use an ephemeral
-local listener and verify sign-in, UUIDs, ownership, catalogue, layouts, cart
-records, and atomic job claiming. R2 access is not needed for these tests.
+`npm test` runs backend unit/API workflows and frontend logic tests. Set
+`TEST_DATABASE_URL` to the local `printconfig_test` database and apply test
+migrations first. PostgreSQL tests use an ephemeral local API listener and verify
+sign-in, UUID responses, ownership and schema constraints, catalogue and layout
+CRUD, product-type public configuration, merchant-scoped search, project save/load,
+concurrent Add to Cart for one project, checkout versus admin-only generation,
+and final print output and dimensions for collage and canvas products.
+The design workflow uses an in-memory R2 command fake; no external storage or
+internet access is needed. Frontend browser E2E and real R2 integration are not
+covered by this suite.
 
 Jobs are persisted in PostgreSQL, but execution currently starts in the API process.
 A separate durable worker and automatic interrupted-job recovery are future work.

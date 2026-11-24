@@ -26,11 +26,19 @@ const printStatusOptions = [
 
 const productTypeOptions = [
   { value: '', label: 'All product types' },
+  { value: 'Canvas Print', label: 'Canvas Print' },
+  { value: 'Framed Print', label: 'Framed Print' },
+  { value: 'Metal Print', label: 'Metal Print' },
+  { value: 'Photo Print', label: 'Photo Print' },
   { value: 'Photo Book Print', label: 'Photo Book Print' },
   { value: 'Photo Collage Print', label: 'Photo Collage Print' },
   { value: 'Pillow Print', label: 'Pillow Print' },
   { value: 'Mug Print', label: 'Mug Print' },
   { value: 'T-Shirt Print', label: 'T-Shirt Print' },
+  { value: 'AI Art Generation', label: 'AI Art Generation' },
+  { value: 'Art Print', label: 'Art Print' },
+  { value: 'Business Card', label: 'Business Card' },
+  { value: 'Sticker', label: 'Sticker' },
 ];
 
 export function Orders() {

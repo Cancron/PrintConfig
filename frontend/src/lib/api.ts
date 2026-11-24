@@ -5,6 +5,7 @@ import { liftLegacyRoomPreviews, normalizeSharedRoomPreview } from './roomPrevie
 import { normalizeFrontendContent } from './frontendContent';
 import { normalizeEditorProductSelection } from './productSelection';
 import { normalizeMugProductConfig, normalizeMugVariantConfig, normalizePillowProductConfig, normalizePillowVariantConfig, normalizeTShirtProductConfig } from './storage';
+import { apiPayload, idOf } from './apiIds';
 
 export interface AuthUser {
   id: string;
@@ -47,10 +48,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new Error(body.error ?? `API request failed: ${response.status}`);
   }
   return response.json();
-}
-
-function idOf(value: any) {
-  return String(value?.id ?? '');
 }
 
 function normalizeMerchant(raw: any): Merchant {
@@ -370,20 +367,6 @@ function normalizeProductLayoutSettings(raw: any) {
     allowedTemplateTags,
     requireTemplateSelection: raw?.requireTemplateSelection === true,
   };
-}
-
-function apiPayload<T>(value: T): T {
-  if (Array.isArray(value)) return value.map(apiPayload) as T;
-  if (value && typeof value === 'object') {
-    const output: Record<string, unknown> = {};
-    for (const [key, child] of Object.entries(value)) {
-      if (key === 'clientId' || (key === 'id' && !child)) continue;
-      if (!child && ['productId', 'optionGroupId', 'variantId', 'surfaceId', 'categoryId', 'thumbnailAssetId', 'backgroundImageAssetId', 'imageAssetId'].includes(key)) continue;
-      output[key] = apiPayload(child);
-    }
-    return output as T;
-  }
-  return value;
 }
 
 function withoutRootId<T extends { id: string }>(value: T) {

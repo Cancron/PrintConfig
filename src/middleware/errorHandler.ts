@@ -23,6 +23,7 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     const code = String(error.code);
     if (code === '23505') { res.status(409).json({ error: 'A record with this value already exists.' }); return; }
     if (code === '23503') { res.status(409).json({ error: 'This record is referenced by another record or references a missing record.' }); return; }
+    if (code === '23502' || code === '23514') { res.status(400).json({ error: 'Required fields or values are invalid.' }); return; }
     if (code === '22P02') { res.status(400).json({ error: 'Invalid ID or data format.' }); return; }
   }
   const statusCode = error instanceof ApiError ? error.statusCode : 500;
