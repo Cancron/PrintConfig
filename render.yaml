@@ -22,12 +22,6 @@ projects:
             sync: false
           - key: JWT_SECRET
             generateValue: true
-          - key: SUPABASE_URL
-            sync: false
-          - key: SUPABASE_SERVICE_ROLE_KEY
-            sync: false
-          - key: SUPABASE_GALLERY_BUCKET
-            value: gallery
           - key: CLOUDFLARE_ACCOUNT_ID
             sync: false
           - key: CLOUDFLARE_R2_ACCESS_KEY_ID

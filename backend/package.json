@@ -1,6 +1,6 @@
 {
     "name": "printconfig-api",
-    "description": "PrintConfig API with Cloudflare R2 storage and legacy Supabase compatibility and migration.",
+    "description": "PrintConfig API with Cloudflare R2 storage.",
     "version": "0.1.0",
     "private": true,
     "type": "module",
@@ -19,6 +19,7 @@
     "dependencies": {
         "@aws-sdk/client-s3": "3.1156.0",
         "@aws-sdk/s3-request-presigner": "3.1156.0",
+        "@napi-rs/canvas": "1.0.13",
         "@supabase/supabase-js": "2.109.0",
         "@types/sanitize-html": "2.16.2",
         "archiver": "8.0.0",
@@ -29,8 +30,7 @@
         "jsonwebtoken": "9.0.3",
         "mongoose": "8.24.7",
         "multer": "2.5.0",
-        "sanitize-html": "2.17.5",
-        "skia-canvas": "3.0.8"
+        "sanitize-html": "2.17.5"
     },
     "devDependencies": {
         "@types/archiver": "8.0.0",

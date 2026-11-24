@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Canvas, Path2D, loadImage, type CanvasRenderingContext2D, type Image } from 'skia-canvas';
+import { createCanvas, Path2D, loadImage, type SKRSContext2D as CanvasRenderingContext2D, type Image } from '@napi-rs/canvas';
 
 const EDITOR_PAGE_REFERENCE_WIDTH = 496;
 const EMPTY_TEXT_VALUES = new Set(['Add text', 'Add heading', 'Add subtitle', 'Add caption']);
@@ -98,7 +98,7 @@ export interface RenderDesignPageInput {
 }
 
 export async function renderDesignPageToImageBuffer(input: RenderDesignPageInput) {
-  const canvas = new Canvas(input.widthPx, input.heightPx);
+  const canvas = createCanvas(input.widthPx, input.heightPx);
   const ctx = canvas.getContext('2d');
   const design = isRecord(input.design) ? input.design : {};
   const styleScale = input.widthPx / EDITOR_PAGE_REFERENCE_WIDTH;
@@ -133,9 +133,9 @@ export async function renderDesignPageToImageBuffer(input: RenderDesignPageInput
   }
 
   if (input.format === 'jpeg') {
-    return canvas.toBuffer('jpeg', { quality: clamp(input.quality ?? 0.94, 0.01, 1) });
+    return canvas.toBuffer('image/jpeg', Math.round(clamp(input.quality ?? 0.94, 0.01, 1) * 100));
   }
-  return canvas.toBuffer('png');
+  return canvas.toBuffer('image/png');
 }
 
 async function drawPageBackground(

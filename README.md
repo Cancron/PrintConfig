@@ -22,19 +22,13 @@ and complete role/ownership enforcement are not implemented.
 ## Stack
 
 React, TypeScript, Vite, Tailwind CSS, Express, MongoDB/Mongoose, Cloudflare R2,
-Skia Canvas, and optional legacy Supabase Storage compatibility.
+and an npm-packaged Skia-backed canvas renderer.
 
-## Storage Support
+## Storage
 
-| Provider | Current support |
-| --- | --- |
-| Cloudflare R2 | All new gallery uploads, customer uploads, saved JSON, previews, order copies, and final prints. |
-| Supabase Storage | Legacy reads, deletion of legacy assets, legacy order-source copying, and migration to R2. |
-
-Supabase is not an alternative provider for new uploads. The backend retains
-`@supabase/supabase-js` because legacy operations and migration still depend on it.
-The frontend has no Supabase SDK and obtains upload authorization from the backend.
-MongoDB stores application records; neither storage provider replaces MongoDB.
+Cloudflare R2 stores gallery images, customer uploads, saved designs, previews,
+order copies, and final prints. The frontend obtains upload authorization from
+the backend. MongoDB stores application records.
 
 The current R2 design uses public object URLs. Files uploaded to a public bucket
 are publicly addressable; private signed delivery is not implemented for customer files.
@@ -50,10 +44,10 @@ npm --prefix backend ci
 
 Direct dependencies are pinned, and both npm projects require releases to be at
 least 30 days old when resolving new versions. Commit both lockfiles and use
-`npm ci` for reproducible installs. The native `skia-canvas` install script
-downloads a platform binary from its GitHub releases and verifies its SHA-256
-hash. `esbuild` can fetch a platform binary from npm if its optional package is
-missing; other locked package tarballs resolve from the npm registry.
+`npm ci` for reproducible installs. Install scripts are disabled in both npm
+projects. The print renderer's native binary (`@napi-rs/canvas`) and esbuild's
+platform binary are distributed as npm optional packages, so dependency
+installation does not fetch binaries from GitHub or other external hosts.
 
 Create local `.env` files from `.env.example` and `backend/.env.example`.
 Configure MongoDB, a random `JWT_SECRET`, and R2 credentials in the backend only.
@@ -84,7 +78,6 @@ The default frontend is `http://localhost:5173`; the API is
 | `CLOUDFLARE_R2_BUCKET` | Existing R2 bucket name; default `printconfig`. |
 | `CLOUDFLARE_PUBLIC_DEV_URL` | Public R2 base URL or production custom-domain URL. |
 | `R2_SIGNED_UPLOAD_TTL_SECONDS` | Upload URL expiry; default 900 seconds. |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_GALLERY_BUCKET` | Optional legacy storage/migration configuration. |
 
 `CLOUDFLARE_TOKEN` is not used by normal storage operations. Keep it out of the
 frontend. Frontend settings are only `VITE_API_URL` and `VITE_BASE_PATH`.
@@ -110,7 +103,7 @@ The deployment build uses extensionless asset URLs handled by Express to accommo
 shared hosts that intercept file-extension requests. The physical asset folder is `_assets`.
 Upload generated `dist` and `public/admin` together. Install production dependencies
 on the target server with `npm ci --omit=dev`, then run `npm start` from `backend`.
-Never upload Windows `node_modules` to Linux: Skia Canvas includes a native binary.
+Never upload Windows `node_modules` to Linux: the renderer includes a native binary.
 Rebuild and restart when changing the deployment prefix.
 
 See [DEPLOY_RENDER.md](DEPLOY_RENDER.md) for hosting and CORS configuration.
@@ -127,19 +120,6 @@ npm --prefix backend run test:mongo-network
 
 MongoDB diagnostics write logs under `backend/logs` when run through these commands.
 Network tests check DNS, TCP, and TLS; `test:mongo` also verifies authentication and ping.
-
-Supabase migration commands:
-
-```sh
-npm --prefix backend run migrate:supabase-to-r2 -- --dryRun
-npm --prefix backend run migrate:supabase-to-r2 -- --apply
-npm --prefix backend run migrate:supabase-to-r2 -- --verify
-```
-
-Back up MongoDB first. Dry-run inventories objects and checks destinations.
-Apply copies objects and rewrites stored URLs/metadata after the object phase succeeds.
-Verify checks object presence and sizes where applicable; it is not a full database
-reference audit or checksum comparison. Original Supabase files are not deleted.
 
 Jobs are persisted in MongoDB, but execution currently starts in the API process.
 A separate durable worker and automatic interrupted-job recovery are future work.

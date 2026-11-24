@@ -25,9 +25,9 @@ npm ci --omit=dev
 npm start
 ```
 
-Use `dist/server.js` as the cPanel startup file. Skia Canvas installation scripts
-must run on the server to download its Linux native binary from GitHub releases.
-The package checks the downloaded binary against its published SHA-256 hash.
+Use `dist/server.js` as the cPanel startup file. The renderer's Linux native
+binary is supplied by an npm optional package (`@napi-rs/canvas-linux-x64-gnu`
+or its platform equivalent), not downloaded from GitHub.
 A Windows binary causes
 an `invalid ELF header` startup failure. Do not overwrite a cPanel-managed
 `node_modules` symlink with an uploaded folder.
@@ -59,12 +59,10 @@ hosting change. Set frontend `VITE_API_URL` to the deployed API address and back
 `FRONTEND_URL` to the frontend origin. Supply all environment values marked
 `sync: false`; keep secrets in backend environment settings only.
 
-## R2 and Legacy Supabase
+## R2 Storage
 
 Set `CLOUDFLARE_R2_BUCKET` explicitly to your existing bucket; the example default
 is `printconfig`. This does not rename any existing Cloudflare bucket.
-New uploads use R2. Supabase variables are optional and only needed for legacy
-read/delete/copy operations and migration.
 
 Edit `cloudflare-r2-cors.json` to include production admin origins before applying:
 
@@ -77,16 +75,6 @@ This requires Cloudflare bucket-configuration permission. Browser uploads requir
 `PUT` and `Content-Type`; image display requires `GET`/`HEAD`. The sample permits
 public reads; it does not make customer files private. Use a custom asset domain
 for production and keep storage credentials on the backend.
-
-Before migrating Supabase data, back up MongoDB and run:
-
-```sh
-npm --prefix backend run migrate:supabase-to-r2 -- --dryRun
-npm --prefix backend run migrate:supabase-to-r2 -- --apply
-npm --prefix backend run migrate:supabase-to-r2 -- --verify
-```
-
-Retain Supabase credentials/files until production verification is complete.
 
 ## Troubleshooting
 
