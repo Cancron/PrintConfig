@@ -431,6 +431,16 @@ export const api = {
   markDesignCartItemOrdered: (id: string, input: { orderId?: string; force?: boolean } = {}) => request<any>(`/products/cart-items/${id}/mark-ordered`, { method: 'POST', body: JSON.stringify(input) }),
   createFinalPrintsDownloadToken: (id: string) => request<{ url: string; expiresInSeconds: number }>(`/products/cart-items/${id}/final-prints-download-token`, { method: 'POST', body: JSON.stringify({}) }),
   listMerchants: (accountId: string) => request<any[]>(`/merchants?accountId=${encodeURIComponent(accountId)}`).then((items) => items.map(normalizeMerchant)),
+  createMerchant: (merchant: Pick<Merchant, 'accountId' | 'name' | 'slug' | 'status'>) => request<any>('/merchants', {
+    method: 'POST',
+    body: JSON.stringify({
+      ...merchant,
+      status: merchant.status === 'Active' ? 'active' : 'draft',
+      editorPrimaryColor: '#111827',
+      editorSecondaryColor: '#f3f4f6',
+      editorAccentColor: '#2563eb',
+    }),
+  }).then(normalizeMerchant),
   updateMerchant: (merchant: Merchant) => request<any>(`/merchants/${merchant.id}`, { method: 'PUT', body: JSON.stringify(merchantPayload(merchant)) }).then(normalizeMerchant),
   rotateMerchantApiKey: (merchantId: string) => request<any>(`/merchants/${merchantId}/api-key`, { method: 'POST' }).then((result) => ({ merchant: normalizeMerchant(result.merchant), apiPrivateKey: String(result.apiPrivateKey) })),
   listLayoutCategories: (accountId: string, merchantId: string) => request<any[]>(`/layout-categories?${layoutQuery({ accountId, merchantId })}`).then((items) => items.map(normalizeLayoutCategory)),

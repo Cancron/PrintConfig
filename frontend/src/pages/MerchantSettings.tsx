@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Copy, KeyRound, RefreshCw, Save } from 'lucide-react';
+import { Copy, KeyRound, Plus, RefreshCw, Save, X } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
+import { EmptyState } from '../components/ui/EmptyState';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
@@ -15,8 +16,9 @@ const statusOptions = [
 ];
 
 export function MerchantSettings() {
-  const { selectedMerchant, updateMerchant } = useWorkspace();
+  const { merchants, selectedMerchant, createMerchant, updateMerchant } = useWorkspace();
   const [form, setForm] = useState<Merchant | undefined>(() => selectedMerchant);
+  const [createOpen, setCreateOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const [revealedApiKey, setRevealedApiKey] = useState('');
   const [apiKeyError, setApiKeyError] = useState('');
@@ -31,8 +33,16 @@ export function MerchantSettings() {
 
   const errors = useMemo(() => (form ? validateMerchant(form) : {}), [form]);
   const isValid = Object.keys(errors).length === 0;
+  const createButton = <button type="button" onClick={() => setCreateOpen(true)} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"><Plus className="h-4 w-4" /> Create Merchant</button>;
+  const createDialog = createOpen && <CreateMerchantDialog merchants={merchants} onSave={createMerchant} onClose={() => setCreateOpen(false)} />;
 
-  if (!selectedMerchant || !form) return <div className="text-sm text-gray-500">No merchant selected.</div>;
+  if (!selectedMerchant || !form) return (
+    <div>
+      <PageHeader title="Merchant Settings" description="Manage merchant sites and customer editor branding." action={createButton} />
+      <EmptyState title="No merchant yet" description="Create a merchant to configure a store for this workspace." />
+      {createDialog}
+    </div>
+  );
 
   function update<K extends keyof Merchant>(field: K, value: Merchant[K]) {
     setForm((prev) => (prev ? { ...prev, [field]: value } : prev));
@@ -64,7 +74,8 @@ export function MerchantSettings() {
 
   return (
     <div>
-      <PageHeader title="Merchant Settings" description="Edit the selected merchant site and customer editor branding." />
+      <PageHeader title="Merchant Settings" description="Edit the selected merchant site and customer editor branding." action={createButton} />
+      {createDialog}
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="space-y-5 rounded-lg bg-white p-6 shadow-sm ring-1 ring-gray-200 xl:col-span-2">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -120,6 +131,66 @@ export function MerchantSettings() {
 
         <BrandingPreview merchant={form} />
       </form>
+    </div>
+  );
+}
+
+function CreateMerchantDialog({ merchants, onSave, onClose }: { merchants: Merchant[]; onSave: (input: Pick<Merchant, 'name' | 'slug' | 'status'>) => Promise<Merchant>; onClose: () => void }) {
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [slugEdited, setSlugEdited] = useState(false);
+  const [status, setStatus] = useState<MerchantStatus>('Active');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const nameError = name.trim() ? '' : 'Merchant name is required.';
+  const slugError = !slug.trim()
+    ? 'Slug is required.'
+    : !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug.trim())
+      ? 'Use lowercase letters, numbers, and hyphens only.'
+      : merchants.some((merchant) => merchant.slug === slug.trim())
+        ? 'This slug is already used by another merchant.'
+        : '';
+
+  function handleName(value: string) {
+    setName(value);
+    if (!slugEdited) setSlug(value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (nameError || slugError || saving) return;
+    setSaving(true);
+    setError('');
+    try {
+      await onSave({ name: name.trim(), slug: slug.trim(), status });
+      onClose();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not create merchant.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onClose(); }}>
+      <div role="dialog" aria-modal="true" aria-labelledby="create-merchant-title" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-md bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+          <h2 id="create-merchant-title" className="text-lg font-semibold text-gray-900">Create Merchant</h2>
+          <button type="button" title="Close" aria-label="Close" onClick={onClose} disabled={saving} className="rounded p-1 text-gray-500 hover:bg-gray-100 disabled:opacity-50"><X className="h-4 w-4" /></button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4 p-5">
+            <Input label="Merchant Name" value={name} onChange={(event) => handleName(event.target.value)} error={name ? nameError : undefined} autoFocus />
+            <Input label="Slug" value={slug} onChange={(event) => { setSlug(event.target.value); setSlugEdited(true); }} error={slug ? slugError : undefined} />
+            <Select label="Status" value={status} onChange={(event) => setStatus(event.target.value as MerchantStatus)} options={statusOptions} />
+            {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+          </div>
+          <div className="flex justify-end gap-3 border-t border-gray-200 px-5 py-4">
+            <button type="button" onClick={onClose} disabled={saving} className="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 disabled:opacity-50">Cancel</button>
+            <button type="submit" disabled={Boolean(nameError || slugError) || saving} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">{saving ? 'Creating...' : 'Create Merchant'}</button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

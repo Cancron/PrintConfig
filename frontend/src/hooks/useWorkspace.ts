@@ -10,6 +10,7 @@ interface WorkspaceContextValue {
   selectedMerchant?: Merchant;
   selectedMerchantId: string;
   setSelectedMerchantId: (merchantId: string) => void;
+  createMerchant: (input: Pick<Merchant, 'name' | 'slug' | 'status'>) => Promise<Merchant>;
   updateMerchant: (merchant: Merchant) => void;
   loading: boolean;
   error: string | null;
@@ -65,12 +66,20 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     saveSelectedMerchantId(account.id, merchantId);
   }, [account.id, accountMerchants]);
 
+  const createMerchant = useCallback(async (input: Pick<Merchant, 'name' | 'slug' | 'status'>) => {
+    const saved = await api.createMerchant({ ...input, accountId: account.id });
+    setMerchants((prev) => [...prev, saved]);
+    setSelectedMerchantIdState(saved.id);
+    saveSelectedMerchantId(account.id, saved.id);
+    return saved;
+  }, [account.id]);
+
   const updateMerchant = useCallback((merchant: Merchant) => {
     setMerchants((prev) => prev.map((item) => (item.id === merchant.id ? merchant : item)));
     api.updateMerchant(merchant).then((saved) => setMerchants((prev) => prev.map((item) => (item.id === saved.id ? saved : item)))).catch(() => setMerchants(persistMerchant(merchant)));
   }, []);
 
-  const value = useMemo(() => ({ account, merchants: accountMerchants, selectedMerchant, selectedMerchantId: selectedMerchant?.id ?? '', setSelectedMerchantId, updateMerchant, loading, error }), [account, accountMerchants, error, loading, selectedMerchant, setSelectedMerchantId, updateMerchant]);
+  const value = useMemo(() => ({ account, merchants: accountMerchants, selectedMerchant, selectedMerchantId: selectedMerchant?.id ?? '', setSelectedMerchantId, createMerchant, updateMerchant, loading, error }), [account, accountMerchants, createMerchant, error, loading, selectedMerchant, setSelectedMerchantId, updateMerchant]);
 
   return createElement(WorkspaceContext.Provider, { value }, children);
 }
