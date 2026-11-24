@@ -19,6 +19,7 @@ process.env.JWT_SECRET = 'postgres-test-secret';
 let server: ReturnType<typeof app.listen>;
 let baseUrl: string;
 let accountId = '';
+let otherAccountId = '';
 
 before(async () => {
   const database = await getPostgresPool().query('SELECT current_database() AS name');
@@ -39,9 +40,16 @@ after(async () => {
     await db.query('DELETE FROM layout_categories WHERE account_id = $1', [accountId]);
     await db.query('DELETE FROM products WHERE account_id = $1', [accountId]);
     await db.query('DELETE FROM product_categories WHERE account_id = $1', [accountId]);
+    await db.query('DELETE FROM image_folders WHERE account_id = $1', [accountId]);
     await db.query('DELETE FROM merchants WHERE account_id = $1', [accountId]);
     await db.query('DELETE FROM users WHERE account_id = $1', [accountId]);
     await db.query('DELETE FROM accounts WHERE id = $1', [accountId]);
+  }
+  if (otherAccountId) {
+    const db = getPostgresPool();
+    await db.query('DELETE FROM merchants WHERE account_id = $1', [otherAccountId]);
+    await db.query('DELETE FROM users WHERE account_id = $1', [otherAccountId]);
+    await db.query('DELETE FROM accounts WHERE id = $1', [otherAccountId]);
   }
   await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   await closePostgresPool();
@@ -64,6 +72,16 @@ test('sign-up, sign-in, scoped catalogue and UUID responses use PostgreSQL', asy
   assert.equal(inactiveRequest.status, 401);
   await getPostgresPool().query("UPDATE users SET payload = jsonb_set(payload, '{isActive}', 'true'::jsonb) WHERE id = $1", [auth.user.id]);
 
+  const freshHeaders = { Authorization: `Bearer ${auth.token}` };
+  for (const path of [
+    `/api/categories?accountId=${accountId}&merchantId=`,
+    `/api/categories?accountId=${accountId}&merchantId=6a3ec8c62d9f5c0bcff11d80`,
+    `/api/products?accountId=${accountId}&merchantId=&summary=true`,
+  ]) {
+    const response = await fetch(`${baseUrl}${path}`, { headers: freshHeaders });
+    assert.equal(response.status, 200, `${path}: ${await response.clone().text()}`);
+  }
+
   const badSignIn = await fetch(`${baseUrl}/api/auth/signin`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password: 'wrong-password' }),
@@ -84,6 +102,28 @@ test('sign-up, sign-in, scoped catalogue and UUID responses use PostgreSQL', asy
   const merchant = await merchantResponse.json();
   assert.equal(merchant.id.length, 36);
   assert.equal(merchant._id, undefined);
+  const folderResponse = await fetch(`${baseUrl}/api/image-folders`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ accountId, scope: 'shared', name: 'Artwork' }),
+  });
+  assert.equal(folderResponse.status, 201, await folderResponse.clone().text());
+  const folder = await folderResponse.json();
+  const childFolderResponse = await fetch(`${baseUrl}/api/image-folders`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ accountId, scope: 'shared', parentFolderId: folder.id, name: 'Prints' }),
+  });
+  assert.equal(childFolderResponse.status, 201, await childFolderResponse.clone().text());
+  const childFolder = await childFolderResponse.json();
+  const blockedFolderDelete = await fetch(`${baseUrl}/api/image-folders/${folder.id}`, { method: 'DELETE', headers });
+  assert.equal(blockedFolderDelete.status, 409);
+  const updatedFolderResponse = await fetch(`${baseUrl}/api/image-folders/${childFolder.id}`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ ...childFolder, name: 'Final Prints' }),
+  });
+  assert.equal(updatedFolderResponse.status, 200, await updatedFolderResponse.clone().text());
+  assert.equal((await updatedFolderResponse.json()).slug, 'final-prints');
+  assert.equal((await fetch(`${baseUrl}/api/image-folders/${childFolder.id}`, { method: 'DELETE', headers })).status, 200);
+  assert.equal((await fetch(`${baseUrl}/api/image-folders/${folder.id}`, { method: 'DELETE', headers })).status, 200);
   const invalidMerchant = await fetch(`${baseUrl}/api/merchants`, {
     method: 'POST', headers,
     body: JSON.stringify({ accountId, name: 'Bad Slug', slug: 'not a slug', status: 'active' }),
@@ -133,6 +173,22 @@ test('sign-up, sign-in, scoped catalogue and UUID responses use PostgreSQL', asy
   assert.equal(configuration.id, product.id);
   assert.equal(configuration.variants[0].id, product.variants[0].id);
   assert.equal(configuration._id, undefined);
+  const priceResponse = await fetch(`${baseUrl}/api/products/${product.id}/calculate-price`, {
+    method: 'POST', headers, body: JSON.stringify({ variantId: product.variants[0].id, selectedOptions: {} }),
+  });
+  assert.equal(priceResponse.status, 200, await priceResponse.clone().text());
+  assert.equal((await priceResponse.json()).finalPrice, 20);
+  const productExport = await fetch(`${baseUrl}/api/products/${product.id}/export`, { headers });
+  assert.equal(productExport.status, 200, await productExport.clone().text());
+  const importedProductResponse = await fetch(`${baseUrl}/api/products/import`, {
+    method: 'POST', headers, body: JSON.stringify(await productExport.json()),
+  });
+  assert.equal(importedProductResponse.status, 201, await importedProductResponse.clone().text());
+  const importedProduct = await importedProductResponse.json();
+  assert.notEqual(importedProduct.id, product.id);
+  assert.notEqual(importedProduct.variants[0].id, product.variants[0].id);
+  assert.equal(importedProduct.status, 'draft');
+  assert.equal(importedProduct.categoryId, category.id);
   const privateProductResponse = await fetch(`${baseUrl}/api/products`, {
     method: 'POST', headers,
     body: JSON.stringify({ accountId, categoryId: privateCategory.id, merchantId: merchant.id, scope: 'merchant', name: 'Private Product', productType: 'Canvas Print', status: 'draft' }),
@@ -334,4 +390,23 @@ test('sign-up, sign-in, scoped catalogue and UUID responses use PostgreSQL', asy
   const list = await fetch(`${baseUrl}/api/categories?accountId=${accountId}&merchantId=${merchant.id}`, { headers });
   assert.equal(list.status, 200, await list.clone().text());
   assert.ok((await list.json()).some((item: { id: string }) => item.id === category.id));
+  const otherSignup = await fetch(`${baseUrl}/api/auth/signup`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: `${randomUUID()}@example.test`, password: 'strong-password', name: 'Other Admin' }),
+  });
+  assert.equal(otherSignup.status, 201, await otherSignup.clone().text());
+  const otherAuth = await otherSignup.json();
+  otherAccountId = otherAuth.user.accountId;
+  const otherHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${otherAuth.token}` };
+  const otherMerchantResponse = await fetch(`${baseUrl}/api/merchants`, {
+    method: 'POST', headers: otherHeaders,
+    body: JSON.stringify({ accountId: otherAccountId, name: 'Other Account Store', slug: `other-${randomUUID()}`, status: 'active' }),
+  });
+  assert.equal(otherMerchantResponse.status, 201, await otherMerchantResponse.clone().text());
+  const otherMerchant = await otherMerchantResponse.json();
+  const otherKeyResponse = await fetch(`${baseUrl}/api/merchants/${otherMerchant.id}/api-key`, { method: 'POST', headers: otherHeaders });
+  assert.equal(otherKeyResponse.status, 200, await otherKeyResponse.clone().text());
+  const otherKey = (await otherKeyResponse.json()).apiPrivateKey;
+  const crossAccountConfig = await fetch(`${baseUrl}/api/products/editor/${product.id}/config`, { headers: { 'x-api-key': otherKey } });
+  assert.equal(crossAccountConfig.status, 404, await crossAccountConfig.clone().text());
 });

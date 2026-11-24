@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createCanvas, Path2D, loadImage, type SKRSContext2D as CanvasRenderingContext2D, type Image } from '@napi-rs/canvas';
+import { downloadObject } from '../config/storage.js';
 
 const EDITOR_PAGE_REFERENCE_WIDTH = 496;
 const EMPTY_TEXT_VALUES = new Set(['Add text', 'Add heading', 'Add subtitle', 'Add caption']);
@@ -156,8 +157,8 @@ async function drawPageBackground(
 
   const backgroundUrl = stringValue(page.backgroundImageUrl, stringValue(design.backgroundImageUrl, ''));
   if (backgroundUrl) {
-    const background = await loadOptionalImage(backgroundUrl);
-    if (background) drawImageFit(ctx, background, 0, 0, width, height, 'cover');
+    const background = await loadRequiredImage(backgroundUrl, 'page background');
+    drawImageFit(ctx, background, 0, 0, width, height, 'cover');
   }
 
   drawBackgroundPattern(ctx, stringValue(page.backgroundPattern, stringValue(design.backgroundPattern, 'none')), width, height, styleScale);
@@ -223,9 +224,11 @@ async function drawPhotoBookImage(
   const content = isRecord(element.content) ? element.content : {};
   const style = isRecord(element.style) ? element.style : {};
   const url = stringValue(content.url, content.photoId ? photoUrlById[String(content.photoId)] : '');
-  if (!url) return;
-  const image = await loadOptionalImage(url);
-  if (!image) return;
+  if (!url) {
+    if (content.photoId) throw new Error('A photo element references a missing source image.');
+    return;
+  }
+  const image = await loadRequiredImage(url, 'photo element');
 
   const radius = numberValue(style.borderRadius, 0) * styleScale;
   const borderWidth = numberValue(style.borderWidth, 0) * styleScale;
@@ -420,7 +423,7 @@ async function drawLayoutPhoto(ctx: CanvasRenderingContext2D, element: Record<st
   clipLayoutElementBounds(ctx, element, width, height);
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, width, height);
-  const image = url ? await loadOptionalImage(url) : null;
+  const image = url ? await loadRequiredImage(url, 'photo placeholder') : null;
   if (image) drawImageFit(ctx, image, 0, 0, width, height, normalizeFitMode(stringValue(settings.fitMode, 'cover')));
 }
 
@@ -481,8 +484,7 @@ async function drawLayoutStaticImage(ctx: CanvasRenderingContext2D, element: Rec
   const settings = isRecord(element.imageSettings) ? element.imageSettings : {};
   const url = stringValue(settings.imageUrl, '');
   if (!url) return;
-  const image = await loadOptionalImage(url);
-  if (!image) return;
+  const image = await loadRequiredImage(url, 'static image');
   ctx.save();
   ctx.globalAlpha *= numberValue(settings.opacity, 1);
   drawImageFit(ctx, image, 0, 0, width, height, 'contain');
@@ -519,7 +521,7 @@ function drawSvgPath(ctx: CanvasRenderingContext2D, svgPath: string, svgViewBox:
 function isEmptyElement(element: Record<string, any>, photoUrlById: Record<string, string>) {
   if (element.type === 'image') {
     const content = isRecord(element.content) ? element.content : {};
-    return !stringValue(content.url, content.photoId ? photoUrlById[String(content.photoId)] : '');
+    return !content.photoId && !stringValue(content.url, '');
   }
   if (element.type === 'text') {
     const content = stringValue(element.content, '').trim();
@@ -811,9 +813,23 @@ function parseViewBox(viewBox: string) {
   };
 }
 
-async function loadOptionalImage(url: string) {
+async function loadRequiredImage(url: string, label: string) {
   try {
-    return await loadImage(url);
+    const storagePath = r2StoragePathFromPublicUrl(url);
+    return await loadImage(storagePath ? await downloadObject(storagePath, { legacyFallback: false }) : url);
+  } catch {
+    throw new Error(`Failed to load ${label} for print rendering.`);
+  }
+}
+
+function r2StoragePathFromPublicUrl(url: string) {
+  const publicBase = String(process.env.CLOUDFLARE_PUBLIC_DEV_URL ?? '').trim().replace(/\/+$/, '');
+  if (!publicBase) return null;
+  try {
+    const base = new URL(`${publicBase}/`);
+    const asset = new URL(url);
+    if (asset.origin !== base.origin || !asset.pathname.startsWith(base.pathname)) return null;
+    return asset.pathname.slice(base.pathname.length).split('/').map(decodeURIComponent).join('/');
   } catch {
     return null;
   }

@@ -6,7 +6,7 @@ import { slugify } from '../utils/slug.js';
 import { resolveAccountId } from './account.service.js';
 
 export function visibleQuery(accountId: string, merchantId?: string) {
-  return { accountId, $or: [{ scope: 'shared' }, { scope: 'merchant', merchantId }] };
+  return { accountId, $or: isUuid(merchantId) ? [{ scope: 'shared' }, { scope: 'merchant', merchantId }] : [{ scope: 'shared' }] };
 }
 
 function normalizeScope(data: Record<string, unknown>) {

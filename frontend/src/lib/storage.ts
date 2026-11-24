@@ -443,12 +443,12 @@ export function updateMerchant(updated: Merchant) {
   return merchants;
 }
 
-export function loadSelectedMerchantId() {
-  return localStorage.getItem(SELECTED_MERCHANT_KEY) ?? '';
+export function loadSelectedMerchantId(accountId: string) {
+  return accountId ? localStorage.getItem(`${SELECTED_MERCHANT_KEY}:${accountId}`) ?? '' : '';
 }
 
-export function saveSelectedMerchantId(merchantId: string) {
-  localStorage.setItem(SELECTED_MERCHANT_KEY, merchantId);
+export function saveSelectedMerchantId(accountId: string, merchantId: string) {
+  if (accountId) localStorage.setItem(`${SELECTED_MERCHANT_KEY}:${accountId}`, merchantId);
 }
 
 export function getProducts(accountId: string, selectedMerchantId: string) {

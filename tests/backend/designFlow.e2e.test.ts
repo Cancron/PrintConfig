@@ -8,12 +8,13 @@ import {
   CopyObjectCommand, DeleteObjectsCommand, GetObjectCommand, HeadObjectCommand,
   ListObjectsV2Command, PutObjectCommand,
 } from '@aws-sdk/client-s3';
-import { loadImage } from '@napi-rs/canvas';
+import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { app } from '../../src/app.js';
 import { closePostgresPool, getPostgresPool } from '../../src/config/postgres.js';
 import { getR2Client } from '../../src/config/storage.js';
 import { DesignProcessingJobModel } from '../../src/models/DesignProcessingJob.js';
 import { DesignCartItemModel } from '../../src/models/DesignCartItem.js';
+import { processNextDesignProcessingJob } from '../../src/services/product.service.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl || new URL(databaseUrl).pathname !== '/printconfig_test') {
@@ -179,6 +180,9 @@ test('customer design save/load and two same-product checkout jobs stay isolated
   }, admin);
   assert.equal(product.response.status, 201, JSON.stringify(product.data));
   const productId = product.data.id;
+  const editorProductConfig = await json(`/api/products/editor/${productId}/config`, 'GET', undefined, { 'x-api-key': apiKey });
+  assert.equal(editorProductConfig.response.status, 200, JSON.stringify(editorProductConfig.data));
+  assert.equal(editorProductConfig.data.id, productId);
   const userKey = `user-${randomUUID()}`;
   const expires = Math.floor(Date.now() / 1000) + 300;
   const tokenData = `${userKey}:${merchantId}:${productId}|${expires}`;
@@ -359,6 +363,84 @@ test('customer design save/load and two same-product checkout jobs stay isolated
   assert.equal(canvasOrders.data.pagination.total, 1);
   assert.equal(canvasOrders.data.items[0].id, canvasUpload.cartItem.id);
   assert.equal(canvasOrders.data.items[0].productType, 'Canvas Print');
+  const sizedProduct = await json('/api/products', 'POST', {
+    accountId, categoryId: category.data.id, scope: 'shared', name: 'Sized Collage',
+    productType: 'Photo Collage Print', status: 'active',
+    variants: [
+      { name: '10x8', sku: `SIZE-A-${randomUUID()}`, status: 'active', price: 20, width: 10, height: 8, unit: 'inch', dpi: 300, options: {} },
+      { name: '6x4', sku: `SIZE-B-${randomUUID()}`, status: 'active', price: 10, width: 6, height: 4, unit: 'inch', dpi: 300, options: {} },
+    ],
+  }, admin);
+  assert.equal(sizedProduct.response.status, 201, JSON.stringify(sizedProduct.data));
+  const sizedTokenData = `${userKey}:${merchantId}:${sizedProduct.data.id}|${expires}`;
+  const sizedEditor = { Authorization: `Bearer ${Buffer.from(sizedTokenData).toString('base64')}.${createHmac('sha256', apiKey).update(sizedTokenData).digest('hex')}` };
+  const addSizedDesign = async (variantId?: string) => {
+    const freshProject = await json(`/api/products/public/${sizedProduct.data.id}/design?projectId=prj-missing-${randomUUID()}`, 'GET', undefined, sizedEditor);
+    assert.equal(freshProject.response.status, 200, JSON.stringify(freshProject.data));
+    let sourceImageUrl = '';
+    if (variantId) {
+      const sourceCanvas = createCanvas(4, 4);
+      const sourceContext = sourceCanvas.getContext('2d');
+      sourceContext.fillStyle = '#d02020';
+      sourceContext.fillRect(0, 0, 4, 4);
+      const imageForm = new FormData();
+      imageForm.set('projectId', freshProject.data.projectId);
+      imageForm.set('image', new Blob([sourceCanvas.toBuffer('image/png')], { type: 'image/png' }), 'source.png');
+      const imageResponse = await fetch(`${baseUrl}/api/products/public/${sizedProduct.data.id}/design-upload`, {
+        method: 'POST', headers: sizedEditor, body: imageForm,
+      });
+      assert.equal(imageResponse.status, 201, await imageResponse.clone().text());
+      sourceImageUrl = (await imageResponse.json()).image.url;
+    }
+    const form = new FormData();
+    form.set('projectId', freshProject.data.projectId);
+    form.set('designData', JSON.stringify({
+      ...(variantId ? { variantId } : {}),
+      pages: [{ pageNumber: 1, elements: [
+        ...(sourceImageUrl ? [{ type: 'image', x: 0, y: 0, width: 100, height: 100, content: { url: sourceImageUrl } }] : []),
+        { type: 'text', x: 10, y: 10, width: 80, height: 20, content: 'Sized artwork', style: { fontSize: 14 } },
+      ] }],
+    }));
+    form.set('addToCart', 'true');
+    const response = await fetch(`${baseUrl}/api/products/public/${sizedProduct.data.id}/design-upload`, {
+      method: 'POST', headers: sizedEditor, body: form,
+    });
+    assert.equal(response.status, 201, await response.clone().text());
+    return response.json();
+  };
+  const ambiguousDesign = await addSizedDesign();
+  const ambiguousProcess = await json(`/api/products/cart-items/${ambiguousDesign.cartItem.id}/process-admin`, 'POST', {}, admin);
+  assert.equal(ambiguousProcess.response.status, 202, JSON.stringify(ambiguousProcess.data));
+  let failedArtwork: any;
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const result = await json(`/api/products/cart-items/${ambiguousDesign.cartItem.id}`, 'GET', undefined, admin);
+    if (result.data.printGenerationStatus === 'failed') { failedArtwork = result.data; break; }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.ok(failedArtwork, 'Ambiguous variant should fail print generation.');
+  assert.match(failedArtwork.printGenerationError, /Select a product variant/);
+  assert.equal(failedArtwork.status, 'cart');
+  const selectedDesign = await addSizedDesign(sizedProduct.data.variants[0].id);
+  await DesignProcessingJobModel.create({
+    accountId, merchantId, productId: sizedProduct.data.id, cartItemId: selectedDesign.cartItem.id,
+    status: 'pending', availableAt: new Date(Date.now() - 1000),
+  });
+  const resumedJob = await processNextDesignProcessingJob();
+  assert.equal(resumedJob.processed, true);
+  const sizedOrder = await waitForCompletion(selectedDesign.cartItem.id);
+  assert.equal(sizedOrder.status, 'cart');
+  assert.equal(sizedOrder.finalPrintFiles[0].mimeType, 'image/jpeg');
+  const sizedArtwork = await loadImage(objects.get(sizedOrder.finalPrintFiles[0].storagePath)!);
+  assert.equal(sizedArtwork.width, 3000);
+  assert.equal(sizedArtwork.height, 2400);
+  const pixelCanvas = createCanvas(1, 1);
+  const pixelContext = pixelCanvas.getContext('2d');
+  pixelContext.drawImage(sizedArtwork, 0, 0, 1, 1, 0, 0, 1, 1);
+  const [red, green, blue] = pixelContext.getImageData(0, 0, 1, 1).data;
+  assert.ok(red > green * 2 && red > blue * 2, 'Uploaded photo must appear in final print artwork.');
+  const orderedDesign = JSON.parse(objects.get(sizedOrder.designStoragePath)!.toString('utf8'));
+  assert.match(orderedDesign.pages[0].elements[0].content.url, /\/designs\/orders\//);
+  assert.ok(!orderedDesign.pages[0].elements[0].content.url.includes('/designs/tmp/'));
   const repeatedPublicPrint = await json(`/api/products/public/${productId}/final-print`, 'POST',
     { cartItemId: first.cartItem.id }, { 'x-api-key': apiKey });
   assert.equal(repeatedPublicPrint.response.status, 202, JSON.stringify(repeatedPublicPrint.data));

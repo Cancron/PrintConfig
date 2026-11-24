@@ -21,24 +21,26 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const account = useMemo(() => ({ ...loadAccount(), id: user?.accountId ?? '' }), [user?.accountId]);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
-  const [selectedMerchantId, setSelectedMerchantIdState] = useState(() => loadSelectedMerchantId());
+  const [selectedMerchantId, setSelectedMerchantIdState] = useState(() => loadSelectedMerchantId(account.id));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setMerchants([]);
+    setSelectedMerchantIdState(loadSelectedMerchantId(account.id));
     if (!account.id) { setLoading(false); return; }
     setLoading(true);
     api.listMerchants(account.id)
       .then((items) => {
         if (!cancelled) {
-          setMerchants(items);
+          setMerchants(items.filter((merchant) => merchant.accountId === account.id));
           setError(null);
         }
       })
       .catch((err) => {
         if (!cancelled) {
-          setMerchants(loadMerchants());
+          setMerchants(loadMerchants().filter((merchant) => merchant.accountId === account.id));
           setError(err instanceof Error ? err.message : 'Could not load merchants from API.');
         }
       })
@@ -46,26 +48,29 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, [account.id]);
 
-  useEffect(() => {
-    if (!merchants.some((merchant) => merchant.id === selectedMerchantId) && merchants[0]) {
-      setSelectedMerchantIdState(merchants[0].id);
-      saveSelectedMerchantId(merchants[0].id);
-    }
-  }, [merchants, selectedMerchantId]);
+  const accountMerchants = useMemo(() => merchants.filter((merchant) => merchant.accountId === account.id), [account.id, merchants]);
 
-  const selectedMerchant = useMemo(() => merchants.find((merchant) => merchant.id === selectedMerchantId) ?? merchants[0], [merchants, selectedMerchantId]);
+  useEffect(() => {
+    if (!accountMerchants.some((merchant) => merchant.id === selectedMerchantId) && accountMerchants[0]) {
+      setSelectedMerchantIdState(accountMerchants[0].id);
+      saveSelectedMerchantId(account.id, accountMerchants[0].id);
+    }
+  }, [account.id, accountMerchants, selectedMerchantId]);
+
+  const selectedMerchant = useMemo(() => accountMerchants.find((merchant) => merchant.id === selectedMerchantId) ?? accountMerchants[0], [accountMerchants, selectedMerchantId]);
 
   const setSelectedMerchantId = useCallback((merchantId: string) => {
+    if (!accountMerchants.some((merchant) => merchant.id === merchantId)) return;
     setSelectedMerchantIdState(merchantId);
-    saveSelectedMerchantId(merchantId);
-  }, []);
+    saveSelectedMerchantId(account.id, merchantId);
+  }, [account.id, accountMerchants]);
 
   const updateMerchant = useCallback((merchant: Merchant) => {
     setMerchants((prev) => prev.map((item) => (item.id === merchant.id ? merchant : item)));
     api.updateMerchant(merchant).then((saved) => setMerchants((prev) => prev.map((item) => (item.id === saved.id ? saved : item)))).catch(() => setMerchants(persistMerchant(merchant)));
   }, []);
 
-  const value = useMemo(() => ({ account, merchants, selectedMerchant, selectedMerchantId: selectedMerchant?.id ?? selectedMerchantId, setSelectedMerchantId, updateMerchant, loading, error }), [account, error, loading, merchants, selectedMerchant, selectedMerchantId, setSelectedMerchantId, updateMerchant]);
+  const value = useMemo(() => ({ account, merchants: accountMerchants, selectedMerchant, selectedMerchantId: selectedMerchant?.id ?? '', setSelectedMerchantId, updateMerchant, loading, error }), [account, accountMerchants, error, loading, selectedMerchant, setSelectedMerchantId, updateMerchant]);
 
   return createElement(WorkspaceContext.Provider, { value }, children);
 }

@@ -1140,6 +1140,12 @@ export async function listEditorProducts(apiPrivateKey: string) {
 export async function getEditorProductConfig(id: string, apiPrivateKey: string) {
   const merchant = await authenticateApiPrivateKey(apiPrivateKey);
   if (!merchant) throw new ApiError(401, 'A valid merchant API private key is required.');
+  const visibleProduct = await ProductModel.findOne({
+    id,
+    ...visibleQuery(String(merchant.accountId), String(merchant.id)),
+    status: 'active',
+  }).select('id').lean();
+  if (!visibleProduct) throw new ApiError(404, 'Product not found.');
   return getPublicProductConfig(id, String(merchant.id));
 }
 
@@ -1708,6 +1714,16 @@ async function runDesignCartItemProcessing(jobId: string) {
     const orderPrefix = String(job.orderPrefix || cartItem.orderStoragePrefix || designOrderPrefix(String(cartItem.merchantId), orderId, String(cartItem.productId), String(cartItem.id)));
     const copiedFiles = await copyStoragePrefix(sourcePrefix, orderPrefix);
     if (!copiedFiles.some((file) => file.destination === `${orderPrefix}/design.json`)) throw new ApiError(400, 'Cart item has no saved design.json to process.');
+    const copiedDesignPath = `${orderPrefix}/design.json`;
+    const copiedDesign = await readDesignJsonFromStorage(copiedDesignPath);
+    const orderedDesign = rewriteDesignStorageReferences(copiedDesign, sourcePrefix, orderPrefix);
+    await uploadObject({
+      storagePath: copiedDesignPath,
+      body: Buffer.from(JSON.stringify(orderedDesign), 'utf8'),
+      contentType: 'application/json',
+      upsert: true,
+      cacheControl: '0',
+    });
 
     const designPublicBaseUrl = `${r2PublicUrl(orderPrefix)}/`;
     const designPublicUrl = `${designPublicBaseUrl}design.json`;
@@ -2256,6 +2272,30 @@ async function copyStoragePrefix(sourcePrefix: string, destinationPrefix: string
   return copiedFiles;
 }
 
+function rewriteDesignStorageReferences(design: unknown, sourcePrefix: string, destinationPrefix: string): unknown {
+  const sourcePublicPrefix = `${r2PublicUrl(sourcePrefix)}/`;
+  const destinationPublicPrefix = `${r2PublicUrl(destinationPrefix)}/`;
+  const legacyBase = String(process.env.SUPABASE_URL ?? '').replace(/\/+$/, '');
+  const legacyPublicPrefix = legacyBase
+    ? `${legacyBase}/storage/v1/object/public/${galleryBucket}/${sourcePrefix}/`
+    : '';
+  const referenceKeys = new Set(['url', 'publicUrl', 'src', 'imageUrl', 'backgroundImageUrl', 'storagePath']);
+  const rewrite = (value: unknown, key = ''): unknown => {
+    if (Array.isArray(value)) return value.map((item) => rewrite(item));
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([field, child]) => [field, rewrite(child, field)]));
+    }
+    if (typeof value !== 'string' || !referenceKeys.has(key)) return value;
+    if (value.startsWith(`${sourcePrefix}/`)) return `${destinationPrefix}/${value.slice(sourcePrefix.length + 1)}`;
+    if (value.startsWith(sourcePublicPrefix)) return `${destinationPublicPrefix}${value.slice(sourcePublicPrefix.length)}`;
+    if (legacyPublicPrefix && value.startsWith(legacyPublicPrefix)) {
+      return `${destinationPublicPrefix}${value.slice(legacyPublicPrefix.length)}`;
+    }
+    return value;
+  };
+  return rewrite(design);
+}
+
 function rewriteStoredFile(file: Record<string, any>, sourcePrefix: string, destinationPrefix: string) {
   const storagePath = String(file.storagePath ?? '');
   if (!storagePath.startsWith(sourcePrefix)) return file;
@@ -2274,6 +2314,7 @@ function rewriteStoredFile(file: Record<string, any>, sourcePrefix: string, dest
 async function generateFinalPrintImages(cartItem: Record<string, any>, orderPrefix: string) {
   const design = await readDesignJsonFromStorage(String(cartItem.designStoragePath));
   const product = await ProductModel.findById(cartItem.productId).lean();
+  if (!product) throw new ApiError(404, 'Product is no longer available for print generation.');
   const pages = resolveFinalPrintPages(design, cartItem, product);
   if (pages.length === 0) throw new ApiError(400, 'No pages are available for final print generation.');
   const rasterOutput = resolveFinalPrintRasterOutput(design, product);
@@ -2617,7 +2658,8 @@ function resolveFinalPrintVariant(design: Record<string, unknown>, product: any)
     const activeVariants = Array.isArray(product?.variants)
       ? product.variants.filter((variant: any) => variant?.status === 'active' && hasValidVariantDimensions(variant))
       : [];
-    return activeVariants.length === 1 ? activeVariants[0] : undefined;
+    if (activeVariants.length > 1) throw new ApiError(400, 'Select a product variant before generating final print images.');
+    return activeVariants[0];
   }
 
   const currentVariant = Array.isArray(product?.variants)
@@ -2633,7 +2675,8 @@ function resolveFinalPrintVariant(design: Record<string, unknown>, product: any)
   const savedVariant = Array.isArray(productConfig.variants)
     ? productConfig.variants.find((variant: any) => String(variant?.id ?? variant?.id ?? '') === selectedVariantId)
     : undefined;
-  return savedVariant && hasValidVariantDimensions(savedVariant) ? savedVariant : undefined;
+  if (savedVariant && hasValidVariantDimensions(savedVariant)) return savedVariant;
+  throw new ApiError(400, 'The selected product variant is no longer available for print generation.');
 }
 
 function hasValidVariantDimensions(variant: Record<string, unknown>) {

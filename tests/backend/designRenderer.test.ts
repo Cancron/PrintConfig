@@ -40,3 +40,21 @@ test('old text without a background stays on the page matte', async () => {
   const inside = await pixel(buffer, 12, 22);
   assert.ok(inside[0] > 240 && inside[1] > 240 && inside[2] > 240);
 });
+
+test('missing source images fail rendering instead of producing blank print artwork', async () => {
+  const brokenUrl = 'data:image/png;base64,AA==';
+  await assert.rejects(
+    renderDesignPageToImageBuffer({ design: {}, page: { elements: [{ type: 'image', x: 0, y: 0, width: 100, height: 100, content: { url: brokenUrl } }] }, widthPx: 100, heightPx: 100 }),
+    /Failed to load photo element/,
+  );
+  await assert.rejects(
+    renderDesignPageToImageBuffer({ design: {}, page: { backgroundImageUrl: brokenUrl, elements: [] }, widthPx: 100, heightPx: 100 }),
+    /Failed to load page background/,
+  );
+  await assert.rejects(
+    renderDesignPageToImageBuffer({ design: {}, page: { elements: [{ type: 'image', x: 0, y: 0, width: 100, height: 100, content: { photoId: 'missing' } }] }, widthPx: 100, heightPx: 100 }),
+    /missing source image/,
+  );
+  const empty = await renderDesignPageToImageBuffer({ design: {}, page: { elements: [{ type: 'photo_placeholder', x: 0, y: 0, width: 100, height: 100 }] }, widthPx: 100, heightPx: 100 });
+  assert.equal((await loadImage(empty)).width, 100);
+});
