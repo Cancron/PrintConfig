@@ -115,12 +115,7 @@ See [DEPLOY_RENDER.md](DEPLOY_RENDER.md) for hosting and CORS configuration.
 npm run typecheck
 npm run frontend:typecheck
 npm run frontend:lint
-npm run test:mongo
-npm run test:mongo-network
 ```
-
-MongoDB diagnostics write logs under `logs` when run through these commands.
-Network tests check DNS, TCP, and TLS; `test:mongo` also verifies authentication and ping.
 
 Jobs are persisted in MongoDB, but execution currently starts in the API process.
 A separate durable worker and automatic interrupted-job recovery are future work.

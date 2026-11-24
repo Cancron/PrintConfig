@@ -12,8 +12,6 @@
         "frontend:lint": "npm --prefix frontend run lint",
         "start": "node dist/server.js",
         "typecheck": "tsc --noEmit -p tsconfig.json",
-        "test:mongo": "node scripts/testMongo.mjs",
-        "test:mongo-network": "node scripts/testMongoNetwork.mjs",
         "migrate:shared-rooms": "tsx src/scripts/migrateSharedRooms.ts",
         "migrate:shared-rooms:apply": "tsx src/scripts/migrateSharedRooms.ts --apply",
         "migrate:supabase-to-r2": "tsx src/scripts/migrateSupabaseToR2.ts"

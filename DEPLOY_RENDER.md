@@ -73,6 +73,6 @@ for production and keep storage credentials on the backend.
   MongoDB access, startup file, and hosting process configuration.
 - API returns HTML: verify proxy mapping and the frontend API base URL.
 - Asset `404`: upload the complete matching admin build and compiled backend.
-- MongoDB failures: run `npm run test:mongo` and `npm run test:mongo-network`
-  inside `backend`. The host must permit outbound TCP to the Atlas cluster.
+- MongoDB failures: inspect Node startup logs and verify the host permits
+  outbound TCP to the Atlas cluster.
 - Browser CORS failure: configure both backend `FRONTEND_URL` and R2 bucket CORS.
