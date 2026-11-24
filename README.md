@@ -115,7 +115,13 @@ See [DEPLOY_RENDER.md](DEPLOY_RENDER.md) for hosting and CORS configuration.
 npm run typecheck
 npm run frontend:typecheck
 npm run frontend:lint
+npm test
 ```
+
+`npm test` runs offline backend unit/API and frontend logic tests. API tests use
+an ephemeral local listener and mocked Mongoose model methods; they do not
+connect to MongoDB or require external services. They do not verify real
+MongoDB queries, indexes, or persistence, which need separate integration tests.
 
 Jobs are persisted in MongoDB, but execution currently starts in the API process.
 A separate durable worker and automatic interrupted-job recovery are future work.

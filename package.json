@@ -12,6 +12,9 @@
         "frontend:lint": "npm --prefix frontend run lint",
         "start": "node dist/server.js",
         "typecheck": "tsc --noEmit -p tsconfig.json",
+        "test": "npm run test:backend && npm run test:frontend",
+        "test:backend": "node --import tsx --test tests/backend/*.test.ts",
+        "test:frontend": "node --import tsx --test tests/frontend/*.test.ts",
         "migrate:shared-rooms": "tsx src/scripts/migrateSharedRooms.ts",
         "migrate:shared-rooms:apply": "tsx src/scripts/migrateSharedRooms.ts --apply",
         "migrate:supabase-to-r2": "tsx src/scripts/migrateSupabaseToR2.ts"
