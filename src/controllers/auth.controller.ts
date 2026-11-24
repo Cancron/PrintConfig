@@ -25,8 +25,8 @@ export async function signInController(req: Request, res: Response, next: NextFu
 
 export async function meController(req: AuthedRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?._id) throw new ApiError(401, 'Authentication required.');
-    const user = await getUserById(req.user._id);
+    if (!req.user?.id) throw new ApiError(401, 'Authentication required.');
+    const user = await getUserById(req.user.id);
     if (!user) throw new ApiError(404, 'User not found.');
     res.json({ user });
   } catch (error) {

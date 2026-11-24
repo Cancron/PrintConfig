@@ -38,9 +38,9 @@ const MERCHANTS_KEY = 'print-config-merchants';
 const ACCOUNT_KEY = 'print-config-account';
 const SELECTED_MERCHANT_KEY = 'print-config-selected-merchant';
 
-export const CURRENT_ACCOUNT_ID = '6a3ec80a97741e7afc64d62b';
+export const CURRENT_ACCOUNT_ID = '';
 
-export const defaultAccount: Account = { _id: CURRENT_ACCOUNT_ID, name: 'PrintConfig Account' };
+export const defaultAccount: Account = { id: CURRENT_ACCOUNT_ID, name: 'PrintConfig Account' };
 
 export const defaultMerchants: Merchant[] = [];
 
@@ -438,13 +438,13 @@ export function saveMerchants(merchants: Merchant[]) {
 }
 
 export function updateMerchant(updated: Merchant) {
-  const merchants = loadMerchants().map((merchant) => (merchant._id === updated._id ? normalizeMerchant(updated) : merchant));
+  const merchants = loadMerchants().map((merchant) => (merchant.id === updated.id ? normalizeMerchant(updated) : merchant));
   saveMerchants(merchants);
   return merchants;
 }
 
 export function loadSelectedMerchantId() {
-  return localStorage.getItem(SELECTED_MERCHANT_KEY) ?? '6a3ec8c62d9f5c0bcff11d7f';
+  return localStorage.getItem(SELECTED_MERCHANT_KEY) ?? '';
 }
 
 export function saveSelectedMerchantId(merchantId: string) {
@@ -498,9 +498,9 @@ export function normalizeProduct(product: Product): Product {
   const legacyMerchantId = product.merchantId ?? null;
   const scope: ProductScope = product.scope === 'shared' ? 'shared' : 'merchant';
   const firstLegacySurface = legacy.surface ?? legacy.variants?.flatMap((variant) => variant.surfaces ?? [])[0] ?? null;
-  const surface = firstLegacySurface ? normalizeSurface(firstLegacySurface, product._id) : null;
-  const variants = (legacy.variants ?? []).map((variant) => normalizeVariant(variant, product._id));
-  const sharedRooms = (product.roomPreviews ?? []).map((room, index) => normalizeSharedRoomPreview(room, product._id, index));
+  const surface = firstLegacySurface ? normalizeSurface(firstLegacySurface, product.id) : null;
+  const variants = (legacy.variants ?? []).map((variant) => normalizeVariant(variant, product.id));
+  const sharedRooms = (product.roomPreviews ?? []).map((room, index) => normalizeSharedRoomPreview(room, product.id, index));
 
   return {
     ...product,
@@ -511,7 +511,7 @@ export function normalizeProduct(product: Product): Product {
     categorySnapshot: product.categorySnapshot,
     surface,
     optionGroups: (product.optionGroups ?? []).map((group) => ({ ...group, values: (group.values ?? []).map((value) => ({ ...value, metadata: value.metadata ?? {} })) })),
-    variantOptionDefinitions: normalizeVariantOptionDefinitions(product.variantOptionDefinitions, product._id),
+    variantOptionDefinitions: normalizeVariantOptionDefinitions(product.variantOptionDefinitions, product.id),
     frontendContent: normalizeFrontendContent(product.frontendContent),
     editorProductSelection: normalizeEditorProductSelection(product.editorProductSelection),
     editorRules: { ...defaultEditorRules, ...(product.editorRules ?? {}) },
@@ -570,7 +570,7 @@ type LegacySurface = Partial<ProductSurface> & { variantId?: string; width?: num
 function normalizeSurface(surface: LegacySurface, productId: string): ProductSurface {
   const now = new Date().toISOString();
   return {
-    _id: typeof surface._id === 'string' ? surface._id : '',
+    id: typeof surface.id === 'string' ? surface.id : '',
     clientId: surface.clientId ?? crypto.randomUUID(),
     productId,
     name: typeof surface.name === 'string' && surface.name.trim() ? surface.name : 'Front Print Area',
@@ -588,7 +588,7 @@ function normalizeVariant(variant: LegacyVariant, productId: string): ProductVar
   const now = new Date().toISOString();
   const legacySurface = variant.surfaces?.[0];
   return {
-    _id: typeof variant._id === 'string' ? variant._id : '',
+    id: typeof variant.id === 'string' ? variant.id : '',
     clientId: variant.clientId ?? crypto.randomUUID(),
     productId,
     name: typeof variant.name === 'string' ? variant.name : 'Variant',

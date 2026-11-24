@@ -48,7 +48,7 @@ export function CreateProduct() {
   const { categories } = useCategories();
   const { account, selectedMerchant } = useWorkspace();
 
-  const initialCategoryId = searchParams.get('categoryId') ?? categories[0]?._id ?? '';
+  const initialCategoryId = searchParams.get('categoryId') ?? categories[0]?.id ?? '';
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [productType, setProductType] = useState<ProductType>('Canvas Print');
@@ -77,10 +77,10 @@ export function CreateProduct() {
 
     const now = new Date().toISOString();
     const product: Product = {
-      _id: '',
-      accountId: account._id,
+      id: '',
+      accountId: account.id,
       scope,
-      merchantId: scope === 'merchant' ? selectedMerchant?._id ?? null : null,
+      merchantId: scope === 'merchant' ? selectedMerchant?.id ?? null : null,
       name: name.trim(),
       slug: slug.trim(),
       productType,
@@ -90,7 +90,7 @@ export function CreateProduct() {
       thumbnailUrl: thumbnailUrl.trim(),
       thumbnailAssetId,
       categoryId,
-      categorySnapshot: categories.find((category) => category._id === categoryId),
+      categorySnapshot: categories.find((category) => category.id === categoryId),
       editorRules: createDefaultEditorRules(),
       exportRules: createDefaultExportRules(),
       surface: null,
@@ -113,7 +113,7 @@ export function CreateProduct() {
     };
 
     const saved = await api.createProduct(product);
-    navigate(`/products/${saved._id}`);
+    navigate(`/products/${saved.id}`);
   }
 
   return (
@@ -127,7 +127,7 @@ export function CreateProduct() {
       <form onSubmit={handleSubmit} className="max-w-2xl bg-white rounded-lg shadow-sm ring-1 ring-gray-200 p-6 space-y-6">
         <Input label="Product Name" value={name} onChange={(e) => handleNameChange(e.target.value)} error={errors.name} placeholder="e.g. Canvas Print" />
         <Input label="Slug" value={slug} onChange={(e) => setSlug(e.target.value)} error={errors.slug} placeholder="e.g. canvas-print" />
-        <Select label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} options={categories.map((category) => ({ value: category._id, label: category.name }))} error={errors.categoryId} />
+        <Select label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} options={categories.map((category) => ({ value: category.id, label: category.name }))} error={errors.categoryId} />
         <Select label="Product Type" value={productType} onChange={(e) => setProductType(e.target.value as ProductType)} options={productTypeOptions} error={errors.productType} />
         <Textarea label="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="Describe the product..." />
         <Select label="Product Scope" value={scope} onChange={(e) => setScope(e.target.value as ProductScope)} options={scopeOptions} />

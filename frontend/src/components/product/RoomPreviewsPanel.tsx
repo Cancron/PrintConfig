@@ -34,7 +34,7 @@ export function RoomPreviewsPanel({ product, orientation, variant, onSave }: Pro
   const errors = useMemo(() => form ? validateRoomPreview(form) : {}, [form]);
 
   function startAdd() {
-    const room = createRoomPreview(product._id, product.roomPreviews.length);
+    const room = createRoomPreview(product.id, product.roomPreviews.length);
     room.orientations = [orientation];
     setEditingKey(null);
     setForm(room);
@@ -69,9 +69,9 @@ export function RoomPreviewsPanel({ product, orientation, variant, onSave }: Pro
       ...product,
       roomPreviews: [...product.roomPreviews, {
         ...room,
-        _id: '',
+        id: '',
         clientId: crypto.randomUUID(),
-        productId: product._id,
+        productId: product.id,
         name: `${room.name} Copy`,
         defaultOrientations: [],
         sortOrder: product.roomPreviews.length,
@@ -146,7 +146,7 @@ function SharedRoomModal({ product, variant, room, errors, onChange, onSave, onC
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
       <div className="flex max-h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4"><div><h3 className="text-lg font-semibold text-gray-900">{room._id ? 'Edit' : 'Add'} Shared Room</h3><p className="mt-1 text-sm text-gray-500">Select the maximum placement rectangle directly on the room image.</p></div><IconButton title="Close" onClick={onClose}><X className="h-5 w-5" /></IconButton></div>
+        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4"><div><h3 className="text-lg font-semibold text-gray-900">{room.id ? 'Edit' : 'Add'} Shared Room</h3><p className="mt-1 text-sm text-gray-500">Select the maximum placement rectangle directly on the room image.</p></div><IconButton title="Close" onClick={onClose}><X className="h-5 w-5" /></IconButton></div>
         <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_380px]">
           <RectangleEditor product={product} variant={variant} room={room} onChange={onChange} />
           <aside className="space-y-5 border-l border-gray-200 p-5">

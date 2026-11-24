@@ -12,7 +12,7 @@ export function ImagePicker({ onSelect, onClose }: { onSelect: (value: ImagePick
   const [selected, setSelected] = useState<ImageAsset | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const library = useImageLibrary(folderId, search);
-  const currentFolder = library.allFolders.find((folder) => folder._id === folderId);
+  const currentFolder = library.allFolders.find((folder) => folder.id === folderId);
   const items = useMemo(() => {
     const result = [...library.folders.map((value) => ({ kind: 'folder' as const, value })), ...library.assets.map((value) => ({ kind: 'asset' as const, value }))];
     return result.sort((a, b) => foldersFirst && a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.value.name.localeCompare(b.value.name));
@@ -20,7 +20,7 @@ export function ImagePicker({ onSelect, onClose }: { onSelect: (value: ImagePick
 
   function choose(asset: ImageAsset) {
     onSelect({
-      assetId: asset._id,
+      assetId: asset.id,
       url: asset.url,
       thumbnailUrl: asset.thumbnailUrl,
       name: asset.name,
@@ -115,9 +115,9 @@ export function ImagePicker({ onSelect, onClose }: { onSelect: (value: ImagePick
               {items.map((item) =>
                 item.kind === "folder" ? (
                   <button
-                    key={item.value._id}
-                    onDoubleClick={() => setFolderId(item.value._id)}
-                    onClick={() => setFolderId(item.value._id)}
+                    key={item.value.id}
+                    onDoubleClick={() => setFolderId(item.value.id)}
+                    onClick={() => setFolderId(item.value.id)}
                     className="flex aspect-square flex-col items-center justify-center rounded-md bg-gray-50 ring-1 ring-gray-200 hover:bg-gray-100"
                   >
                     <Folder className="h-14 w-14 fill-amber-300 text-amber-500" />
@@ -127,10 +127,10 @@ export function ImagePicker({ onSelect, onClose }: { onSelect: (value: ImagePick
                   </button>
                 ) : (
                   <button
-                    key={item.value._id}
+                    key={item.value.id}
                     onDoubleClick={() => choose(item.value)}
                     onClick={() => setSelected(item.value)}
-                    className={`overflow-hidden rounded-md text-left ring-1 ${selected?._id === item.value._id ? "ring-2 ring-blue-600" : "ring-gray-200"}`}
+                    className={`overflow-hidden rounded-md text-left ring-1 ${selected?.id === item.value.id ? "ring-2 ring-blue-600" : "ring-gray-200"}`}
                   >
                     <div className="aspect-square bg-gray-100">
                       <img
@@ -151,8 +151,8 @@ export function ImagePicker({ onSelect, onClose }: { onSelect: (value: ImagePick
               {items.map((item) =>
                 item.kind === "folder" ? (
                   <button
-                    key={item.value._id}
-                    onClick={() => setFolderId(item.value._id)}
+                    key={item.value.id}
+                    onClick={() => setFolderId(item.value.id)}
                     className="flex w-full items-center gap-3 px-3 py-3 text-left hover:bg-gray-50"
                   >
                     <Folder className="h-8 w-8 fill-amber-300 text-amber-500" />
@@ -160,10 +160,10 @@ export function ImagePicker({ onSelect, onClose }: { onSelect: (value: ImagePick
                   </button>
                 ) : (
                   <button
-                    key={item.value._id}
+                    key={item.value.id}
                     onClick={() => setSelected(item.value)}
                     onDoubleClick={() => choose(item.value)}
-                    className={`flex w-full items-center gap-3 px-3 py-3 text-left ${selected?._id === item.value._id ? "border-l-4 border-blue-600 bg-blue-50" : ""}`}
+                    className={`flex w-full items-center gap-3 px-3 py-3 text-left ${selected?.id === item.value.id ? "border-l-4 border-blue-600 bg-blue-50" : ""}`}
                   >
                     <img
                       src={item.value.thumbnailUrl || item.value.url}
@@ -203,7 +203,7 @@ export function ImagePicker({ onSelect, onClose }: { onSelect: (value: ImagePick
           folderId={folderId}
           defaultScope={currentFolder?.scope}
           folders={library.allFolders}
-          accountId={library.account._id}
+          accountId={library.account.id}
           merchantId={library.selectedMerchantId}
           onClose={() => setUploadOpen(false)}
           onUploaded={async (asset) => {

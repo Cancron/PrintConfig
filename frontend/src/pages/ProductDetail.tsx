@@ -47,7 +47,7 @@ export function ProductDetail() {
     setLoadError('');
     Promise.all([
       api.getProduct(id),
-      api.listProductSummaries({ accountId: account._id, merchantId: selectedMerchantId, page: 1, pageSize: 500 }),
+      api.listProductSummaries({ accountId: account.id, merchantId: selectedMerchantId, page: 1, pageSize: 500 }),
     ])
       .then(([loadedProduct, summaries]) => {
         if (cancelled) return;
@@ -61,14 +61,14 @@ export function ProductDetail() {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [account._id, id, selectedMerchantId]);
+  }, [account.id, id, selectedMerchantId]);
 
   const updateProduct = useCallback((updated: Product) => {
     setProduct(updated);
     api.updateProduct(updated)
       .then((saved) => {
         setProduct(saved);
-        setProducts((current) => current.map((item) => item._id === saved._id
+        setProducts((current) => current.map((item) => item.id === saved.id
           ? {
               ...item,
               name: saved.name,
@@ -105,7 +105,7 @@ export function ProductDetail() {
 
   const currentProduct = product;
   const defaultTab = searchParams.get('tab') ?? 'basic';
-  const merchantName = merchants.find((merchant) => merchant._id === currentProduct.merchantId)?.name ?? selectedMerchant?.name ?? 'selected merchant';
+  const merchantName = merchants.find((merchant) => merchant.id === currentProduct.merchantId)?.name ?? selectedMerchant?.name ?? 'selected merchant';
 
   function showMessage(type: 'success' | 'error', text: string) {
     setMessage({ type, text });
@@ -117,7 +117,7 @@ export function ProductDetail() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${currentProduct.slug || currentProduct._id}-configuration.json`;
+    link.download = `${currentProduct.slug || currentProduct.id}-configuration.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -128,9 +128,9 @@ export function ProductDetail() {
   async function handleDuplicateProduct() {
     const targetScope: ProductScope = currentProduct.scope === 'shared' && !confirm('Duplicate as shared product? Choose Cancel to duplicate as merchant custom for the selected merchant.') ? 'merchant' : currentProduct.scope;
     try {
-      const duplicated = await api.duplicateProduct(currentProduct._id, targetScope, targetScope === 'merchant' ? selectedMerchantId : null);
+      const duplicated = await api.duplicateProduct(currentProduct.id, targetScope, targetScope === 'merchant' ? selectedMerchantId : null);
       showMessage('success', 'Product duplicated as draft.');
-      navigate(`/products/${duplicated._id}`);
+      navigate(`/products/${duplicated.id}`);
     } catch (reason) {
       showMessage('error', 'Could not duplicate product.');
       if (reason instanceof Error) setLoadError(reason.message);
@@ -139,7 +139,7 @@ export function ProductDetail() {
 
   async function handleImportJson() {
     const result = parseImportedProduct(importJson, {
-      accountId: account._id,
+      accountId: account.id,
       scope: importScope,
       merchantId: importScope === 'merchant' ? selectedMerchantId : null,
     });
@@ -152,24 +152,24 @@ export function ProductDetail() {
     setImportJson('');
     setImportError('');
     showMessage('success', 'Product configuration imported as a new draft product.');
-    navigate(`/products/${saved._id}`);
+    navigate(`/products/${saved.id}`);
   }
 
   const tabs = [
-    { _id: 'basic', label: 'Basic Info', content: <BasicInfoTab product={product} products={products} onSave={updateProduct} /> },
-    { _id: 'options', label: 'Options', content: <OptionsTab product={product} onSave={updateProduct} /> },
-    { _id: 'variants', label: 'Variants', content: <VariantsTab product={product} onSave={updateProduct} /> },
+    { id: 'basic', label: 'Basic Info', content: <BasicInfoTab product={product} products={products} onSave={updateProduct} /> },
+    { id: 'options', label: 'Options', content: <OptionsTab product={product} onSave={updateProduct} /> },
+    { id: 'variants', label: 'Variants', content: <VariantsTab product={product} onSave={updateProduct} /> },
     ...(product.productType === 'T-Shirt Print'
-      ? [{ _id: 'tshirt-settings', label: 'T-Shirt Settings', content: <TShirtSettingsTab product={product} onSave={updateProduct} /> }]
+      ? [{ id: 'tshirt-settings', label: 'T-Shirt Settings', content: <TShirtSettingsTab product={product} onSave={updateProduct} /> }]
       : []),
-    { _id: 'surfaces', label: 'Surfaces', content: <SurfacesTab product={product} onSave={updateProduct} /> },
-    { _id: 'editor-rules', label: 'Editor Rules', content: <EditorRulesTab product={product} onSave={updateProduct} /> },
-    { _id: 'export-rules', label: 'Export Rules', content: <ExportRulesTab product={product} onSave={updateProduct} /> },
-    { _id: 'layout-templates', label: 'Layout Templates', content: <LayoutSettingsTab product={product} onSave={updateProduct} /> },
-    { _id: 'preview', label: 'Preview', content: <PreviewTab product={product} onSave={updateProduct} /> },
-    { _id: 'ai-art', label: 'AI Art', content: <AiArtTab product={product} onSave={updateProduct} /> },
-    { _id: 'json', label: 'JSON', content: <JsonPreviewTab product={product} /> },
-    { _id: 'design', label: 'Design', content: <DesignGeneralTab product={product} onSave={updateProduct} /> },
+    { id: 'surfaces', label: 'Surfaces', content: <SurfacesTab product={product} onSave={updateProduct} /> },
+    { id: 'editor-rules', label: 'Editor Rules', content: <EditorRulesTab product={product} onSave={updateProduct} /> },
+    { id: 'export-rules', label: 'Export Rules', content: <ExportRulesTab product={product} onSave={updateProduct} /> },
+    { id: 'layout-templates', label: 'Layout Templates', content: <LayoutSettingsTab product={product} onSave={updateProduct} /> },
+    { id: 'preview', label: 'Preview', content: <PreviewTab product={product} onSave={updateProduct} /> },
+    { id: 'ai-art', label: 'AI Art', content: <AiArtTab product={product} onSave={updateProduct} /> },
+    { id: 'json', label: 'JSON', content: <JsonPreviewTab product={product} /> },
+    { id: 'design', label: 'Design', content: <DesignGeneralTab product={product} onSave={updateProduct} /> },
   ];
 
   return (

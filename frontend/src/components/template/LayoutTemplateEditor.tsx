@@ -19,8 +19,8 @@ export function LayoutTemplateEditor() {
   const { account, selectedMerchantId, collages, allTemplates, templates, addTemplate, updateTemplate, deleteTemplate, loading } = useLayouts();
   const { selectedMerchant } = useWorkspace();
   const isNew = id === "new";
-  const source = isNew ? null : templates.find((template) => template._id === id);
-  const [template, setTemplate] = useState<LayoutTemplate>(() => source ?? createTemplate(account._id, selectedMerchantId));
+  const source = isNew ? null : templates.find((template) => template.id === id);
+  const [template, setTemplate] = useState<LayoutTemplate>(() => source ?? createTemplate(account.id, selectedMerchantId));
   const [selectedPageId, setSelectedPageId] = useState(() => keyOf(template.pages[0]));
   const [message, setMessage] = useState<string | null>(null);
   const [openPanels, setOpenPanels] = useState({ template: true, page: true });
@@ -33,7 +33,7 @@ export function LayoutTemplateEditor() {
   }, [isNew, source]);
 
   const selectedPage = template.pages.find((page) => keyOf(page) === selectedPageId) ?? template.pages[0];
-  const selectedCollage = selectedPage?.collageId ? collages.find((collage) => collage._id === selectedPage.collageId) : null;
+  const selectedCollage = selectedPage?.collageId ? collages.find((collage) => collage.id === selectedPage.collageId) : null;
   const previewPage = selectedPage ? pageWithCollage(selectedPage, selectedCollage) : undefined;
   const errors = useMemo(() => validateLayoutTemplate(template, allTemplates, selectedMerchantId), [allTemplates, selectedMerchantId, template]);
   const isValid = Object.keys(errors).length === 0;
@@ -53,7 +53,7 @@ export function LayoutTemplateEditor() {
   }
   function duplicatePage() {
     if (!selectedPage) return;
-    const page = { ...selectedPage, _id: "", clientId: crypto.randomUUID(), pageNumber: template.pages.length + 1, name: `${selectedPage.name} Copy`, elements: [] };
+    const page = { ...selectedPage, id: "", clientId: crypto.randomUUID(), pageNumber: template.pages.length + 1, name: `${selectedPage.name} Copy`, elements: [] };
     setTemplate((prev) => ({ ...prev, pageCount: prev.pages.length + 1, pages: [...prev.pages, page] }));
     setSelectedPageId(keyOf(page));
   }
@@ -68,15 +68,15 @@ export function LayoutTemplateEditor() {
     const payload = { ...template, merchantContextId: selectedMerchantId, merchantId: template.scope === "merchant" ? selectedMerchantId : null, pageCount: template.pages.length || template.pageCount };
     const saved = isNew ? await addTemplate(payload) : await updateTemplate(payload);
     setMessage("Layout template saved.");
-    navigate(`/layouts/templates/${saved._id}`);
+    navigate(`/layouts/templates/${saved.id}`);
   }
   async function remove() {
-    if (!template._id || !confirm("Delete this layout template?")) return;
-    await deleteTemplate(template._id);
+    if (!template.id || !confirm("Delete this layout template?")) return;
+    await deleteTemplate(template.id);
     navigate("/layouts/templates");
   }
   async function exportJson() {
-    const data = template._id ? await api.exportLayoutTemplate(template._id) : { template };
+    const data = template.id ? await api.exportLayoutTemplate(template.id) : { template };
     downloadJson(`layout-template-${template.slug || "draft"}.json`, data);
   }
 

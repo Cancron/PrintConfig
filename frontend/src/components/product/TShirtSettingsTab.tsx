@@ -370,7 +370,7 @@ function validateDraft(draft: TShirtProductConfig, product: Product): Errors {
   for (const variant of product.variants) {
     const valueFor = (key: string) => Object.entries(variant.options ?? {}).find(([optionKey]) => optionKey.toLowerCase() === key.toLowerCase())?.[1]?.trim();
     if (!valueFor(product.tshirt.colorOptionKey) || !valueFor(product.tshirt.sizeOptionKey)) {
-      errors[`variant.${variant._id}`] = `${variant.name} needs values for the current Color and Size option keys before those keys can be migrated.`;
+      errors[`variant.${variant.id}`] = `${variant.name} needs values for the current Color and Size option keys before those keys can be migrated.`;
     }
   }
   return errors;

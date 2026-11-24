@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isUuid } from '../utils/uuid.js';
 import { ImageFolderModel } from '../models/ImageFolder.js';
 import { ImageAssetModel } from '../models/ImageAsset.js';
 import { ApiError } from '../middleware/errorHandler.js';
@@ -18,7 +18,7 @@ function normalizeRefs(data: Record<string, unknown>) {
   data.accountId = resolveAccountId(String(data.accountId ?? ''));
   normalizeScope(data);
   for (const key of ['merchantId', 'parentFolderId'] as const) {
-    if (data[key] && !Types.ObjectId.isValid(String(data[key]))) throw new ApiError(400, `${key} must be a valid MongoDB ObjectId.`);
+    if (data[key] && !isUuid(String(data[key]))) throw new ApiError(400, `${key} must be a valid UUID.`);
   }
   if (!data.parentFolderId) data.parentFolderId = null;
 }
@@ -56,7 +56,7 @@ export async function updateFolder(id: string, payload: Record<string, unknown>)
   if (!String(payload.name ?? '').trim()) throw new ApiError(400, 'Folder name is required.');
   await assertParentAvailable(payload);
   payload.slug = slugify(String(payload.name));
-  const duplicate = await ImageFolderModel.findOne({ _id: { $ne: id }, accountId: payload.accountId, merchantId: payload.scope === 'shared' ? null : payload.merchantId, scope: payload.scope, parentFolderId: payload.parentFolderId, slug: payload.slug });
+  const duplicate = await ImageFolderModel.findOne({ id: { $ne: id }, accountId: payload.accountId, merchantId: payload.scope === 'shared' ? null : payload.merchantId, scope: payload.scope, parentFolderId: payload.parentFolderId, slug: payload.slug });
   if (duplicate) throw new ApiError(409, 'Folder name must be unique inside this folder.');
   return ImageFolderModel.findByIdAndUpdate(id, payload, { new: true, runValidators: true });
 }

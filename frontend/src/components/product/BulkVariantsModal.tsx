@@ -246,7 +246,7 @@ function parseBatch(input: {
         : size;
     const now = new Date().toISOString();
     variants.push({
-      _id: '',
+      id: '',
       clientId: crypto.randomUUID(),
       productId: input.productId,
       name: variantName,

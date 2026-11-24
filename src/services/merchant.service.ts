@@ -66,7 +66,7 @@ export async function getMerchantPublicConfig(apiPrivateKey: string) {
   if (!merchant) throw new ApiError(401, 'A valid merchant API private key is required.');
   
   return {
-    _id: String(merchant._id),
+    id: String(merchant.id),
     name: merchant.name,
     slug: merchant.slug,
     logoUrl: merchant.logoUrl,

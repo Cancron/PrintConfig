@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isUuid } from '../utils/uuid.js';
 import { LayoutCategoryModel } from '../models/LayoutCategory.js';
 import { LayoutTemplateModel } from '../models/LayoutTemplate.js';
 import { CollageModel } from '../models/Collage.js';
@@ -17,14 +17,14 @@ const ELEMENT_TYPES = ['photo_placeholder', 'text_placeholder', 'shape', 'backgr
 export function layoutVisibleQuery(accountId: string, merchantId?: string | null) {
   const query: Record<string, unknown> = { accountId };
   const merchant = String(merchantId ?? '').trim();
-  query.$or = merchant && Types.ObjectId.isValid(merchant)
+  query.$or = merchant && isUuid(merchant)
     ? [{ scope: 'shared' }, { scope: 'merchant', merchantId: merchant }]
     : [{ scope: 'shared' }];
   return query;
 }
 
-function isObjectId(value: unknown) {
-  return Types.ObjectId.isValid(String(value ?? ''));
+function isUuidValue(value: unknown) {
+  return isUuid(String(value ?? ''));
 }
 
 function normalizeScope(data: Record<string, unknown>, label: string) {
@@ -36,7 +36,7 @@ function normalizeScope(data: Record<string, unknown>, label: string) {
 function normalizeRefs(data: Record<string, unknown>) {
   data.accountId = resolveAccountId(String(data.accountId ?? ''));
   if (data.scope === 'shared') data.merchantId = null;
-  if (data.merchantId && !isObjectId(data.merchantId)) throw new ApiError(400, 'merchantId must be a valid MongoDB ObjectId.');
+  if (data.merchantId && !isUuidValue(data.merchantId)) throw new ApiError(400, 'merchantId must be a valid UUID.');
   if (data.thumbnailAssetId === '') delete data.thumbnailAssetId;
 }
 
@@ -53,18 +53,18 @@ function validateStatus(status: unknown) {
 
 async function assertCategorySlugUnique(data: Record<string, unknown>, id?: string) {
   const query: Record<string, unknown> = { accountId: data.accountId, scope: data.scope, merchantId: data.scope === 'shared' ? null : data.merchantId, slug: data.slug };
-  if (id) query._id = { $ne: id };
+  if (id) query.id = { $ne: id };
   if (await LayoutCategoryModel.findOne(query)) throw new ApiError(409, 'Layout category slug must be unique within account, scope, and merchant.');
 }
 
 async function assertTemplateSlugUnique(data: Record<string, unknown>, id?: string) {
   const query: Record<string, unknown> = { accountId: data.accountId, scope: data.scope, merchantId: data.scope === 'shared' ? null : data.merchantId, slug: data.slug };
-  if (id) query._id = { $ne: id };
+  if (id) query.id = { $ne: id };
   if (await LayoutTemplateModel.findOne(query)) throw new ApiError(409, 'Layout template slug must be unique within account, scope, and merchant.');
 }
 async function assertCollageSlugUnique(data: Record<string, unknown>, id?: string) {
   const query: Record<string, unknown> = { accountId: data.accountId, scope: data.scope, merchantId: data.scope === 'shared' ? null : data.merchantId, categoryId: data.categoryId, slug: data.slug };
-  if (id) query._id = { $ne: id };
+  if (id) query.id = { $ne: id };
   if (await CollageModel.findOne(query)) throw new ApiError(409, 'Collage slug must be unique within account, scope, merchant, and category.');
 }
 
@@ -156,9 +156,9 @@ async function normalizePages(data: Record<string, unknown>, merchantContextId?:
     if (!normalized.collageId) {
       normalized.collageId = null;
     } else {
-      if (!isObjectId(normalized.collageId)) throw new ApiError(400, 'Page collage must be a valid MongoDB ObjectId.');
+      if (!isUuidValue(normalized.collageId)) throw new ApiError(400, 'Page collage must be a valid UUID.');
       const collage = await CollageModel.findOne({
-        _id: normalized.collageId,
+        id: normalized.collageId,
         ...layoutVisibleQuery(String(data.accountId), merchantContextId ?? (data.merchantId ? String(data.merchantId) : undefined)),
       });
       if (!collage) throw new ApiError(400, 'Selected collage is not visible for this account and merchant.');
@@ -288,11 +288,11 @@ async function normalizeCollagePayload(payload: Record<string, unknown>, id?: st
   if (!String(payload.name ?? '').trim()) throw new ApiError(400, 'Collage name is required.');
   payload.slug = validateSlug(payload.slug || slugify(String(payload.name ?? 'collage')));
   validateStatus(payload.status ?? 'draft');
-  if (!payload.categoryId || !isObjectId(payload.categoryId)) throw new ApiError(400, 'Layout category is required.');
+  if (!payload.categoryId || !isUuidValue(payload.categoryId)) throw new ApiError(400, 'Layout category is required.');
   const merchantContextId = payload.merchantContextId ? String(payload.merchantContextId) : undefined;
   delete payload.merchantContextId;
   const category = await LayoutCategoryModel.findOne({
-    _id: payload.categoryId,
+    id: payload.categoryId,
     ...layoutVisibleQuery(String(payload.accountId), merchantContextId ?? (payload.merchantId ? String(payload.merchantId) : undefined)),
   });
   if (!category) throw new ApiError(400, 'Layout category is not visible for this account and merchant.');
@@ -389,12 +389,11 @@ export async function importCollage(payload: Record<string, unknown>) {
 }
 function stripIds<T>(value: T): T {
   if (Array.isArray(value)) return value.map(stripIds) as T;
-  if (isObjectIdValue(value)) return String(value) as T;
   if (value instanceof Date) return value.toISOString() as T;
   if (value && typeof value === 'object') {
     const output: Record<string, unknown> = {};
     for (const [key, child] of Object.entries(value)) {
-      if (key === '_id' || key === '__v' || key === 'createdAt' || key === 'updatedAt') continue;
+      if (key === 'id' || key === '__v' || key === 'createdAt' || key === 'updatedAt') continue;
       output[key] = stripIds(child);
     }
     return output as T;
@@ -402,6 +401,3 @@ function stripIds<T>(value: T): T {
   return value;
 }
 
-function isObjectIdValue(value: unknown) {
-  return value instanceof Types.ObjectId || Boolean(value && typeof value === 'object' && (value as { _bsontype?: string })._bsontype === 'ObjectId');
-}

@@ -34,7 +34,7 @@ function defaultSafeArea(): SafeAreaSettings {
 function defaultSurface(productId: string): ProductSurface {
   const now = new Date().toISOString();
   return {
-    _id: '',
+    id: '',
     clientId: crypto.randomUUID(),
     productId,
     name: 'Front Print Area',
@@ -49,27 +49,27 @@ function defaultSurface(productId: string): ProductSurface {
 }
 
 export function SurfacesTab({ product, onSave }: Props) {
-  const [selectedVariantId, setSelectedVariantId] = useState(product.variants[0]?._id ?? '');
+  const [selectedVariantId, setSelectedVariantId] = useState(product.variants[0]?.id ?? '');
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [form, setForm] = useState<ProductSurface>(() => product.surface ?? defaultSurface(product._id));
-  const selectedVariant = product.variants.find((variant) => variant._id === selectedVariantId) ?? product.variants[0];
+  const [form, setForm] = useState<ProductSurface>(() => product.surface ?? defaultSurface(product.id));
+  const selectedVariant = product.variants.find((variant) => variant.id === selectedVariantId) ?? product.variants[0];
   const errors = useMemo(() => validateSurface(form, selectedVariant), [form, selectedVariant]);
   const isValid = Object.keys(errors).length === 0;
   const dimensions = selectedVariant ? calculateDimensions(form, selectedVariant) : null;
 
   function startAdd() {
-    setForm(defaultSurface(product._id));
+    setForm(defaultSurface(product.id));
     setIsFormOpen(true);
   }
 
   function startEdit() {
-    setForm(product.surface ?? defaultSurface(product._id));
+    setForm(product.surface ?? defaultSurface(product.id));
     setIsFormOpen(true);
   }
 
   function cancelEdit() {
     setIsFormOpen(false);
-    setForm(product.surface ?? defaultSurface(product._id));
+    setForm(product.surface ?? defaultSurface(product.id));
   }
 
   function updateForm<K extends keyof ProductSurface>(field: K, value: ProductSurface[K]) {
@@ -89,7 +89,7 @@ export function SurfacesTab({ product, onSave }: Props) {
     const now = new Date().toISOString();
     const surface: ProductSurface = {
       ...form,
-      productId: product._id,
+      productId: product.id,
       name: form.name.trim(),
       code: form.code.trim(),
       createdAt: product.surface?.createdAt ?? form.createdAt ?? now,
@@ -157,7 +157,7 @@ export function SurfacesTab({ product, onSave }: Props) {
             </div>
 
             <div className="space-y-4">
-              <Select label="Preview Variant" value={selectedVariant?._id ?? ''} onChange={(event) => setSelectedVariantId(event.target.value)} options={product.variants.length > 0 ? product.variants.map((variant) => ({ value: variant._id, label: `${variant.name} (${variant.width}x${variant.height})` })) : [{ value: '', label: 'No variants available' }]} disabled={product.variants.length === 0} />
+              <Select label="Preview Variant" value={selectedVariant?.id ?? ''} onChange={(event) => setSelectedVariantId(event.target.value)} options={product.variants.length > 0 ? product.variants.map((variant) => ({ value: variant.id, label: `${variant.name} (${variant.width}x${variant.height})` })) : [{ value: '', label: 'No variants available' }]} disabled={product.variants.length === 0} />
               <div className="rounded-lg bg-white p-4 ring-1 ring-gray-200">
                 <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Preview</h4>
                 {selectedVariant ? <SurfacePreview surface={form} variant={selectedVariant} size={240} /> : <p className="text-sm text-gray-500">Add a variant to preview the surface ratio.</p>}
@@ -180,11 +180,11 @@ export function SurfacesTab({ product, onSave }: Props) {
 }
 
 function PreviewPanel({ product, selectedVariantId, onVariantChange }: { product: Product; selectedVariantId: string; onVariantChange: (id: string) => void }) {
-  const selectedVariant = product.variants.find((variant) => variant._id === selectedVariantId) ?? product.variants[0];
+  const selectedVariant = product.variants.find((variant) => variant.id === selectedVariantId) ?? product.variants[0];
   const dimensions = product.surface && selectedVariant ? calculateDimensions(product.surface, selectedVariant) : null;
   return (
     <div className="space-y-4 rounded-lg bg-white p-4 ring-1 ring-gray-200">
-      <Select label="Preview Variant" value={selectedVariant?._id ?? ''} onChange={(event) => onVariantChange(event.target.value)} options={product.variants.length > 0 ? product.variants.map((variant) => ({ value: variant._id, label: `${variant.name} (${variant.width}x${variant.height})` })) : [{ value: '', label: 'No variants available' }]} disabled={product.variants.length === 0} />
+      <Select label="Preview Variant" value={selectedVariant?.id ?? ''} onChange={(event) => onVariantChange(event.target.value)} options={product.variants.length > 0 ? product.variants.map((variant) => ({ value: variant.id, label: `${variant.name} (${variant.width}x${variant.height})` })) : [{ value: '', label: 'No variants available' }]} disabled={product.variants.length === 0} />
       <div className="flex justify-center">{product.surface && selectedVariant ? <SurfacePreview surface={product.surface} variant={selectedVariant} size={240} /> : <p className="text-sm text-gray-500">Add a variant to preview.</p>}</div>
       {dimensions && <dl className="space-y-2 text-sm"><SummaryRow label="Trim" value={`${dimensions.widthPx} x ${dimensions.heightPx} px`} /><SummaryRow label="With bleed" value={`${dimensions.totalWidthWithBleedPx} x ${dimensions.totalHeightWithBleedPx} px`} /></dl>}
     </div>

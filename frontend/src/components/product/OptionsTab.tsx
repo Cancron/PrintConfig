@@ -43,7 +43,7 @@ export function OptionsTab({ product, onSave }: Props) {
 
   function startAddGroup() {
     setEditingGroupId(null);
-    setForm(createGroup(product._id, sortedGroups.length + 1));
+    setForm(createGroup(product.id, sortedGroups.length + 1));
   }
 
   function startEditGroup(group: ProductOptionGroup) {
@@ -84,12 +84,12 @@ export function OptionsTab({ product, onSave }: Props) {
     const clientId = crypto.randomUUID();
     const copy: ProductOptionGroup = {
       ...group,
-      _id: '',
+      id: '',
       clientId,
       name: `${group.name} Copy`,
       code: `${group.code}-copy`,
       sortOrder: sortedGroups.length + 1,
-      values: group.values.map((value) => ({ ...value, _id: '', clientId: crypto.randomUUID(), optionGroupId: '', createdAt: now, updatedAt: now })),
+      values: group.values.map((value) => ({ ...value, id: '', clientId: crypto.randomUUID(), optionGroupId: '', createdAt: now, updatedAt: now })),
       createdAt: now,
       updatedAt: now,
     };
@@ -110,7 +110,7 @@ export function OptionsTab({ product, onSave }: Props) {
   }
 
   function addValue() {
-    setForm((prev) => (prev ? { ...prev, values: [...prev.values, createValue(prev._id, prev.values.length + 1)] } : prev));
+    setForm((prev) => (prev ? { ...prev, values: [...prev.values, createValue(prev.id, prev.values.length + 1)] } : prev));
   }
 
   function updateValue<K extends keyof ProductOptionValue>(id: string, field: K, value: ProductOptionValue[K]) {
@@ -468,12 +468,12 @@ function validateGroup(group: ProductOptionGroup, groups: ProductOptionGroup[], 
 
 function createGroup(productId: string, sortOrder: number): ProductOptionGroup {
   const now = new Date().toISOString();
-  return { _id: '', clientId: crypto.randomUUID(), productId, name: '', code: '', displayType: 'Dropdown', required: true, sortOrder, values: [], dependencyRules: [], createdAt: now, updatedAt: now };
+  return { id: '', clientId: crypto.randomUUID(), productId, name: '', code: '', displayType: 'Dropdown', required: true, sortOrder, values: [], dependencyRules: [], createdAt: now, updatedAt: now };
 }
 
 function createValue(optionGroupId: string, sortOrder: number): ProductOptionValue {
   const now = new Date().toISOString();
-  return { _id: '', clientId: crypto.randomUUID(), optionGroupId, label: '', value: '', skuCode: '', priceModifierType: 'none', priceModifier: 0, isDefault: sortOrder === 1, isActive: true, sortOrder, previewImageUrl: '', thumbnailImageUrl: '', metadata: {}, createdAt: now, updatedAt: now };
+  return { id: '', clientId: crypto.randomUUID(), optionGroupId, label: '', value: '', skuCode: '', priceModifierType: 'none', priceModifier: 0, isDefault: sortOrder === 1, isActive: true, sortOrder, previewImageUrl: '', thumbnailImageUrl: '', metadata: {}, createdAt: now, updatedAt: now };
 }
 
 function getModifierAmount(basePrice: number, value: ProductOptionValue) {
@@ -509,6 +509,6 @@ function slugify(value: string, allowPeriod = false) {
   return value.toLowerCase().replace(disallowed, '-').replace(/^-|-$/g, '');
 }
 
-function entityKey(entity: { _id: string; clientId?: string }) {
-  return entity._id || entity.clientId || '';
+function entityKey(entity: { id: string; clientId?: string }) {
+  return entity.id || entity.clientId || '';
 }

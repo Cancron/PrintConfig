@@ -17,7 +17,7 @@ export function PreviewTab({ product, onSave }: Props) {
   const [searchParams] = useSearchParams();
   const activeVariants = product.variants.filter((variant) => variant.status === 'Active');
   const requestedVariantId = searchParams.get('variantId');
-  const requestedVariant = product.variants.find((variant) => variant._id === requestedVariantId);
+  const requestedVariant = product.variants.find((variant) => variant.id === requestedVariantId);
   const initialOrientation = requestedVariant ? getVariantRoomOrientation(requestedVariant) : product.variants[0] ? getVariantRoomOrientation(product.variants[0]) : 'square';
   const [selectedOrientation, setSelectedOrientation] = useState<RoomOrientation>(initialOrientation);
   const selectedVariant = product.variants.find((variant) => getVariantRoomOrientation(variant) === selectedOrientation);
@@ -161,11 +161,11 @@ function hasTightSafeArea(surface: ProductSurface, variant: ProductVariant) {
 }
 
 function summarizeProduct(product: Product) {
-  return { _id: product._id, name: product.name, slug: product.slug, productType: product.productType, status: product.status, basePrice: product.basePrice, roomPreviews: product.roomPreviews };
+  return { id: product.id, name: product.name, slug: product.slug, productType: product.productType, status: product.status, basePrice: product.basePrice, roomPreviews: product.roomPreviews };
 }
 
 function summarizeVariant(variant: ProductVariant) {
-  return { _id: variant._id, name: variant.name, sku: variant.sku, status: variant.status, price: variant.price, width: variant.width, height: variant.height, unit: variant.unit, dpi: variant.dpi, previewImageUrl: variant.previewImageUrl, thumbnailImageUrl: variant.thumbnailImageUrl, options: variant.options, roomOrientation: getVariantRoomOrientation(variant) };
+  return { id: variant.id, name: variant.name, sku: variant.sku, status: variant.status, price: variant.price, width: variant.width, height: variant.height, unit: variant.unit, dpi: variant.dpi, previewImageUrl: variant.previewImageUrl, thumbnailImageUrl: variant.thumbnailImageUrl, options: variant.options, roomOrientation: getVariantRoomOrientation(variant) };
 }
 
 function orientationLabel(orientation: RoomOrientation) {

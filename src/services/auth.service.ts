@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'node:crypto';
 import { UserModel } from '../models/User.js';
+import { withTransaction } from '../config/postgres.js';
 import { ApiError } from '../middleware/errorHandler.js';
 
 function jwtSecret() {
@@ -12,16 +14,16 @@ const JWT_EXPIRES_IN = '7d';
 const DOWNLOAD_TOKEN_EXPIRES_IN = '5m';
 
 export interface AuthUser {
-  _id: string;
+  id: string;
   email: string;
   name: string;
   role: string;
   accountId?: string;
 }
 
-export function signToken(user: { _id: string; email: string; name: string; role: string; accountId?: string }): string {
+export function signToken(user: { id: string; email: string; name: string; role: string; accountId?: string }): string {
   return jwt.sign(
-    { sub: String(user._id), email: user.email, name: user.name, role: user.role, accountId: user.accountId ? String(user.accountId) : undefined },
+    { sub: String(user.id), email: user.email, name: user.name, role: user.role, accountId: user.accountId ? String(user.accountId) : undefined },
     jwtSecret(),
     { expiresIn: JWT_EXPIRES_IN }
   );
@@ -61,9 +63,18 @@ export async function signUp(email: string, password: string, name: string): Pro
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = await UserModel.create({ email: normalizedEmail, passwordHash, name: name.trim() });
+  const user = await withTransaction(async (client) => {
+    const accountId = randomUUID();
+    const userId = randomUUID();
+    await client.query('INSERT INTO accounts (id, payload) VALUES ($1, $2::jsonb)', [accountId, JSON.stringify({ name: `${name.trim()}'s Workspace`, status: 'active' })]);
+    const result = await client.query(
+      'INSERT INTO users (id, payload) VALUES ($1, $2::jsonb) RETURNING *',
+      [userId, JSON.stringify({ email: normalizedEmail, passwordHash, name: name.trim(), role: 'admin', isActive: true, accountId })],
+    );
+    return { id: result.rows[0].id, ...result.rows[0].payload };
+  });
   const authUser: AuthUser = {
-    _id: String(user._id),
+    id: String(user.id),
     email: user.email,
     name: user.name,
     role: user.role,
@@ -89,7 +100,7 @@ export async function signIn(email: string, password: string): Promise<{ user: A
   }
 
   const authUser: AuthUser = {
-    _id: String(user._id),
+    id: String(user.id),
     email: user.email,
     name: user.name,
     role: user.role,
@@ -103,7 +114,7 @@ export async function getUserById(id: string): Promise<AuthUser | null> {
   const user = await UserModel.findById(id);
   if (!user) return null;
   return {
-    _id: String(user._id),
+    id: String(user.id),
     email: user.email,
     name: user.name,
     role: user.role,

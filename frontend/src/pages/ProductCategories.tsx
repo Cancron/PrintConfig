@@ -41,7 +41,7 @@ export function ProductCategories() {
     return matchesSearch && matchesFilter;
   });
 
-  const productCounts = useMemo(() => new Map(categories.map((category) => [category._id, products.filter((product) => product.categoryId === category._id).length])), [categories, products]);
+  const productCounts = useMemo(() => new Map(categories.map((category) => [category.id, products.filter((product) => product.categoryId === category.id).length])), [categories, products]);
 
   function openCreate() {
     setEditing(null);
@@ -56,7 +56,7 @@ export function ProductCategories() {
   async function handleDuplicate(category: ProductCategory) {
     const includeProducts = confirm('Duplicate category with all products? Choose Cancel to duplicate category only.');
     const result = await duplicateCategory(category, includeProducts);
-    if (result) navigate(`/categories/${result.category._id}`);
+    if (result) navigate(`/categories/${result.category.id}`);
   }
 
   return (
@@ -85,21 +85,21 @@ export function ProductCategories() {
           <Table>
             <TableHead><TableHeader>Category name</TableHeader><TableHeader>Scope</TableHeader><TableHeader>Status</TableHeader><TableHeader>Products</TableHeader><TableHeader>Sort order</TableHeader><TableHeader>Updated</TableHeader><TableHeader className="text-right">Actions</TableHeader></TableHead>
             <TableBody>
-              {filtered.map((category) => <tr key={category._id}>
+              {filtered.map((category) => <tr key={category.id}>
                 <TableCell><div className="flex items-center gap-3">{category.thumbnailUrl ? <img src={category.thumbnailUrl} alt={category.name} className="h-10 w-10 rounded-md object-cover" /> : <div className="h-10 w-10 rounded-md bg-gray-100" />}<span className="font-medium text-gray-900">{category.name}</span></div></TableCell>
-                <TableCell><ScopeBadge scope={category.scope} />{category.scope === 'merchant' && <p className="mt-1 text-xs text-gray-500">{merchants.find((merchant) => merchant._id === category.merchantId)?.name}</p>}</TableCell>
+                <TableCell><ScopeBadge scope={category.scope} />{category.scope === 'merchant' && <p className="mt-1 text-xs text-gray-500">{merchants.find((merchant) => merchant.id === category.merchantId)?.name}</p>}</TableCell>
                 <TableCell><CategoryStatusBadge status={category.status} /></TableCell>
-                <TableCell>{productCounts.get(category._id) ?? 0}</TableCell>
+                <TableCell>{productCounts.get(category.id) ?? 0}</TableCell>
                 <TableCell>{category.sortOrder}</TableCell>
                 <TableCell>{new Date(category.updatedAt).toLocaleDateString()}</TableCell>
-                <TableCell className="text-right"><div className="flex items-center justify-end gap-2"><Link to={`/categories/${category._id}`} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900" title="View"><Eye className="h-4 w-4" /></Link><button onClick={() => openEdit(category)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900" title="Edit"><Pencil className="h-4 w-4" /></button><button onClick={() => handleDuplicate(category)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900" title="Duplicate"><Copy className="h-4 w-4" /></button><button onClick={() => { if (confirm('Delete this category? Products will remain but need reassignment.')) deleteCategory(category._id); }} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Delete"><Trash2 className="h-4 w-4" /></button></div></TableCell>
+                <TableCell className="text-right"><div className="flex items-center justify-end gap-2"><Link to={`/categories/${category.id}`} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900" title="View"><Eye className="h-4 w-4" /></Link><button onClick={() => openEdit(category)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900" title="Edit"><Pencil className="h-4 w-4" /></button><button onClick={() => handleDuplicate(category)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900" title="Duplicate"><Copy className="h-4 w-4" /></button><button onClick={() => { if (confirm('Delete this category? Products will remain but need reassignment.')) deleteCategory(category.id); }} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Delete"><Trash2 className="h-4 w-4" /></button></div></TableCell>
               </tr>)}
             </TableBody>
           </Table>
         )}
       </div>
 
-      {isFormOpen && <CategoryForm category={editing} allCategories={allCategories} accountId={account._id} selectedMerchantId={selectedMerchantId} selectedMerchantName={selectedMerchant?.name} onClose={() => setIsFormOpen(false)} onSave={(category) => { if (editing) { updateCategory(category); } else { addCategory(category); } setIsFormOpen(false); }} />}
+      {isFormOpen && <CategoryForm category={editing} allCategories={allCategories} accountId={account.id} selectedMerchantId={selectedMerchantId} selectedMerchantName={selectedMerchant?.name} onClose={() => setIsFormOpen(false)} onSave={(category) => { if (editing) { updateCategory(category); } else { addCategory(category); } setIsFormOpen(false); }} />}
     </div>
   );
 }
@@ -114,7 +114,7 @@ export function CategoryForm({ category, allCategories, accountId, selectedMerch
   const [thumbnailAssetId, setThumbnailAssetId] = useState(category?.thumbnailAssetId);
   const [sortOrder, setSortOrder] = useState(String(category?.sortOrder ?? 0));
   const merchantId = scope === 'merchant' ? selectedMerchantId : null;
-  const errors = useMemo(() => validateCategory({ _id: category?._id, name, slug, status, scope, merchantId, sortOrder, existingCategories: allCategories }), [allCategories, category?._id, merchantId, name, scope, slug, sortOrder, status]);
+  const errors = useMemo(() => validateCategory({ id: category?.id, name, slug, status, scope, merchantId, sortOrder, existingCategories: allCategories }), [allCategories, category?.id, merchantId, name, scope, slug, sortOrder, status]);
   const isValid = Object.keys(errors).length === 0;
 
   function handleName(value: string) {
@@ -125,7 +125,7 @@ export function CategoryForm({ category, allCategories, accountId, selectedMerch
   function save() {
     if (!isValid) return;
     const now = new Date().toISOString();
-    onSave({ _id: category?._id ?? '', accountId, merchantId, scope, name: name.trim(), slug: slug.trim(), description: description.trim(), status, thumbnailUrl: thumbnailUrl.trim(), thumbnailAssetId, sortOrder: Number(sortOrder), createdAt: category?.createdAt ?? now, updatedAt: now });
+    onSave({ id: category?.id ?? '', accountId, merchantId, scope, name: name.trim(), slug: slug.trim(), description: description.trim(), status, thumbnailUrl: thumbnailUrl.trim(), thumbnailAssetId, sortOrder: Number(sortOrder), createdAt: category?.createdAt ?? now, updatedAt: now });
   }
 
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><div className="w-full max-w-2xl rounded-lg bg-white shadow-xl ring-1 ring-gray-200"><div className="border-b border-gray-200 px-5 py-4"><h2 className="text-lg font-semibold text-gray-900">{category ? 'Edit Category' : 'Create Category'}</h2></div><div className="space-y-4 p-5"><Input label="Category Name" value={name} onChange={(event) => handleName(event.target.value)} error={errors.name} /><Input label="Slug" value={slug} onChange={(event) => setSlug(event.target.value)} error={errors.slug} /><Textarea label="Description" value={description} onChange={(event) => setDescription(event.target.value)} rows={3} /><Select label="Status" value={status} onChange={(event) => setStatus(event.target.value as ProductCategoryStatus)} options={statusOptions} error={errors.status} /><Select label="Scope" value={scope} onChange={(event) => setScope(event.target.value as ProductScope)} options={scopeOptions} error={errors.scope} />{scope === 'merchant' && <p className="rounded-md bg-purple-50 p-3 text-sm text-purple-700 ring-1 ring-inset ring-purple-200">This category will belong only to {selectedMerchantName ?? 'the selected merchant'}.</p>}<ImageField label="Thumbnail Image URL" url={thumbnailUrl} assetId={thumbnailAssetId} onChange={(url, assetId) => { setThumbnailUrl(url); setThumbnailAssetId(assetId); }} /><Input label="Sort Order" type="number" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)} error={errors.sortOrder} /></div><div className="flex justify-end gap-3 border-t border-gray-200 px-5 py-4"><button onClick={onClose} className="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50">Cancel</button><button onClick={save} disabled={!isValid} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">Save Category</button></div></div></div>;

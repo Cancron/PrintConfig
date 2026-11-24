@@ -72,7 +72,7 @@ export function GalleryUploadModal({ folderId, defaultScope, folders, accountId,
             {file && <p className="text-xs text-gray-500">{formatFileSize(file.size)} - {file.type}{dimensions.width && dimensions.height ? ` - ${dimensions.width} x ${dimensions.height}` : ''}</p>}
             <Input label="Image Name" value={name} onChange={(event) => setName(event.target.value)} />
             <Select label="Scope" value={scope} onChange={(event) => { setScope(event.target.value as ProductScope); setTargetFolderId(''); }} options={[{ value: 'shared', label: 'Shared' }, { value: 'merchant', label: 'Merchant Custom' }]} />
-            <Select label="Folder" value={targetFolderId} onChange={(event) => setTargetFolderId(event.target.value)} options={[{ value: '', label: 'Image Library root' }, ...compatibleFolders.map((folder) => ({ value: folder._id, label: folder.name }))]} />
+            <Select label="Folder" value={targetFolderId} onChange={(event) => setTargetFolderId(event.target.value)} options={[{ value: '', label: 'Image Library root' }, ...compatibleFolders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
             <Input label="Alt Text" value={altText} onChange={(event) => setAltText(event.target.value)} />
             <Input label="Tags" value={tags} onChange={(event) => setTags(event.target.value)} placeholder="room, canvas, modern" />
             {error && <p className="text-sm text-red-600">{error}</p>}

@@ -2,6 +2,7 @@ import { createContext, createElement, useCallback, useContext, useEffect, useMe
 import type { Account, Merchant } from '../types';
 import { api } from '../lib/api';
 import { loadAccount, loadMerchants, loadSelectedMerchantId, saveSelectedMerchantId, updateMerchant as persistMerchant } from '../lib/storage';
+import { useAuth } from './useAuth';
 
 interface WorkspaceContextValue {
   account: Account;
@@ -17,7 +18,8 @@ interface WorkspaceContextValue {
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
-  const [account] = useState(() => loadAccount());
+  const { user } = useAuth();
+  const account = useMemo(() => ({ ...loadAccount(), id: user?.accountId ?? '' }), [user?.accountId]);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [selectedMerchantId, setSelectedMerchantIdState] = useState(() => loadSelectedMerchantId());
   const [loading, setLoading] = useState(true);
@@ -25,8 +27,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    if (!account.id) { setLoading(false); return; }
     setLoading(true);
-    api.listMerchants(account._id)
+    api.listMerchants(account.id)
       .then((items) => {
         if (!cancelled) {
           setMerchants(items);
@@ -41,16 +44,16 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [account._id]);
+  }, [account.id]);
 
   useEffect(() => {
-    if (!merchants.some((merchant) => merchant._id === selectedMerchantId) && merchants[0]) {
-      setSelectedMerchantIdState(merchants[0]._id);
-      saveSelectedMerchantId(merchants[0]._id);
+    if (!merchants.some((merchant) => merchant.id === selectedMerchantId) && merchants[0]) {
+      setSelectedMerchantIdState(merchants[0].id);
+      saveSelectedMerchantId(merchants[0].id);
     }
   }, [merchants, selectedMerchantId]);
 
-  const selectedMerchant = useMemo(() => merchants.find((merchant) => merchant._id === selectedMerchantId) ?? merchants[0], [merchants, selectedMerchantId]);
+  const selectedMerchant = useMemo(() => merchants.find((merchant) => merchant.id === selectedMerchantId) ?? merchants[0], [merchants, selectedMerchantId]);
 
   const setSelectedMerchantId = useCallback((merchantId: string) => {
     setSelectedMerchantIdState(merchantId);
@@ -58,11 +61,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateMerchant = useCallback((merchant: Merchant) => {
-    setMerchants((prev) => prev.map((item) => (item._id === merchant._id ? merchant : item)));
-    api.updateMerchant(merchant).then((saved) => setMerchants((prev) => prev.map((item) => (item._id === saved._id ? saved : item)))).catch(() => setMerchants(persistMerchant(merchant)));
+    setMerchants((prev) => prev.map((item) => (item.id === merchant.id ? merchant : item)));
+    api.updateMerchant(merchant).then((saved) => setMerchants((prev) => prev.map((item) => (item.id === saved.id ? saved : item)))).catch(() => setMerchants(persistMerchant(merchant)));
   }, []);
 
-  const value = useMemo(() => ({ account, merchants, selectedMerchant, selectedMerchantId: selectedMerchant?._id ?? selectedMerchantId, setSelectedMerchantId, updateMerchant, loading, error }), [account, error, loading, merchants, selectedMerchant, selectedMerchantId, setSelectedMerchantId, updateMerchant]);
+  const value = useMemo(() => ({ account, merchants, selectedMerchant, selectedMerchantId: selectedMerchant?.id ?? selectedMerchantId, setSelectedMerchantId, updateMerchant, loading, error }), [account, error, loading, merchants, selectedMerchant, selectedMerchantId, setSelectedMerchantId, updateMerchant]);
 
   return createElement(WorkspaceContext.Provider, { value }, children);
 }

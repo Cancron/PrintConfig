@@ -3,7 +3,7 @@ import { toPixels } from '../../lib/validation';
 
 interface Props {
   surface: ProductSurface | null;
-  variant: Pick<ProductVariant, '_id' | 'width' | 'height' | 'unit' | 'dpi'>;
+  variant: Pick<ProductVariant, 'id' | 'width' | 'height' | 'unit' | 'dpi'>;
   size?: number;
   showLegend?: boolean;
 }
@@ -44,7 +44,7 @@ export function SurfacePreview({ surface, variant, size = 200, showLegend = true
   const trimH = previewH - bleedTopS - bleedBottomS;
   const safeW = trimW - safeLeftS - safeRightS;
   const safeH = trimH - safeTopS - safeBottomS;
-  const checkerId = `checker-${surface?._id ?? variant._id}`;
+  const checkerId = `checker-${surface?.id ?? variant.id}`;
 
   return (
     <div className="flex flex-col items-center gap-2">

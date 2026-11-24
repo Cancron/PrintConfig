@@ -51,7 +51,7 @@ export function validateProductBasicInfo(input: {
 }
 
 export function validateVariant(input: {
-  _id?: string | null;
+  id?: string | null;
   name: string;
   sku: string;
   price: string | number;
@@ -59,7 +59,7 @@ export function validateVariant(input: {
   height: string | number;
   unit: string;
   dpi: string | number;
-  existingSkus: { _id: string; sku: string }[];
+  existingSkus: { id: string; sku: string }[];
 }): ValidationErrors {
   const errors: ValidationErrors = {};
   const price = Number(input.price);
@@ -71,7 +71,7 @@ export function validateVariant(input: {
   if (!input.name.trim()) errors.name = 'Variant name is required.';
   if (!input.sku.trim()) {
     errors.sku = 'SKU is required.';
-  } else if (input.existingSkus.some((item) => String(item._id) !== String(input._id ?? '') && item.sku.trim().toLowerCase() === sku)) {
+  } else if (input.existingSkus.some((item) => String(item.id) !== String(input.id ?? '') && item.sku.trim().toLowerCase() === sku)) {
     errors.sku = 'SKU must be unique within this product.';
   }
   if (input.price === '' || Number.isNaN(price) || price < 0) errors.price = 'Price must be zero or greater.';
@@ -233,7 +233,7 @@ export function validateTShirtProduct(product: Product): ValidationErrors {
   }
   for (const variant of product.variants) {
     const valueFor = (key: string) => Object.entries(variant.options ?? {}).find(([optionKey]) => optionKey.toLowerCase() === key.toLowerCase())?.[1]?.trim();
-    if (!valueFor(settings?.colorOptionKey ?? 'Color') || !valueFor(settings?.sizeOptionKey ?? 'Size')) errors[`tshirt.variant.${variant._id}`] = `${variant.name} needs color and size options.`;
+    if (!valueFor(settings?.colorOptionKey ?? 'Color') || !valueFor(settings?.sizeOptionKey ?? 'Size')) errors[`tshirt.variant.${variant.id}`] = `${variant.name} needs color and size options.`;
   }
   return errors;
 }
@@ -333,7 +333,7 @@ export function normalizeUnit(value: unknown): ProductUnit {
 }
 
 export function validateCategory(input: {
-  _id?: string | null;
+  id?: string | null;
   name: string;
   slug: string;
   status: string;
@@ -351,7 +351,7 @@ export function validateCategory(input: {
     errors.slug = 'Slug is required.';
   } else if (!URL_SAFE_SLUG.test(slug)) {
     errors.slug = 'Use lowercase letters, numbers, and hyphens only.';
-  } else if (input.existingCategories.some((category) => category._id !== input._id && category.slug.toLowerCase() === slug && category.accountId === category.accountId && category.scope === input.scope && (category.scope === 'shared' || category.merchantId === input.merchantId))) {
+  } else if (input.existingCategories.some((category) => category.id !== input.id && category.slug.toLowerCase() === slug && category.accountId === category.accountId && category.scope === input.scope && (category.scope === 'shared' || category.merchantId === input.merchantId))) {
     errors.slug = 'Slug must be unique in this category scope.';
   }
   if (input.status !== 'active' && input.status !== 'draft' && input.status !== 'archived') errors.status = 'Status is required.';
@@ -363,7 +363,7 @@ export function validateCategory(input: {
 }
 
 export function validateLayoutCategory(input: {
-  _id?: string | null;
+  id?: string | null;
   name: string;
   slug: string;
   status: string;
@@ -378,7 +378,7 @@ export function validateLayoutCategory(input: {
   if (!input.name.trim()) errors.name = 'Layout category name is required.';
   if (!slug) errors.slug = 'Slug is required.';
   else if (!URL_SAFE_SLUG.test(slug)) errors.slug = 'Use lowercase letters, numbers, and hyphens only.';
-  else if (input.existingCategories.some((category) => category._id !== input._id && category.slug.toLowerCase() === slug && category.scope === input.scope && (category.scope === 'shared' || category.merchantId === input.merchantId))) errors.slug = 'Slug must be unique in this layout category scope.';
+  else if (input.existingCategories.some((category) => category.id !== input.id && category.slug.toLowerCase() === slug && category.scope === input.scope && (category.scope === 'shared' || category.merchantId === input.merchantId))) errors.slug = 'Slug must be unique in this layout category scope.';
   if (input.status !== 'active' && input.status !== 'draft' && input.status !== 'archived') errors.status = 'Status is required.';
   if (input.scope !== 'shared' && input.scope !== 'merchant') errors.scope = 'Scope is required.';
   if (input.scope === 'merchant' && !input.merchantId) errors.scope = 'Select a merchant for merchant custom layout categories.';
@@ -393,7 +393,7 @@ export function validateLayoutTemplate(template: LayoutTemplate, existingTemplat
   if (!template.name.trim()) errors.name = 'Layout template name is required.';
   if (!slug) errors.slug = 'Slug is required.';
   else if (!URL_SAFE_SLUG.test(slug)) errors.slug = 'Use lowercase letters, numbers, and hyphens only.';
-  else if (existingTemplates.some((item) => item._id !== template._id && item.slug.toLowerCase() === slug && item.scope === template.scope && (item.scope === 'shared' || item.merchantId === effectiveMerchantId))) errors.slug = 'Slug must be unique in this scope.';
+  else if (existingTemplates.some((item) => item.id !== template.id && item.slug.toLowerCase() === slug && item.scope === template.scope && (item.scope === 'shared' || item.merchantId === effectiveMerchantId))) errors.slug = 'Slug must be unique in this scope.';
   if (template.status !== 'active' && template.status !== 'draft' && template.status !== 'archived') errors.status = 'Status is required.';
   if (template.scope !== 'shared' && template.scope !== 'merchant') errors.scope = 'Scope is required.';
   if (template.scope === 'merchant' && !effectiveMerchantId) errors.scope = 'Select a merchant for merchant custom templates.';

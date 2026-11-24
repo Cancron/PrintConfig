@@ -65,7 +65,7 @@ export function createDefaultFrontendContent(): ProductFrontendContent {
     showProductDetailDescription: true,
     frontendLayoutStyle: 'standard',
     trustBadges: badges.map(([icon, text], index) => ({
-      _id: '',
+      id: '',
       clientId: crypto.randomUUID(),
       icon,
       text,
@@ -91,7 +91,7 @@ export function normalizeFrontendContent(input?: Partial<ProductFrontendContent>
 export function normalizeTrustBadge(input: Partial<ProductTrustBadge>, index: number): ProductTrustBadge {
   const now = new Date().toISOString();
   return {
-    _id: input._id ? String(input._id) : '',
+    id: input.id ? String(input.id) : '',
     clientId: input.clientId ?? crypto.randomUUID(),
     icon: String(input.icon ?? ''),
     text: String(input.text ?? ''),

@@ -9,13 +9,13 @@ projects:
         runtime: node
         plan: free
         buildCommand: npm ci && npm --prefix frontend ci && npm run build
-        startCommand: npm start
+        startCommand: npm run db:migrate && npm start
         healthCheckPath: /api/health
         autoDeployTrigger: commit
         envVars:
           - key: NODE_VERSION
             value: "22"
-          - key: MONGODB_URI
+          - key: DATABASE_URL
             sync: false
           - key: FRONTEND_URL
             sync: false

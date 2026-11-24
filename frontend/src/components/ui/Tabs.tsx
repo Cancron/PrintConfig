@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
 interface Tab {
-  _id: string;
+  id: string;
   label: string;
   content: ReactNode;
 }
@@ -12,7 +12,7 @@ interface TabsProps {
 }
 
 export function Tabs({ tabs, defaultTab }: TabsProps) {
-  const [active, setActive] = useState(defaultTab ?? tabs[0]?._id);
+  const [active, setActive] = useState(defaultTab ?? tabs[0]?.id);
 
   useEffect(() => {
     if (defaultTab) setActive(defaultTab);
@@ -24,10 +24,10 @@ export function Tabs({ tabs, defaultTab }: TabsProps) {
         <nav className="-mb-px flex min-w-max space-x-8" aria-label="Tabs">
           {tabs.map((tab) => (
             <button
-              key={tab._id}
-              onClick={() => setActive(tab._id)}
+              key={tab.id}
+              onClick={() => setActive(tab.id)}
               className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                active === tab._id
+                active === tab.id
                   ? 'border-slate-900 text-slate-900'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
@@ -39,7 +39,7 @@ export function Tabs({ tabs, defaultTab }: TabsProps) {
       </div>
       <div className="py-6">
         {tabs.map((tab) => (
-          <div key={tab._id} hidden={active !== tab._id}>
+          <div key={tab.id} hidden={active !== tab.id}>
             {tab.content}
           </div>
         ))}

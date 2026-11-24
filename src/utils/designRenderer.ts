@@ -535,7 +535,7 @@ function getPhotoUrlMap(design: Record<string, any>, cartItem?: Record<string, a
     if (!isRecord(photo)) continue;
     const url = stringValue(photo.url, stringValue(photo.publicUrl, ''));
     if (!url) continue;
-    map[String(photo.id ?? photo._id ?? index + 1)] = url;
+    map[String(photo.id ?? photo.id ?? index + 1)] = url;
   }
   const imageUrl = stringValue(cartItem?.image?.publicUrl, stringValue(cartItem?.image?.url, ''));
   if (imageUrl) {

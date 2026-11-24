@@ -59,13 +59,13 @@ export function LayoutTemplatesList() {
   });
 
   async function handleDuplicate(template: LayoutTemplate) {
-    const copy = await duplicateTemplate(template._id);
-    navigate(`/layouts/templates/${copy._id}`);
+    const copy = await duplicateTemplate(template.id);
+    navigate(`/layouts/templates/${copy.id}`);
   }
   async function handleExport(template: LayoutTemplate) {
     downloadJson(
       `layout-template-${template.slug}.json`,
-      await api.exportLayoutTemplate(template._id),
+      await api.exportLayoutTemplate(template.id),
     );
   }
 
@@ -151,7 +151,7 @@ export function LayoutTemplatesList() {
             </TableHead>
             <TableBody>
               {filtered.map((template) => (
-                <tr key={template._id}>
+                <tr key={template.id}>
                   <TableCell>
                     {template.thumbnailUrl ? (
                       <img
@@ -165,7 +165,7 @@ export function LayoutTemplatesList() {
                   </TableCell>
                   <TableCell>
                     <Link
-                      to={`/layouts/templates/${template._id}`}
+                      to={`/layouts/templates/${template.id}`}
                       className="font-medium text-gray-900 hover:text-slate-700"
                     >
                       {template.name}
@@ -189,7 +189,7 @@ export function LayoutTemplatesList() {
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
                       <Link
-                        to={`/layouts/templates/${template._id}`}
+                        to={`/layouts/templates/${template.id}`}
                         className="rounded-md p-2 text-gray-500 hover:bg-gray-100"
                       >
                         Open
@@ -211,7 +211,7 @@ export function LayoutTemplatesList() {
                       <button
                         onClick={() => {
                           if (confirm("Delete this layout template?"))
-                            deleteTemplate(template._id);
+                            deleteTemplate(template.id);
                         }}
                         className="rounded-md p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
                         title="Delete"
@@ -232,7 +232,7 @@ export function LayoutTemplatesList() {
           onImported={async (template) => {
             setImportOpen(false);
             reload();
-            navigate(`/layouts/templates/${template._id}`);
+            navigate(`/layouts/templates/${template.id}`);
           }}
         />
       )}

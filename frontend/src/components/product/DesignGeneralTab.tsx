@@ -45,7 +45,7 @@ export function DesignGeneralTab({ product, onSave }: Props) {
   function addBadge() {
     const now = new Date().toISOString();
     update('trustBadges', [...content.trustBadges, {
-      _id: '',
+      id: '',
       clientId: crypto.randomUUID(),
       icon: '',
       text: '',
@@ -140,7 +140,7 @@ export function DesignGeneralTab({ product, onSave }: Props) {
         <Section title="Trust Badges">
           <div className="space-y-3">
             {content.trustBadges.map((badge, index) => (
-              <div key={badge._id || badge.clientId} className="grid grid-cols-[72px_minmax(0,1fr)_90px_100px_auto] items-start gap-3 border-b border-gray-200 pb-3 last:border-0 last:pb-0">
+              <div key={badge.id || badge.clientId} className="grid grid-cols-[72px_minmax(0,1fr)_90px_100px_auto] items-start gap-3 border-b border-gray-200 pb-3 last:border-0 last:pb-0">
                 <Input label="Icon" value={badge.icon} onChange={(event) => updateBadge(index, { icon: event.target.value })} />
                 <Input label="Text" value={badge.text} onChange={(event) => updateBadge(index, { text: event.target.value })} error={errors[`trustBadges.${index}.text`]} />
                 <Input label="Sort Order" type="number" value={badge.sortOrder} onChange={(event) => updateBadge(index, { sortOrder: Number(event.target.value) })} error={errors[`trustBadges.${index}.sortOrder`]} />
@@ -214,7 +214,7 @@ function LivePreview({ product, content, html }: { product: Product; content: Pr
         {content.showPrecheckMessage && <div className={`rounded-md p-3 text-sm ${statusTone}`}><p className="font-semibold">{content.precheckTitle}</p><p className="mt-1">{content.precheckMessage}</p></div>}
         <div className="flex flex-wrap gap-2">{[content.resizeLabel, content.rotateLabel, content.resetLabel, content.cropLabel, content.changePhotoLabel, content.previewLabel].map((label) => <span key={label} className="rounded-md bg-gray-50 px-2 py-1 text-xs text-gray-700 ring-1 ring-gray-200">{label}</span>)}</div>
         <button type="button" className="w-full rounded-md bg-slate-900 px-4 py-3 text-sm font-semibold text-white">{content.orderButtonText}</button>
-        {content.showTrustBadges && activeBadges.length > 0 && <div className="flex flex-wrap gap-x-3 gap-y-2 border-y border-gray-200 py-3">{activeBadges.map((badge) => <span key={badge._id || badge.clientId} className="text-xs text-gray-700">{badge.icon} {badge.text}</span>)}</div>}
+        {content.showTrustBadges && activeBadges.length > 0 && <div className="flex flex-wrap gap-x-3 gap-y-2 border-y border-gray-200 py-3">{activeBadges.map((badge) => <span key={badge.id || badge.clientId} className="text-xs text-gray-700">{badge.icon} {badge.text}</span>)}</div>}
         {content.showSupportBox && <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-900"><p className="font-semibold">{content.supportIcon} {content.supportLabel}</p><p className="mt-1">{content.supportPhone}</p>{content.supportEmail && <p>{content.supportEmail}</p>}{content.supportMessage && <p className="mt-1">{content.supportMessage}</p>}</div>}
         {content.showProductDetailDescription && <HtmlPreview html={html} emptyText="Product description preview" />}
       </div>

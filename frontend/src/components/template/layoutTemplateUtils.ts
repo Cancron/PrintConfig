@@ -66,7 +66,7 @@ export function createTemplate(
 ): LayoutTemplate {
   const now = new Date().toISOString();
   return {
-    _id: "",
+    id: "",
     accountId,
     merchantId: null,
     scope: "shared",
@@ -100,7 +100,7 @@ export function createPage(
 ): LayoutTemplatePage {
   const now = new Date().toISOString();
   return {
-    _id: "",
+    id: "",
     clientId: crypto.randomUUID(),
     pageNumber,
     name: `Page ${pageNumber}`,
@@ -120,7 +120,7 @@ export function createElement(
 ): LayoutElement {
   const now = new Date().toISOString();
   return {
-    _id: "",
+    id: "",
     clientId: crypto.randomUUID(),
     type,
     name: formatLabel(type),
@@ -165,8 +165,8 @@ export function createElement(
   };
 }
 
-export function keyOf(value?: { _id?: string; clientId?: string }) {
-  return value?._id || value?.clientId || "";
+export function keyOf(value?: { id?: string; clientId?: string }) {
+  return value?.id || value?.clientId || "";
 }
 export function formatLabel(value: string) {
   return value

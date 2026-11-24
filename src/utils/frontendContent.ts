@@ -97,7 +97,7 @@ export function publicFrontendContent(content: any = {}) {
       .filter((badge: any) => badge.isActive !== false)
       .sort((a: any, b: any) => Number(a.sortOrder) - Number(b.sortOrder))
       .map((badge: any) => ({
-        id: String(badge._id ?? ''),
+        id: String(badge.id ?? ''),
         icon: badge.icon ?? '',
         text: badge.text ?? '',
         sortOrder: Number(badge.sortOrder) || 0,

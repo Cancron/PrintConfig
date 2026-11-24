@@ -50,7 +50,7 @@ export function AiArtTab({ product, onSave }: Props) {
     setEditingStyleId(null);
     const now = new Date().toISOString();
     setStyleForm({
-      _id: '',
+      id: '',
       clientId: crypto.randomUUID(),
       name: '',
       slug: '',
@@ -103,7 +103,7 @@ export function AiArtTab({ product, onSave }: Props) {
     const now = new Date().toISOString();
     const copy: AiArtStyle = {
       ...style,
-      _id: '',
+      id: '',
       clientId: crypto.randomUUID(),
       name: `${style.name} Copy`,
       slug: `${style.slug}-copy`,
@@ -497,6 +497,6 @@ function slugifyStyle(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-|-$/g, '');
 }
 
-function entityKey(entity: { _id: string; clientId?: string }) {
-  return entity._id || entity.clientId || '';
+function entityKey(entity: { id: string; clientId?: string }) {
+  return entity.id || entity.clientId || '';
 }

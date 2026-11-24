@@ -122,15 +122,15 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
       description: description.trim(),
       status,
       scope,
-      merchantId: scope === 'merchant' ? selectedMerchant?._id ?? product.merchantId ?? null : null,
+      merchantId: scope === 'merchant' ? selectedMerchant?.id ?? product.merchantId ?? null : null,
       basePrice: Number(basePrice),
       thumbnailUrl: thumbnailUrl.trim(),
       thumbnailAssetId,
       categoryId,
-      categorySnapshot: categories.find((category) => category._id === categoryId),
+      categorySnapshot: categories.find((category) => category.id === categoryId),
       editorProductSelection: {
         mode: selectionMode,
-        specificProductIds: specificProductIds.filter((id) => id !== product._id),
+        specificProductIds: specificProductIds.filter((id) => id !== product.id),
       },
       photoBook: {
         ...photoBook,
@@ -163,7 +163,7 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
     <form onSubmit={handleSubmit} className="max-w-4xl space-y-6 pb-6">
       <Input label="Product Name" value={name} onChange={(e) => setName(e.target.value)} error={errors.name} placeholder="e.g. Canvas Print" />
       <Input label="Slug" value={slug} onChange={(e) => setSlug(e.target.value)} error={errors.slug} placeholder="e.g. canvas-print" />
-      <Select label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} options={categories.map((category) => ({ value: category._id, label: category.name }))} error={errors.categoryId} />
+      <Select label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} options={categories.map((category) => ({ value: category.id, label: category.name }))} error={errors.categoryId} />
       <Select label="Product Type" value={productType} onChange={(e) => handleProductTypeChange(e.target.value as ProductType)} options={productTypeOptions} error={errors.productType} />
       {productType === 'Photo Book Print' && (
         <section className="rounded-lg bg-white p-5 ring-1 ring-gray-200">
@@ -221,7 +221,7 @@ export function BasicInfoTab({ product, products, onSave }: Props) {
       <ImageField label="Thumbnail Image URL" url={thumbnailUrl} assetId={thumbnailAssetId} onChange={(url, assetId) => { setThumbnailUrl(url); setThumbnailAssetId(assetId); }} />
 
       <EditorProductSelection
-        currentProductId={product._id}
+        currentProductId={product.id}
         categoryId={categoryId}
         products={products}
         mode={selectionMode}

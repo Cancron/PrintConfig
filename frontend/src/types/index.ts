@@ -43,7 +43,7 @@ export type MugPrintUnit = 'inch' | 'cm' | 'mm';
 export type TShirtPrintUnit = 'inch' | 'cm' | 'mm';
 
 export interface ImageFolder {
-  _id: string;
+  id: string;
   accountId: string;
   merchantId?: string | null;
   scope: ProductScope;
@@ -56,7 +56,7 @@ export interface ImageFolder {
 }
 
 export interface ImageAsset {
-  _id: string;
+  id: string;
   accountId: string;
   merchantId?: string | null;
   scope: ProductScope;
@@ -105,7 +105,7 @@ export interface DesignStorageFile {
 }
 
 export interface DesignProcessingJob {
-  _id: string;
+  id: string;
   cartItemId: string;
   merchantId: string;
   productId: string;
@@ -124,12 +124,12 @@ export interface DesignProcessingJob {
 }
 
 export interface DesignCartItem {
-  _id: string;
+  id: string;
   accountId: string;
   merchantId: string;
   productId: string;
   productType: ProductType;
-  product?: { _id: string; name: string; slug: string; productType: string } | null;
+  product?: { id: string; name: string; slug: string; productType: string } | null;
   userKey: string;
   projectId: string;
   status: DesignCartItemStatus;
@@ -155,12 +155,12 @@ export interface DesignCartItem {
   updatedAt: string;
 }
 export interface Account {
-  _id: string;
+  id: string;
   name: string;
 }
 
 export interface Merchant {
-  _id: string;
+  id: string;
   accountId: string;
   name: string;
   slug: string;
@@ -177,7 +177,7 @@ export interface Merchant {
 }
 
 export interface ProductCategory {
-  _id: string;
+  id: string;
   accountId: string;
   merchantId?: string | null;
   scope: ProductScope;
@@ -194,7 +194,7 @@ export interface ProductCategory {
 
 
 export interface LayoutCategory {
-  _id: string;
+  id: string;
   accountId: string;
   merchantId?: string | null;
   scope: ProductScope;
@@ -245,7 +245,7 @@ export interface LayoutImageSettings {
 }
 
 export interface LayoutElement {
-  _id: string;
+  id: string;
   clientId?: string;
   type: LayoutElementType;
   name: string;
@@ -268,7 +268,7 @@ export interface LayoutElement {
 }
 
 export interface LayoutTemplatePage {
-  _id: string;
+  id: string;
   clientId?: string;
   pageNumber: number;
   name: string;
@@ -284,7 +284,7 @@ export interface LayoutTemplatePage {
 }
 
 export interface Collage {
-  _id: string;
+  id: string;
   accountId: string;
   merchantId?: string | null;
   scope: ProductScope;
@@ -310,7 +310,7 @@ export interface Collage {
   updatedAt: string;
 }
 export interface LayoutTemplate {
-  _id: string;
+  id: string;
   accountId: string;
   merchantId?: string | null;
   scope: ProductScope;
@@ -347,7 +347,7 @@ export type PrecheckStatus = 'success' | 'warning' | 'info' | 'error';
 export type FrontendLayoutStyle = 'standard' | 'compact' | 'premium';
 
 export interface ProductTrustBadge {
-  _id: string;
+  id: string;
   clientId?: string;
   icon: string;
   text: string;
@@ -402,7 +402,7 @@ export interface ProductFrontendContent {
   trustBadges: ProductTrustBadge[];
 }
 export interface VariantOptionDefinition {
-  _id: string;
+  id: string;
   clientId?: string;
   productId: string;
   name: string;
@@ -421,7 +421,7 @@ export interface ProductOptionValueMetadata {
 }
 
 export interface ProductOptionValue {
-  _id: string;
+  id: string;
   clientId?: string;
   optionGroupId: string;
   label: string;
@@ -452,7 +452,7 @@ export interface DependencyRule {
 }
 
 export interface ProductOptionGroup {
-  _id: string;
+  id: string;
   clientId?: string;
   productId: string;
   name: string;
@@ -483,7 +483,7 @@ export interface SafeAreaSettings {
 }
 
 export interface ProductSurface {
-  _id: string;
+  id: string;
   clientId?: string;
   productId: string;
   name: string;
@@ -532,7 +532,7 @@ export interface ExportRules {
 export type RoomOrientation = 'square' | 'vertical' | 'horizontal' | 'pano-vertical' | 'pano-horizontal';
 
 export interface ProductRoomPreview {
-  _id: string;
+  id: string;
   clientId?: string;
   productId: string;
   name: string;
@@ -550,7 +550,7 @@ export interface ProductRoomPreview {
 }
 
 export interface LegacyVariantRoomPreview {
-  _id: string;
+  id: string;
   clientId?: string;
   variantId: string;
   name: string;
@@ -567,7 +567,7 @@ export interface LegacyVariantRoomPreview {
   updatedAt: string;
 }
 export interface ProductVariant {
-  _id: string;
+  id: string;
   clientId?: string;
   productId: string;
   name: string;
@@ -591,7 +591,7 @@ export interface ProductVariant {
 }
 
 export interface AiArtStyle {
-  _id: string;
+  id: string;
   clientId?: string;
   name: string;
   slug: string;
@@ -768,7 +768,7 @@ export interface TShirtProductConfig {
 }
 
 export interface ProductSummary {
-  _id: string;
+  id: string;
   accountId: string;
   merchantId?: string | null;
   scope: ProductScope;
@@ -786,12 +786,12 @@ export interface ProductSummary {
 }
 
 export interface DesignCartItemSummary {
-  _id: string;
+  id: string;
   accountId: string;
   merchantId: string;
   productId: string;
   productType: ProductType;
-  product?: { _id: string; name: string; slug: string; productType: string } | null;
+  product?: { id: string; name: string; slug: string; productType: string } | null;
   userKey: string;
   projectId: string;
   status: DesignCartItemStatus;
@@ -814,7 +814,7 @@ export interface DesignCartItemSummary {
 }
 
 export interface Product {
-  _id: string;
+  id: string;
   accountId: string;
   merchantId?: string | null;
   scope: ProductScope;

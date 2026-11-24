@@ -74,30 +74,30 @@ export function parseImportedProduct(json: string, options: { accountId: string;
 function clearImportedIds(product: Product): Product {
   return {
     ...product,
-    _id: '',
-    surface: product.surface ? { ...product.surface, _id: '', clientId: crypto.randomUUID(), productId: '' } : null,
-    variantOptionDefinitions: product.variantOptionDefinitions.map((definition) => ({ ...definition, _id: '', clientId: crypto.randomUUID(), productId: '' })),
-    roomPreviews: product.roomPreviews.map((room) => ({ ...room, _id: '', clientId: crypto.randomUUID(), productId: '' })),
-    frontendContent: { ...product.frontendContent, trustBadges: product.frontendContent.trustBadges.map((badge) => ({ ...badge, _id: '', clientId: crypto.randomUUID() })) },
+    id: '',
+    surface: product.surface ? { ...product.surface, id: '', clientId: crypto.randomUUID(), productId: '' } : null,
+    variantOptionDefinitions: product.variantOptionDefinitions.map((definition) => ({ ...definition, id: '', clientId: crypto.randomUUID(), productId: '' })),
+    roomPreviews: product.roomPreviews.map((room) => ({ ...room, id: '', clientId: crypto.randomUUID(), productId: '' })),
+    frontendContent: { ...product.frontendContent, trustBadges: product.frontendContent.trustBadges.map((badge) => ({ ...badge, id: '', clientId: crypto.randomUUID() })) },
     optionGroups: product.optionGroups.map((group) => ({
       ...group,
-      _id: '',
+      id: '',
       clientId: crypto.randomUUID(),
       productId: '',
-      values: group.values.map((value) => ({ ...value, _id: '', clientId: crypto.randomUUID(), optionGroupId: '' })),
+      values: group.values.map((value) => ({ ...value, id: '', clientId: crypto.randomUUID(), optionGroupId: '' })),
     })),
-    variants: product.variants.map((variant) => ({ ...variant, _id: '', clientId: crypto.randomUUID(), productId: '', roomPreviews: undefined })),
+    variants: product.variants.map((variant) => ({ ...variant, id: '', clientId: crypto.randomUUID(), productId: '', roomPreviews: undefined })),
   };
 }
 function buildImportCandidate(input: Record<string, unknown>): Product {
   const now = new Date().toISOString();
-  const id = typeof input._id === 'string' ? input._id : '';
+  const id = typeof input.id === 'string' ? input.id : '';
   const variants = (input.variants as unknown[]).filter(isRecord);
   const surfaceSource = isRecord(input.surface) ? input.surface : findLegacySurface(variants);
   const surface = surfaceSource ? normalizeSurface(surfaceSource, id, now, 0) : null;
 
   const product: Product = {
-    _id: id,
+    id: id,
     accountId: typeof input.accountId === 'string' ? input.accountId : '',
     scope: input.scope === 'shared' ? 'shared' : 'merchant',
     merchantId: typeof input.merchantId === 'string' ? input.merchantId : '',
@@ -147,7 +147,7 @@ function findLegacySurface(variants: Record<string, unknown>[]) {
 function normalizeCategorySnapshot(input: Record<string, unknown>): ProductCategory {
   const now = new Date().toISOString();
   return {
-    _id: typeof input._id === 'string' ? input._id : '',
+    id: typeof input.id === 'string' ? input.id : '',
     accountId: typeof input.accountId === 'string' ? input.accountId : '',
     merchantId: typeof input.merchantId === 'string' ? input.merchantId : null,
     scope: input.scope === 'merchant' ? 'merchant' : 'shared',
@@ -165,7 +165,7 @@ function normalizeCategorySnapshot(input: Record<string, unknown>): ProductCateg
 
 function normalizeSurface(input: Record<string, unknown>, productId: string, now: string, index: number): ProductSurface {
   return {
-    _id: typeof input._id === 'string' ? input._id : '',
+    id: typeof input.id === 'string' ? input.id : '',
     productId,
     name: typeof input.name === 'string' ? input.name : `Surface ${index + 1}`,
     code: typeof input.code === 'string' ? input.code : 'front',
@@ -181,7 +181,7 @@ function normalizeSurface(input: Record<string, unknown>, productId: string, now
 function normalizeVariantOptionDefinition(input: Record<string, unknown>, productId: string, now: string, index: number): VariantOptionDefinition {
   const name = typeof input.name === 'string' ? input.name : `Option ${index + 1}`;
   return {
-    _id: typeof input._id === 'string' ? input._id : '',
+    id: typeof input.id === 'string' ? input.id : '',
     productId,
     name,
     key: typeof input.key === 'string' ? input.key : name,
@@ -193,9 +193,9 @@ function normalizeVariantOptionDefinition(input: Record<string, unknown>, produc
   };
 }
 function normalizeOptionGroup(input: Record<string, unknown>, productId: string, now: string, index: number): ProductOptionGroup {
-  const id = typeof input._id === 'string' ? input._id : '';
+  const id = typeof input.id === 'string' ? input.id : '';
   return {
-    _id: id,
+    id: id,
     productId,
     name: typeof input.name === 'string' ? input.name : `Option Group ${index + 1}`,
     code: typeof input.code === 'string' ? input.code : `option-group-${index + 1}`,
@@ -227,7 +227,7 @@ function normalizeDependencyRule(input: Record<string, unknown>): DependencyRule
 function normalizeOptionValue(input: Record<string, unknown>, optionGroupId: string, now: string, index: number): ProductOptionValue {
   const priceModifierType = input.priceModifierType === 'fixed' || input.priceModifierType === 'variant-fixed' || input.priceModifierType === 'variant-override' || input.priceModifierType === 'percentage' ? input.priceModifierType : 'none';
   return {
-    _id: typeof input._id === 'string' ? input._id : '',
+    id: typeof input.id === 'string' ? input.id : '',
     optionGroupId,
     label: typeof input.label === 'string' ? input.label : `Option ${index + 1}`,
     value: typeof input.value === 'string' ? input.value : `option-${index + 1}`,
@@ -259,10 +259,10 @@ function normalizeDisplayType(value: unknown): ProductOptionDisplayType {
 }
 
 function normalizeVariant(input: Record<string, unknown>, productId: string, now: string, index: number): ProductVariant {
-  const id = typeof input._id === 'string' ? input._id : '';
+  const id = typeof input.id === 'string' ? input.id : '';
   const legacySurface = Array.isArray(input.surfaces) ? input.surfaces.find(isRecord) : null;
   return {
-    _id: id,
+    id: id,
     productId,
     name: typeof input.name === 'string' ? input.name : `Variant ${index + 1}`,
     sku: typeof input.sku === 'string' ? input.sku : `SKU-${index + 1}`,
@@ -301,7 +301,7 @@ function normalizeVariant(input: Record<string, unknown>, productId: string, now
 
 function normalizeRoomPreview(input: Record<string, unknown>, now: string): LegacyVariantRoomPreview {
   return {
-    _id: typeof input._id === 'string' ? input._id : '',
+    id: typeof input.id === 'string' ? input.id : '',
     clientId: crypto.randomUUID(),
     variantId: typeof input.variantId === 'string' ? input.variantId : '',
     name: typeof input.name === 'string' ? input.name : '',
@@ -369,7 +369,7 @@ function normalizeAiArtConfig(input: Record<string, unknown> | undefined, now: s
 
 function normalizeAiArtStyle(input: Record<string, unknown>, now: string, index: number): AiArtStyle {
   return {
-    _id: typeof input._id === 'string' ? input._id : '',
+    id: typeof input.id === 'string' ? input.id : '',
     clientId: typeof input.clientId === 'string' ? input.clientId : crypto.randomUUID(),
     name: typeof input.name === 'string' ? input.name : `Style ${index + 1}`,
     slug: typeof input.slug === 'string' ? input.slug : `style-${index + 1}`,

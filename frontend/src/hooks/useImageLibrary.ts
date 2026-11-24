@@ -14,15 +14,15 @@ export function useImageLibrary(folderId: string | null, search = '') {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const filters = { accountId: account._id, merchantId: selectedMerchantId, folderId, search };
+      const filters = { accountId: account.id, merchantId: selectedMerchantId, folderId, search };
       const [nextFolders, nextAssets, everyFolder] = await Promise.all([
-        api.listImageFolders(filters), api.listImageAssets(filters), api.listAllImageFolders(account._id, selectedMerchantId),
+        api.listImageFolders(filters), api.listImageAssets(filters), api.listAllImageFolders(account.id, selectedMerchantId),
       ]);
       setFolders(nextFolders); setAssets(nextAssets); setAllFolders(everyFolder); setError('');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Could not load the image library.');
     } finally { setLoading(false); }
-  }, [account._id, folderId, search, selectedMerchantId]);
+  }, [account.id, folderId, search, selectedMerchantId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 

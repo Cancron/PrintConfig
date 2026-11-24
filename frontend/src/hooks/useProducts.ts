@@ -13,7 +13,7 @@ export function useProducts() {
     let cancelled = false;
     setLoading(true);
     api.listProductSummaries({
-      accountId: account._id,
+      accountId: account.id,
       merchantId: selectedMerchantId,
       page: 1,
       pageSize: 500,
@@ -32,7 +32,7 @@ export function useProducts() {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [account._id, selectedMerchantId]);
+  }, [account.id, selectedMerchantId]);
 
   return { products, account, selectedMerchantId, loading, error };
 }

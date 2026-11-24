@@ -1,10 +1,11 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ApiError } from './errorHandler.js';
 import { verifyToken } from '../services/auth.service.js';
+import { withAccountContext } from '../db/accountContext.js';
 
 export interface AuthedRequest extends Request {
   user?: {
-    _id: string;
+    id: string;
     email: string;
     name: string;
     role: string;
@@ -22,13 +23,25 @@ export function requireAuth(req: AuthedRequest, _res: Response, next: NextFuncti
   try {
     const payload = verifyToken(token);
     req.user = {
-      _id: String(payload.sub),
+      id: String(payload.sub),
       email: String(payload.email ?? ''),
       name: String(payload.name ?? ''),
       role: String(payload.role ?? 'admin'),
       accountId: payload.accountId ? String(payload.accountId) : undefined,
     };
-    next();
+    if (!req.user.accountId) throw new Error('Account is missing from authentication token.');
+    const accountId = req.user.accountId;
+    if (req.query.accountId && req.query.accountId !== accountId) {
+      next(new ApiError(403, 'Account does not match your session.'));
+      return;
+    }
+    if (req.body?.accountId && req.body.accountId !== accountId) {
+      next(new ApiError(403, 'Account does not match your session.'));
+      return;
+    }
+    req.query.accountId = accountId;
+    if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) req.body.accountId = accountId;
+    withAccountContext(accountId, next);
   } catch {
     next(new ApiError(401, 'Invalid or expired token.'));
   }

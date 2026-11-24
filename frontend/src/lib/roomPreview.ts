@@ -111,7 +111,7 @@ export function validateRoomPreview(room: ProductRoomPreview): ValidationErrors 
 export function createRoomPreview(productId: string, sortOrder: number): ProductRoomPreview {
   const now = new Date().toISOString();
   return {
-    _id: '', clientId: crypto.randomUUID(), productId, name: '', roomImageUrl: '', orientations: [], defaultOrientations: [],
+    id: '', clientId: crypto.randomUUID(), productId, name: '', roomImageUrl: '', orientations: [], defaultOrientations: [],
     centerLeftPercent: 50, centerTopPercent: 45, maxWidthPercent: 30, maxHeightPercent: 30, sortOrder, createdAt: now, updatedAt: now,
   };
 }
@@ -119,7 +119,7 @@ export function createRoomPreview(productId: string, sortOrder: number): Product
 export function normalizeSharedRoomPreview(input: Partial<ProductRoomPreview>, productId: string, index: number): ProductRoomPreview {
   const now = new Date().toISOString();
   return {
-    _id: input._id ? String(input._id) : '',
+    id: input.id ? String(input.id) : '',
     clientId: input.clientId ?? crypto.randomUUID(),
     productId,
     name: String(input.name ?? ''),
@@ -138,7 +138,7 @@ export function normalizeSharedRoomPreview(input: Partial<ProductRoomPreview>, p
 }
 
 export function liftLegacyRoomPreviews(product: Product): ProductRoomPreview[] {
-  const existing = (product.roomPreviews ?? []).map((room, index) => normalizeSharedRoomPreview(room, product._id, index));
+  const existing = (product.roomPreviews ?? []).map((room, index) => normalizeSharedRoomPreview(room, product.id, index));
   const rooms = [...existing];
   const byIdentity = new Map(rooms.map((room) => [roomIdentity(room.name, room.roomImageUrl), room]));
   const claimedDefaults = new Set(rooms.flatMap((room) => room.defaultOrientations));
@@ -170,7 +170,7 @@ export function liftLegacyRoomPreviews(product: Product): ProductRoomPreview[] {
         sortOrder: rooms.length,
         createdAt: legacy.createdAt,
         updatedAt: legacy.updatedAt,
-      }, product._id, rooms.length);
+      }, product.id, rooms.length);
       if (room.defaultOrientations.length) claimedDefaults.add(orientation);
       rooms.push(room);
       byIdentity.set(key, room);
@@ -179,8 +179,8 @@ export function liftLegacyRoomPreviews(product: Product): ProductRoomPreview[] {
   return rooms;
 }
 
-export function roomPreviewKey(room: Pick<ProductRoomPreview, '_id' | 'clientId'>) {
-  return room._id || room.clientId || '';
+export function roomPreviewKey(room: Pick<ProductRoomPreview, 'id' | 'clientId'>) {
+  return room.id || room.clientId || '';
 }
 
 function legacyPlacement(legacy: LegacyVariantRoomPreview, variant: ProductVariant, variants: ProductVariant[], orientation: RoomOrientation) {

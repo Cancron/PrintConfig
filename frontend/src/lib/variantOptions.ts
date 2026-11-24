@@ -5,7 +5,7 @@ const DEFAULT_NAMES = ['Size', 'Orientation', 'Ratio'] as const;
 export function createDefaultVariantOptionDefinitions(productId = ''): VariantOptionDefinition[] {
   const now = new Date().toISOString();
   return DEFAULT_NAMES.map((name, index) => ({
-    _id: '',
+    id: '',
     clientId: crypto.randomUUID(),
     productId,
     name,
@@ -25,7 +25,7 @@ export function normalizeVariantOptionDefinitions(
   const source = definitions === undefined ? createDefaultVariantOptionDefinitions(productId) : definitions;
   return source.map((definition, index) => ({
     ...definition,
-    _id: definition._id ? String(definition._id) : '',
+    id: definition.id ? String(definition.id) : '',
     productId,
     name: String(definition.name ?? '').trim(),
     key: String(definition.key ?? '').trim(),
@@ -56,7 +56,7 @@ export function ensureTShirtVariantOptionDefinitions(
       continue;
     }
     result.push({
-      _id: '',
+      id: '',
       clientId: crypto.randomUUID(),
       productId: definitions[0]?.productId ?? '',
       name,

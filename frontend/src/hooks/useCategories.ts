@@ -13,14 +13,14 @@ export function useCategories() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.listCategories(account._id, selectedMerchantId)
+    api.listCategories(account.id, selectedMerchantId)
       .then((items) => { if (!cancelled) { setAllCategories(items); setError(null); } })
       .catch((err) => { if (!cancelled) { setAllCategories(loadCategories()); setError(err instanceof Error ? err.message : 'Could not load categories from API.'); } })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [account._id, selectedMerchantId]);
+  }, [account.id, selectedMerchantId]);
 
-  const categories = useMemo(() => allCategories.filter((category) => category.accountId === account._id && (category.scope === 'shared' || category.merchantId === selectedMerchantId)).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)), [account._id, allCategories, selectedMerchantId]);
+  const categories = useMemo(() => allCategories.filter((category) => category.accountId === account.id && (category.scope === 'shared' || category.merchantId === selectedMerchantId)).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)), [account.id, allCategories, selectedMerchantId]);
 
   const addCategory = useCallback(async (category: ProductCategory) => {
     try {
@@ -35,18 +35,18 @@ export function useCategories() {
   }, []);
 
   const updateCategory = useCallback((updated: ProductCategory) => {
-    setAllCategories((prev) => prev.map((category) => (category._id === updated._id ? { ...updated, updatedAt: new Date().toISOString() } : category)));
-    api.updateCategory(updated).then((saved) => setAllCategories((prev) => prev.map((item) => (item._id === saved._id ? saved : item)))).catch((err) => setError(err instanceof Error ? err.message : 'Could not update category.'));
+    setAllCategories((prev) => prev.map((category) => (category.id === updated.id ? { ...updated, updatedAt: new Date().toISOString() } : category)));
+    api.updateCategory(updated).then((saved) => setAllCategories((prev) => prev.map((item) => (item.id === saved.id ? saved : item)))).catch((err) => setError(err instanceof Error ? err.message : 'Could not update category.'));
   }, []);
 
   const deleteCategory = useCallback((id: string) => {
-    setAllCategories((prev) => prev.filter((category) => category._id !== id));
+    setAllCategories((prev) => prev.filter((category) => category.id !== id));
     api.deleteCategory(id).catch((err) => setError(err instanceof Error ? err.message : 'Could not delete category.'));
   }, []);
 
   const duplicateCategory = useCallback(async (category: ProductCategory, includeProducts = false) => {
     try {
-      const result = await api.duplicateCategory(category._id, includeProducts);
+      const result = await api.duplicateCategory(category.id, includeProducts);
       setAllCategories((prev) => [...prev, result.category]);
       return result;
     } catch (err) {

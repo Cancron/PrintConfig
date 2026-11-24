@@ -15,9 +15,10 @@
         "test": "npm run test:backend && npm run test:frontend",
         "test:backend": "node --import tsx --test tests/backend/*.test.ts",
         "test:frontend": "node --import tsx --test tests/frontend/*.test.ts",
-        "migrate:shared-rooms": "tsx src/scripts/migrateSharedRooms.ts",
-        "migrate:shared-rooms:apply": "tsx src/scripts/migrateSharedRooms.ts --apply",
-        "migrate:supabase-to-r2": "tsx src/scripts/migrateSupabaseToR2.ts"
+        "db:migrate": "node dist/scripts/migratePostgres.js",
+        "db:migrate:dev": "tsx src/scripts/migratePostgres.ts",
+        "db:migrate:test": "tsx src/scripts/migratePostgres.ts --test",
+        "db:check": "node dist/scripts/checkPostgres.js"
     },
     "dependencies": {
         "@aws-sdk/client-s3": "3.1156.0",
@@ -31,8 +32,8 @@
         "dotenv": "16.6.1",
         "express": "4.22.3",
         "jsonwebtoken": "9.0.3",
-        "mongoose": "8.24.7",
         "multer": "2.5.0",
+        "pg": "8.23.1",
         "sanitize-html": "2.17.5"
     },
     "devDependencies": {
@@ -43,6 +44,7 @@
         "@types/jsonwebtoken": "9.0.10",
         "@types/multer": "2.3.0",
         "@types/node": "22.20.5",
+        "@types/pg": "8.23.1",
         "tsx": "4.23.15",
         "typescript": "5.9.3"
     },

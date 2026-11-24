@@ -52,7 +52,7 @@ export function MerchantSettings() {
     setRotatingApiKey(true);
     setApiKeyError('');
     try {
-      const result = await api.rotateMerchantApiKey(form._id);
+      const result = await api.rotateMerchantApiKey(form.id);
       setForm(result.merchant);
       setRevealedApiKey(result.apiPrivateKey);
     } catch (error) {

@@ -21,14 +21,14 @@ and complete role/ownership enforcement are not implemented.
 
 ## Stack
 
-React, TypeScript, Vite, Tailwind CSS, Express, MongoDB/Mongoose, Cloudflare R2,
+React, TypeScript, Vite, Tailwind CSS, Express, PostgreSQL, Cloudflare R2,
 and an npm-packaged Skia-backed canvas renderer.
 
 ## Storage
 
 Cloudflare R2 stores gallery images, customer uploads, saved designs, previews,
 order copies, and final prints. The frontend obtains upload authorization from
-the backend. MongoDB stores application records.
+the backend. PostgreSQL stores application records. IDs are UUIDs and API records use `id`.
 
 The current R2 design uses public object URLs. Files uploaded to a public bucket
 are publicly addressable; private signed delivery is not implemented for customer files.
@@ -52,7 +52,9 @@ installation does not fetch binaries from GitHub or other external hosts.
 
 Create `.env` from `.env.example`. Frontend-only overrides can be placed in
 `frontend/.env`.
-Configure MongoDB, a random `JWT_SECRET`, and R2 credentials in the backend only.
+Configure PostgreSQL, a random `JWT_SECRET`, and R2 credentials in the backend only.
+After building, apply versioned migrations before starting the API with
+`npm run db:migrate`. During development, `npm run db:migrate:dev` runs from source.
 For root hosting, leave `API_BASE_PATH` empty. Configure `FRONTEND_URL` with
 comma-separated browser origins allowed to call the API.
 
@@ -73,8 +75,8 @@ The default frontend is `http://localhost:5173`; the API is
 | `API_BASE_PATH` | Optional externally forwarded application prefix, such as `/printconfig`. |
 | `ADMIN_STATIC_DIR` | Optional frontend build directory; default `frontend/dist`. |
 | `FRONTEND_URL` | Allowed browser origins; include deployed admin/editor origins. |
-| `MONGODB_URI` | MongoDB connection string. |
-| `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Optional database name and separate credentials. |
+| `DATABASE_URL` | PostgreSQL connection string for the application. |
+| `TEST_DATABASE_URL` | PostgreSQL connection string for the dedicated `printconfig_test` database. |
 | `JWT_SECRET` | Required signing secret; no development fallback. |
 | `CLOUDFLARE_ACCOUNT_ID` | R2 account identifier. |
 | `CLOUDFLARE_R2_ACCESS_KEY_ID`, `CLOUDFLARE_R2_SECRET_ACCESS_KEY` | Server-side S3 credentials. |
@@ -102,14 +104,19 @@ With no prefix, URLs are `/admin/` and `/api`. With `/printconfig`, they become
 
 The deployment build uses extensionless asset URLs handled by Express to accommodate
 shared hosts that intercept file-extension requests. The physical asset folder is `_assets`.
-Upload generated `dist` and `frontend/dist` together. Install production dependencies
-on the target server with `npm ci --omit=dev`, then run `npm start` from the root.
+Upload generated `dist`, `frontend/dist`, and `db/migrations` together. Install production dependencies
+on the target server with `npm ci --omit=dev`, run `npm run db:migrate` before
+deploying new code, then run `npm start` from the root.
 Never upload Windows `node_modules` to Linux: the renderer includes a native binary.
 Rebuild and restart when changing the deployment prefix.
 
 See [DEPLOY_RENDER.md](DEPLOY_RENDER.md) for hosting and CORS configuration.
 
 ## Verification and Maintenance
+
+Run `npm run db:migrate:test` against the dedicated `printconfig_test` database.
+The test migration command rejects other database names. The API requires
+`DATABASE_URL` and uses PostgreSQL only.
 
 ```sh
 npm run typecheck
@@ -118,12 +125,12 @@ npm run frontend:lint
 npm test
 ```
 
-`npm test` runs offline backend unit/API and frontend logic tests. API tests use
-an ephemeral local listener and mocked Mongoose model methods; they do not
-connect to MongoDB or require external services. They do not verify real
-MongoDB queries, indexes, or persistence, which need separate integration tests.
+`npm test` runs backend unit/API and frontend logic tests. Set `TEST_DATABASE_URL`
+to the local `printconfig_test` database. PostgreSQL API tests use an ephemeral
+local listener and verify sign-in, UUIDs, ownership, catalogue, layouts, cart
+records, and atomic job claiming. R2 access is not needed for these tests.
 
-Jobs are persisted in MongoDB, but execution currently starts in the API process.
+Jobs are persisted in PostgreSQL, but execution currently starts in the API process.
 A separate durable worker and automatic interrupted-job recovery are future work.
 
 ## Credentials and Access

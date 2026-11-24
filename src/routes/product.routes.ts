@@ -18,7 +18,6 @@ const designUpload = multer({
 });
 
 // Public endpoints (no auth)
-productRoutes.get('/', controller.list);
 productRoutes.post('/public/:productId/design-upload', designUpload.fields([
   { name: 'image', maxCount: 1 },
   { name: 'pagePreviews', maxCount: 100 },
@@ -26,7 +25,7 @@ productRoutes.post('/public/:productId/design-upload', designUpload.fields([
 productRoutes.get('/public/:productId/design', controller.publicDesign);
 productRoutes.post('/public/:productId/final-print', controller.publicFinalPrint);
 productRoutes.get('/public/:id/config', controller.publicConfig);
-productRoutes.get('/cart-items', controller.listCartItems);
+productRoutes.get('/cart-items', requireAuth, controller.listCartItems);
 productRoutes.get('/cart-items/:cartItemId', requireAuth, controller.getCartItem);
 productRoutes.post('/cart-items/:cartItemId/process', controller.processCartItem);
 productRoutes.post('/cart-items/:cartItemId/process-admin', requireAuth, controller.processCartItemAdmin);

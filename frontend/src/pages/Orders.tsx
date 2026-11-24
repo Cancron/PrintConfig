@@ -48,7 +48,7 @@ export function Orders() {
   const load = useCallback(() => {
     setLoading(true);
     setError('');
-    api.listDesignCartItems({ accountId: account._id, merchantId: selectedMerchantId, status, printGenerationStatus: printStatus, productType, page, pageSize })
+    api.listDesignCartItems({ accountId: account.id, merchantId: selectedMerchantId, status, printGenerationStatus: printStatus, productType, page, pageSize })
       .then((result) => {
         setItems(result.items);
         setPagination(result.pagination);
@@ -56,7 +56,7 @@ export function Orders() {
       })
       .catch((reason) => setError(reason instanceof Error ? reason.message : 'Could not load orders.'))
       .finally(() => setLoading(false));
-  }, [account._id, page, pageSize, printStatus, productType, selectedMerchantId, status]);
+  }, [account.id, page, pageSize, printStatus, productType, selectedMerchantId, status]);
 
   useEffect(() => {
     setPage(1);
@@ -94,10 +94,10 @@ export function Orders() {
               {items.map((item) => {
                 const progress = getPrintProgress(item);
                 return (
-                <tr key={item._id}>
+                <tr key={item.id}>
                   <TableCell>
                     <p className="font-medium text-gray-900">{item.orderId || 'No order yet'}</p>
-                    <p className="mt-1 max-w-40 truncate text-xs text-gray-500">{item._id}</p>
+                    <p className="mt-1 max-w-40 truncate text-xs text-gray-500">{item.id}</p>
                   </TableCell>
                   <TableCell>
                     <p className="font-medium text-gray-900">{item.product?.name ?? item.productId}</p>
@@ -115,7 +115,7 @@ export function Orders() {
                   <TableCell><PreviewSummary files={item.finalPrintFiles} totalCount={item.finalPrintCount} emptyLabel="None" moreLabel="final prints" /></TableCell>
                   <TableCell className="text-sm text-gray-500">{new Date(item.updatedAt).toLocaleString()}</TableCell>
                   <TableCell>
-                    <Link to={`/orders/${item._id}`} className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50">
+                    <Link to={`/orders/${item.id}`} className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50">
                       <Eye className="h-4 w-4" /> View
                     </Link>
                   </TableCell>
@@ -172,8 +172,8 @@ export function OrderDetailPage() {
     setProcessing(true);
     setError('');
     try {
-      await api.processDesignCartItem(item._id, {
-        orderId: item.orderId || item._id,
+      await api.processDesignCartItem(item.id, {
+        orderId: item.orderId || item.id,
         force: item.printGenerationStatus === 'complete',
       });
       await load();
@@ -189,8 +189,8 @@ export function OrderDetailPage() {
     setMarkingOrdered(true);
     setError('');
     try {
-      await api.markDesignCartItemOrdered(item._id, {
-        orderId: item.orderId || item._id,
+      await api.markDesignCartItemOrdered(item.id, {
+        orderId: item.orderId || item.id,
       });
       await load();
     } catch (reason) {
@@ -267,7 +267,7 @@ function OrderDetailContent({ item, processing, markingOrdered, onGenerate, onMa
     if (!item.finalPrintFiles?.length) return;
     setDownloadingZip(true);
     try {
-      const result = await api.createFinalPrintsDownloadToken(item._id);
+      const result = await api.createFinalPrintsDownloadToken(item.id);
       window.location.href = result.url;
     } finally {
       setDownloadingZip(false);
@@ -277,7 +277,7 @@ function OrderDetailContent({ item, processing, markingOrdered, onGenerate, onMa
       <div className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200">
         <div className="p-5">
           <div className="grid gap-4 md:grid-cols-4">
-            <Info label="Cart Item" value={item._id} />
+            <Info label="Cart Item" value={item.id} />
             <Info label="Project" value={item.projectId} />
             <Info label="User Key" value={item.userKey} />
             <Info label="Status" value={item.status} />

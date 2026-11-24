@@ -33,7 +33,7 @@ export function LayoutSettingsTab({ product, onSave }: Props) {
     if (!query) return activeTemplates;
     return activeTemplates.filter((template) => `${template.name} ${template.slug} ${template.tags.join(' ')}`.toLowerCase().includes(query));
   }, [activeTemplates, search]);
-  const selectedTemplates = useMemo(() => allowedTemplateIds.map((id) => activeTemplates.find((template) => template._id === id)).filter(Boolean) as LayoutTemplate[], [activeTemplates, allowedTemplateIds]);
+  const selectedTemplates = useMemo(() => allowedTemplateIds.map((id) => activeTemplates.find((template) => template.id === id)).filter(Boolean) as LayoutTemplate[], [activeTemplates, allowedTemplateIds]);
   const templateTags = useMemo(() => Array.from(new Set(activeTemplates.flatMap((template) => template.tags).map((tag) => tag.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)), [activeTemplates]);
   const parsedTags = allowedTemplateTags.split(',').map((tag) => tag.trim()).filter(Boolean);
   const invalid = mode === 'specific' && allowedTemplateIds.length === 0 || mode === 'by-tags' && parsedTags.length === 0;
@@ -91,8 +91,8 @@ export function LayoutSettingsTab({ product, onSave }: Props) {
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
                   {filteredTemplates.map((template) => (
-                    <tr key={template._id}>
-                      <td className="px-4 py-3"><input type="checkbox" checked={allowedTemplateIds.includes(template._id)} onChange={() => toggleTemplate(template._id)} /></td>
+                    <tr key={template.id}>
+                      <td className="px-4 py-3"><input type="checkbox" checked={allowedTemplateIds.includes(template.id)} onChange={() => toggleTemplate(template.id)} /></td>
                       <td className="px-4 py-3"><p className="font-medium text-gray-900">{template.name}</p><p className="text-xs text-gray-500">{template.slug}</p></td>
                       <td className="px-4 py-3 text-gray-600">{template.templateType}</td>
                       <td className="px-4 py-3 text-gray-600">{template.tags.join(', ') || '-'}</td>

@@ -7,7 +7,7 @@ import { normalizeEditorProductSelection } from './productSelection';
 import { normalizeMugProductConfig, normalizeMugVariantConfig, normalizePillowProductConfig, normalizePillowVariantConfig, normalizeTShirtProductConfig } from './storage';
 
 export interface AuthUser {
-  _id: string;
+  id: string;
   email: string;
   name: string;
   role: string;
@@ -50,12 +50,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 function idOf(value: any) {
-  return String(value?._id ?? '');
+  return String(value?.id ?? '');
 }
 
 function normalizeMerchant(raw: any): Merchant {
   return {
-    _id: idOf(raw),
+    id: idOf(raw),
     accountId: String(raw.accountId ?? 'acct-1'),
     name: raw.name ?? '',
     slug: raw.slug ?? '',
@@ -74,7 +74,7 @@ function normalizeMerchant(raw: any): Merchant {
 
 function normalizeCategory(raw: any): ProductCategory {
   return {
-    _id: idOf(raw),
+    id: idOf(raw),
     accountId: String(raw.accountId ?? 'acct-1'),
     merchantId: raw.merchantId ? String(raw.merchantId) : null,
     scope: raw.scope === 'merchant' ? 'merchant' : 'shared',
@@ -98,7 +98,7 @@ const defaultImageSettings = { imageUrl: '', opacity: 1 };
 
 function normalizeLayoutCategory(raw: any): LayoutCategory {
   return {
-    _id: idOf(raw),
+    id: idOf(raw),
     accountId: String(raw.accountId ?? ''),
     merchantId: raw.merchantId ? String(raw.merchantId) : null,
     scope: raw.scope === 'merchant' ? 'merchant' : 'shared',
@@ -117,7 +117,7 @@ function normalizeLayoutCategory(raw: any): LayoutCategory {
 function normalizeLayoutElement(raw: any): LayoutElement {
   return {
     ...raw,
-    _id: idOf(raw),
+    id: idOf(raw),
     type: raw.type ?? 'photo_placeholder',
     name: raw.name ?? 'Element',
     x: Number(raw.x ?? 0),
@@ -142,7 +142,7 @@ function normalizeLayoutElement(raw: any): LayoutElement {
 function normalizeLayoutPage(raw: any, template?: any): LayoutTemplatePage {
   return {
     ...raw,
-    _id: idOf(raw),
+    id: idOf(raw),
     pageNumber: Number(raw.pageNumber ?? 1),
     name: raw.name ?? 'Page',
     width: Number(raw.width ?? template?.canvasWidth ?? 12),
@@ -160,7 +160,7 @@ function normalizeLayoutPage(raw: any, template?: any): LayoutTemplatePage {
 function normalizeLayoutTemplate(raw: any): LayoutTemplate {
   return {
     ...raw,
-    _id: idOf(raw),
+    id: idOf(raw),
     accountId: String(raw.accountId ?? ''),
     merchantId: raw.merchantId ? String(raw.merchantId) : null,
     scope: raw.scope === 'merchant' ? 'merchant' : 'shared',
@@ -190,7 +190,7 @@ function normalizeLayoutTemplate(raw: any): LayoutTemplate {
 function normalizeCollage(raw: any): Collage {
   return {
     ...raw,
-    _id: idOf(raw),
+    id: idOf(raw),
     accountId: String(raw.accountId ?? ''),
     merchantId: raw.merchantId ? String(raw.merchantId) : null,
     scope: raw.scope ?? 'shared',
@@ -230,24 +230,24 @@ function layoutQuery(input: { accountId: string; merchantId?: string; categoryId
   return params.toString();
 }
 function normalizeSurface(raw: any) {
-  return raw ? { ...raw, _id: idOf(raw), productId: String(raw.productId ?? '') } : null;
+  return raw ? { ...raw, id: idOf(raw), productId: String(raw.productId ?? '') } : null;
 }
 
 function normalizeOptionGroups(groups: any[] = []) {
   return groups.map((group) => ({
     ...group,
-    _id: idOf(group),
+    id: idOf(group),
     productId: String(group.productId ?? ''),
-    values: (group.values ?? []).map((value: any) => ({ ...value, _id: idOf(value), optionGroupId: String(value.optionGroupId ?? group._id ?? ''), metadata: value.metadata ?? {} })),
+    values: (group.values ?? []).map((value: any) => ({ ...value, id: idOf(value), optionGroupId: String(value.optionGroupId ?? group.id ?? ''), metadata: value.metadata ?? {} })),
   }));
 }
 
 function normalizeFolder(raw: any): ImageFolder {
-  return { ...raw, _id: idOf(raw), accountId: String(raw.accountId ?? ''), merchantId: raw.merchantId ? String(raw.merchantId) : null, parentFolderId: raw.parentFolderId ? String(raw.parentFolderId) : null };
+  return { ...raw, id: idOf(raw), accountId: String(raw.accountId ?? ''), merchantId: raw.merchantId ? String(raw.merchantId) : null, parentFolderId: raw.parentFolderId ? String(raw.parentFolderId) : null };
 }
 
 function normalizeAsset(raw: any): ImageAsset {
-  return { ...raw, _id: idOf(raw), accountId: String(raw.accountId ?? ''), merchantId: raw.merchantId ? String(raw.merchantId) : null, folderId: raw.folderId ? String(raw.folderId) : null, tags: raw.tags ?? [] };
+  return { ...raw, id: idOf(raw), accountId: String(raw.accountId ?? ''), merchantId: raw.merchantId ? String(raw.merchantId) : null, folderId: raw.folderId ? String(raw.folderId) : null, tags: raw.tags ?? [] };
 }
 
 function galleryQuery(input: { accountId: string; merchantId?: string; folderId?: string | null; scope?: string; search?: string }) {
@@ -277,7 +277,7 @@ function normalizeProduct(raw: any): Product {
   const productId = idOf(raw);
   const variants = (raw.variants ?? []).map((variant: any) => ({
     ...variant,
-    _id: idOf(variant),
+    id: idOf(variant),
     productId: String(variant.productId ?? productId),
     status: variant.status === 'active' || variant.status === 'Active' ? 'Active' : 'Draft',
     options: variant.options ?? {},
@@ -287,11 +287,11 @@ function normalizeProduct(raw: any): Product {
     mug: raw.productType === 'Mug Print' || variant.mug
       ? normalizeMugVariantConfig(variant.mug, Number(variant.width ?? 0), Number(variant.height ?? 0), variant.unit)
       : undefined,
-    roomPreviews: (variant.roomPreviews ?? []).map((room: any) => ({ ...room, _id: idOf(room), variantId: String(room.variantId ?? variant._id ?? '') })),
+    roomPreviews: (variant.roomPreviews ?? []).map((room: any) => ({ ...room, id: idOf(room), variantId: String(room.variantId ?? variant.id ?? '') })),
   }));
   const product: Product = {
     ...raw,
-    _id: productId,
+    id: productId,
     accountId: String(raw.accountId ?? 'acct-1'),
     merchantId: raw.merchantId ? String(raw.merchantId) : null,
     categoryId: String(raw.categoryId ?? ''),
@@ -320,7 +320,7 @@ function normalizeProduct(raw: any): Product {
 
 function normalizeProductSummary(raw: any): ProductSummary {
   return {
-    _id: idOf(raw),
+    id: idOf(raw),
     accountId: String(raw.accountId ?? ''),
     merchantId: raw.merchantId ? String(raw.merchantId) : null,
     scope: raw.scope === 'merchant' ? 'merchant' : 'shared',
@@ -375,10 +375,9 @@ function normalizeProductLayoutSettings(raw: any) {
 function apiPayload<T>(value: T): T {
   if (Array.isArray(value)) return value.map(apiPayload) as T;
   if (value && typeof value === 'object') {
-    const hasMongoId = Object.prototype.hasOwnProperty.call(value, '_id');
     const output: Record<string, unknown> = {};
     for (const [key, child] of Object.entries(value)) {
-      if (key === 'clientId' || (key === 'id' && hasMongoId) || (key === '_id' && !child)) continue;
+      if (key === 'clientId' || (key === 'id' && !child)) continue;
       if (!child && ['productId', 'optionGroupId', 'variantId', 'surfaceId', 'categoryId', 'thumbnailAssetId', 'backgroundImageAssetId', 'imageAssetId'].includes(key)) continue;
       output[key] = apiPayload(child);
     }
@@ -387,9 +386,9 @@ function apiPayload<T>(value: T): T {
   return value;
 }
 
-function withoutRootId<T extends { _id: string }>(value: T) {
-  const payload = { ...value } as Omit<T, '_id'> & { _id?: string };
-  delete payload._id;
+function withoutRootId<T extends { id: string }>(value: T) {
+  const payload = { ...value } as Omit<T, 'id'> & { id?: string };
+  delete payload.id;
   return payload;
 }
 
@@ -405,12 +404,12 @@ export const api = {
   listAllImageFolders: (accountId: string, merchantId?: string) => request<any[]>(`/image-folders/all?${galleryQuery({ accountId, merchantId })}`).then((items) => items.map(normalizeFolder)),
   getImageFolder: (id: string) => request<any>(`/image-folders/${id}`).then(normalizeFolder),
   createImageFolder: (folder: ImageFolder) => request<any>('/image-folders', { method: 'POST', body: JSON.stringify(apiPayload(withoutRootId(folder))) }).then(normalizeFolder),
-  updateImageFolder: (folder: ImageFolder) => request<any>(`/image-folders/${folder._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(folder))) }).then(normalizeFolder),
+  updateImageFolder: (folder: ImageFolder) => request<any>(`/image-folders/${folder.id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(folder))) }).then(normalizeFolder),
   deleteImageFolder: (id: string) => request(`/image-folders/${id}`, { method: 'DELETE' }),
   listImageAssets: (filters: { accountId: string; merchantId?: string; folderId?: string | null; scope?: string; search?: string }) => request<any[]>(`/image-assets?${galleryQuery(filters)}`).then((items) => items.map(normalizeAsset)),
   getImageAsset: (id: string) => request<any>(`/image-assets/${id}`).then(normalizeAsset),
   createImageAsset: (asset: ImageAsset) => request<any>('/image-assets', { method: 'POST', body: JSON.stringify(apiPayload(withoutRootId(asset))) }).then(normalizeAsset),
-  uploadImageAsset: async (file: File, metadata: Omit<ImageAsset, '_id' | 'url' | 'publicUrl' | 'storageProvider' | 'bucket' | 'storagePath' | 'createdAt' | 'updatedAt'>, overwriteAssetId?: string) => {
+  uploadImageAsset: async (file: File, metadata: Omit<ImageAsset, 'id' | 'url' | 'publicUrl' | 'storageProvider' | 'bucket' | 'storagePath' | 'createdAt' | 'updatedAt'>, overwriteAssetId?: string) => {
     const intent = await request<{ uploadUrl: string; storagePath: string; bucket: string; publicUrl: string; requiredHeaders: Record<string, string> }>('/image-assets/upload-intent', {
       method: 'POST',
       body: JSON.stringify({
@@ -431,7 +430,7 @@ export const api = {
       body: JSON.stringify({ ...metadata, overwriteAssetId, storagePath: intent.storagePath, bucket: intent.bucket, mimeType: file.type, sizeBytes: file.size }),
     }).then(normalizeAsset);
   },
-  updateImageAsset: (asset: ImageAsset) => request<any>(`/image-assets/${asset._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(asset))) }).then(normalizeAsset),
+  updateImageAsset: (asset: ImageAsset) => request<any>(`/image-assets/${asset.id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(asset))) }).then(normalizeAsset),
   deleteImageAsset: (id: string) => request(`/image-assets/${id}`, { method: 'DELETE' }),
   moveImageAsset: (id: string, folderId?: string | null) => request<any>(`/image-assets/${id}/move`, { method: 'POST', body: JSON.stringify({ folderId: folderId || null }) }).then(normalizeAsset),
   listDesignCartItems: (filters: { accountId: string; merchantId?: string; status?: string; printGenerationStatus?: string; productType?: string; page: number; pageSize: number }) =>
@@ -449,12 +448,12 @@ export const api = {
   markDesignCartItemOrdered: (id: string, input: { orderId?: string; force?: boolean } = {}) => request<any>(`/products/cart-items/${id}/mark-ordered`, { method: 'POST', body: JSON.stringify(input) }),
   createFinalPrintsDownloadToken: (id: string) => request<{ url: string; expiresInSeconds: number }>(`/products/cart-items/${id}/final-prints-download-token`, { method: 'POST', body: JSON.stringify({}) }),
   listMerchants: (accountId: string) => request<any[]>(`/merchants?accountId=${encodeURIComponent(accountId)}`).then((items) => items.map(normalizeMerchant)),
-  updateMerchant: (merchant: Merchant) => request<any>(`/merchants/${merchant._id}`, { method: 'PUT', body: JSON.stringify(merchantPayload(merchant)) }).then(normalizeMerchant),
+  updateMerchant: (merchant: Merchant) => request<any>(`/merchants/${merchant.id}`, { method: 'PUT', body: JSON.stringify(merchantPayload(merchant)) }).then(normalizeMerchant),
   rotateMerchantApiKey: (merchantId: string) => request<any>(`/merchants/${merchantId}/api-key`, { method: 'POST' }).then((result) => ({ merchant: normalizeMerchant(result.merchant), apiPrivateKey: String(result.apiPrivateKey) })),
   listLayoutCategories: (accountId: string, merchantId: string) => request<any[]>(`/layout-categories?${layoutQuery({ accountId, merchantId })}`).then((items) => items.map(normalizeLayoutCategory)),
   getLayoutCategory: (id: string) => request<any>(`/layout-categories/${id}`).then(normalizeLayoutCategory),
   createLayoutCategory: (category: LayoutCategory) => request<any>('/layout-categories', { method: 'POST', body: JSON.stringify(apiPayload(withoutRootId(category))) }).then(normalizeLayoutCategory),
-  updateLayoutCategory: (category: LayoutCategory) => request<any>(`/layout-categories/${category._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(category))) }).then(normalizeLayoutCategory),
+  updateLayoutCategory: (category: LayoutCategory) => request<any>(`/layout-categories/${category.id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(category))) }).then(normalizeLayoutCategory),
   deleteLayoutCategory: (id: string) => request(`/layout-categories/${id}`, { method: 'DELETE' }),
   duplicateLayoutCategory: (id: string, includeTemplates: boolean) => request<any>(`/layout-categories/${id}/duplicate`, { method: 'POST', body: JSON.stringify({ includeTemplates }) }).then((result) => ({ category: normalizeLayoutCategory(result.category), templates: (result.templates ?? []).map(normalizeLayoutTemplate) })),
   exportLayoutCategory: (id: string, includeTemplates = false) => request<any>(`/layout-categories/${id}/export?includeTemplates=${includeTemplates ? 'true' : 'false'}`).then((result) => ({ category: normalizeLayoutCategory(result.category), templates: (result.templates ?? []).map(normalizeLayoutTemplate) })),
@@ -462,7 +461,7 @@ export const api = {
   listLayoutTemplates: (filters: { accountId: string; merchantId: string; categoryId?: string; scope?: string; status?: string; templateType?: string; orientation?: string; search?: string }) => request<any[]>(`/layout-templates?${layoutQuery(filters)}`).then((items) => items.map(normalizeLayoutTemplate)),
   getLayoutTemplate: (id: string) => request<any>(`/layout-templates/${id}`).then(normalizeLayoutTemplate),
   createLayoutTemplate: (template: LayoutTemplate) => request<any>('/layout-templates', { method: 'POST', body: JSON.stringify(apiPayload(withoutRootId(template))) }).then(normalizeLayoutTemplate),
-  updateLayoutTemplate: (template: LayoutTemplate) => request<any>(`/layout-templates/${template._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(template))) }).then(normalizeLayoutTemplate),
+  updateLayoutTemplate: (template: LayoutTemplate) => request<any>(`/layout-templates/${template.id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(template))) }).then(normalizeLayoutTemplate),
   deleteLayoutTemplate: (id: string) => request(`/layout-templates/${id}`, { method: 'DELETE' }),
   duplicateLayoutTemplate: (id: string) => request<any>(`/layout-templates/${id}/duplicate`, { method: 'POST' }).then(normalizeLayoutTemplate),
   exportLayoutTemplate: (id: string) => request<any>(`/layout-templates/${id}/export`).then((result) => ({ template: normalizeLayoutTemplate(result.template) })),
@@ -479,14 +478,14 @@ export const api = {
   })),
   getCollage: (id: string) => request<any>(`/collages/${id}`).then(normalizeCollage),
   createCollage: (collage: Collage) => request<any>('/collages', { method: 'POST', body: JSON.stringify(apiPayload(withoutRootId(collage))) }).then(normalizeCollage),
-  updateCollage: (collage: Collage) => request<any>(`/collages/${collage._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(collage))) }).then(normalizeCollage),
+  updateCollage: (collage: Collage) => request<any>(`/collages/${collage.id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(collage))) }).then(normalizeCollage),
   deleteCollage: (id: string) => request(`/collages/${id}`, { method: 'DELETE' }),
   duplicateCollage: (id: string) => request<any>(`/collages/${id}/duplicate`, { method: 'POST' }).then(normalizeCollage),
   exportCollage: (id: string) => request<any>(`/collages/${id}/export`).then((result) => ({ collage: normalizeCollage(result.collage), category: result.category ? normalizeLayoutCategory(result.category) : undefined })),
   importCollage: (payload: unknown) => request<any>('/collages/import', { method: 'POST', body: JSON.stringify(payload) }).then(normalizeCollage),
   listCategories: (accountId: string, merchantId: string) => request<any[]>(`/categories?accountId=${encodeURIComponent(accountId)}&merchantId=${encodeURIComponent(merchantId)}`).then((items) => items.map(normalizeCategory)),
   createCategory: (category: ProductCategory) => request<any>('/categories', { method: 'POST', body: JSON.stringify(apiPayload(withoutRootId(category))) }).then(normalizeCategory),
-  updateCategory: (category: ProductCategory) => request<any>(`/categories/${category._id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(category))) }).then(normalizeCategory),
+  updateCategory: (category: ProductCategory) => request<any>(`/categories/${category.id}`, { method: 'PUT', body: JSON.stringify(apiPayload(withoutRootId(category))) }).then(normalizeCategory),
   deleteCategory: (id: string) => request(`/categories/${id}`, { method: 'DELETE' }),
   duplicateCategory: (id: string, includeProducts: boolean) => request<any>(`/categories/${id}/duplicate`, { method: 'POST', body: JSON.stringify({ includeProducts }) }).then((result) => ({ category: normalizeCategory(result.category), products: (result.products ?? []).map(normalizeProduct) })),
   listProducts: (accountId: string, merchantId: string) => request<any[]>(`/products?accountId=${encodeURIComponent(accountId)}&merchantId=${encodeURIComponent(merchantId)}`).then((items) => items.map(normalizeProduct)),
@@ -502,7 +501,7 @@ export const api = {
     })),
   getProduct: (id: string) => request<any>(`/products/${id}`).then(normalizeProduct),
   createProduct: (product: Product) => request<any>('/products', { method: 'POST', body: JSON.stringify(productPayload(product)) }).then(normalizeProduct),
-  updateProduct: (product: Product) => request<any>(`/products/${product._id}`, { method: 'PUT', body: JSON.stringify(productPayload(product)) }).then(normalizeProduct),
+  updateProduct: (product: Product) => request<any>(`/products/${product.id}`, { method: 'PUT', body: JSON.stringify(productPayload(product)) }).then(normalizeProduct),
   deleteProduct: (id: string) => request(`/products/${id}`, { method: 'DELETE' }),
   duplicateProduct: (id: string, scope: string, merchantId: string | null) => request<any>(`/products/${id}/duplicate`, { method: 'POST', body: JSON.stringify({ scope, merchantId }) }).then(normalizeProduct),
   exportProduct: (id: string) => request<any>(`/products/${id}/export`).then(normalizeProduct),

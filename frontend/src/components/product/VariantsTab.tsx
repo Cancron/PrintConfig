@@ -70,7 +70,7 @@ export function VariantsTab({ product, onSave }: Props) {
   const errors = useMemo(
     () => ({
       ...validateVariant({
-        _id: editingId,
+        id: editingId,
         name: form.name,
         sku: form.sku,
         price: form.price,
@@ -78,7 +78,7 @@ export function VariantsTab({ product, onSave }: Props) {
         height: form.height,
         unit: form.unit,
         dpi: form.dpi,
-        existingSkus: product.variants.map((variant) => ({ _id: variant._id, sku: variant.sku })),
+        existingSkus: product.variants.map((variant) => ({ id: variant.id, sku: variant.sku })),
       }),
       ...validateVariantOptions(formOptions, product.variantOptionDefinitions),
       ...(product.productType === 'Pillow Print' ? validatePillowVariant(form.pillow) : {}),
@@ -137,7 +137,7 @@ export function VariantsTab({ product, onSave }: Props) {
         { key: '', value: '' },
       ],
     });
-    setEditingId(variant._id);
+    setEditingId(variant.id);
     setIsAdding(false);
   }
 
@@ -224,11 +224,11 @@ export function VariantsTab({ product, onSave }: Props) {
     }
 
     const now = new Date().toISOString();
-    const existing = product.variants.find((variant) => String(variant._id) === String(editingId));
+    const existing = product.variants.find((variant) => String(variant.id) === String(editingId));
     const variant: ProductVariant = {
-      _id: editingId ?? '',
+      id: editingId ?? '',
       clientId: existing?.clientId ?? (editingId ? undefined : crypto.randomUUID()),
-      productId: product._id,
+      productId: product.id,
       name: form.name.trim(),
       sku: form.sku.trim(),
       price: Number(form.price),
@@ -248,7 +248,7 @@ export function VariantsTab({ product, onSave }: Props) {
       updatedAt: now,
     };
 
-    const variants = editingId ? product.variants.map((item) => (String(item._id) === String(editingId) ? variant : item)) : [...product.variants, variant];
+    const variants = editingId ? product.variants.map((item) => (String(item.id) === String(editingId) ? variant : item)) : [...product.variants, variant];
     onSave({ ...product, variants, updatedAt: now });
     cancelEdit();
   }
@@ -256,7 +256,7 @@ export function VariantsTab({ product, onSave }: Props) {
   function handleDelete(id: string) {
     if (!confirm('Are you sure you want to delete this variant?')) return;
     const now = new Date().toISOString();
-    onSave({ ...product, variants: product.variants.filter((variant) => variant._id !== id), updatedAt: now });
+    onSave({ ...product, variants: product.variants.filter((variant) => variant.id !== id), updatedAt: now });
   }
 
   function handleBulkImport(variants: ProductVariant[]) {
@@ -328,7 +328,7 @@ export function VariantsTab({ product, onSave }: Props) {
                   <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {sortedDefinitions.map((definition) => (
                       <Input
-                        key={definition._id || definition.clientId || definition.key}
+                        key={definition.id || definition.clientId || definition.key}
                         label={`${definition.name}${definition.required ? ' *' : ''}`}
                         value={formOptions[definition.key] ?? ''}
                         onChange={(event) => updateDefinitionOption(definition.key, event.target.value)}
@@ -384,7 +384,7 @@ export function VariantsTab({ product, onSave }: Props) {
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
               {product.variants.map((variant) => (
-                <tr key={variant._id}>
+                <tr key={variant.id}>
                   <td className="px-4 py-3">{variant.thumbnailImageUrl ? <img src={variant.thumbnailImageUrl} alt={variant.name} className="h-10 w-10 rounded-md object-cover ring-1 ring-gray-200" /> : <div className="h-10 w-10 rounded-md bg-gray-100 ring-1 ring-gray-200" />}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">{variant.name}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{variant.sku}</td>
@@ -393,12 +393,12 @@ export function VariantsTab({ product, onSave }: Props) {
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{variant.width} x {variant.height} {variant.unit} at {variant.dpi} DPI</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{variantPixelDimensions(product, variant).width} x {variantPixelDimensions(product, variant).height} px</td>
                   <td className="px-4 py-3 text-sm text-gray-700"><div className="flex flex-wrap gap-1">{Object.entries(variant.options).map(([key, value]) => <span key={key} className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">{key}: {value}</span>)}</div></td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm"><p className="text-gray-700">{compatibleRooms(product.roomPreviews, variant).length} compatible</p><Link to={`?tab=preview&variantId=${variant._id}`} className="mt-1 inline-block font-medium text-slate-700 hover:text-slate-900">Manage Shared Rooms</Link></td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm"><p className="text-gray-700">{compatibleRooms(product.roomPreviews, variant).length} compatible</p><Link to={`?tab=preview&variantId=${variant.id}`} className="mt-1 inline-block font-medium text-slate-700 hover:text-slate-900">Manage Shared Rooms</Link></td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => setPreviewVariant(variant)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900" title="Preview"><Eye className="h-4 w-4" /></button>
                       <button onClick={() => startEdit(variant)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900" title="Edit"><Pencil className="h-4 w-4" /></button>
-                      <button onClick={() => handleDelete(variant._id)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                      <button onClick={() => handleDelete(variant.id)} className="rounded-md p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Delete"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   </td>
                 </tr>
@@ -411,7 +411,7 @@ export function VariantsTab({ product, onSave }: Props) {
       {previewVariant && <VariantPreviewModal product={product} variant={previewVariant} onClose={() => setPreviewVariant(null)} />}
       {bulkOpen && (
         <BulkVariantsModal
-          productId={product._id}
+          productId={product.id}
           productType={product.productType}
           tshirtColorOptionKey={product.tshirt.colorOptionKey}
           tshirtSizeOptionKey={product.tshirt.sizeOptionKey}

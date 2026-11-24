@@ -15,7 +15,7 @@ const yesNoOptions = [
 ];
 
 function entityKey(definition: VariantOptionDefinition) {
-  return definition._id || definition.clientId || definition.key;
+  return definition.id || definition.clientId || definition.key;
 }
 
 export function VariantOptionDefinitions({ product, onSave }: Props) {
@@ -56,9 +56,9 @@ export function VariantOptionDefinitions({ product, onSave }: Props) {
     const now = new Date().toISOString();
     setEditingKey(null);
     setForm({
-      _id: '',
+      id: '',
       clientId: crypto.randomUUID(),
-      productId: product._id,
+      productId: product.id,
       name: '',
       key: '',
       required: false,

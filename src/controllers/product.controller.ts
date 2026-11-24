@@ -181,7 +181,7 @@ export async function createFinalPrintsDownloadToken(
       await service.createFinalPrintsDownloadToken({
         cartItemId: String(req.params.cartItemId),
         accountId: req.user?.accountId,
-        userId: req.user?._id,
+        userId: req.user?.id,
         origin: `${String(req.get("x-forwarded-proto") ?? req.protocol).split(",")[0]}://${req.get("host")}`,
       }),
     );

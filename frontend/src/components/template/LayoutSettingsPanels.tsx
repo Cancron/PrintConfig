@@ -48,7 +48,7 @@ export function TemplateSettings({
         value={template.name}
         onChange={(event) => {
           onUpdate("name", event.target.value);
-          if (!template._id) onUpdate("slug", slugifyLocal(event.target.value));
+          if (!template.id) onUpdate("slug", slugifyLocal(event.target.value));
         }}
         error={errors.name}
       />
@@ -207,7 +207,7 @@ export function PageSettings({
         label="Collage"
         value={page.collageId ?? ""}
         onChange={(event) => onUpdate("collageId", event.target.value || null)}
-        options={[{ value: "", label: "No collage selected" }, ...collages.map((collage) => ({ value: collage._id, label: collage.name }))]}
+        options={[{ value: "", label: "No collage selected" }, ...collages.map((collage) => ({ value: collage.id, label: collage.name }))]}
       />
       <div className="grid grid-cols-2 gap-3">
         <Input

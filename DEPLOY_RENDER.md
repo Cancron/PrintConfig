@@ -2,7 +2,7 @@
 
 ## Backend With Embedded Admin
 
-Configure `.env` using `.env.example`. Use a real MongoDB URI,
+Configure `.env` using `.env.example`. Use a PostgreSQL `DATABASE_URL`,
 a generated `JWT_SECRET`, the existing R2 bucket name, and public asset base URL.
 Set `FRONTEND_URL` to your admin/editor browser origins.
 
@@ -14,7 +14,7 @@ npm --prefix frontend ci
 npm run build
 ```
 
-Upload the application, including `dist/` and `frontend/dist/`, without local
+Upload the application, including `dist/`, `frontend/dist/`, and `db/migrations/`, without local
 `node_modules`, local credentials, or diagnostic logs. Configure server secrets
 through the hosting environment, or a backend-only `.env` file.
 
@@ -22,6 +22,7 @@ Install dependencies on the target operating system:
 
 ```sh
 npm ci --omit=dev
+npm run db:migrate
 npm start
 ```
 
@@ -70,9 +71,9 @@ for production and keep storage credentials on the backend.
 ## Troubleshooting
 
 - `503`: inspect Node startup logs; verify dependencies, native binaries,
-  MongoDB access, startup file, and hosting process configuration.
+  PostgreSQL access, applied migrations, startup file, and hosting process configuration.
 - API returns HTML: verify proxy mapping and the frontend API base URL.
 - Asset `404`: upload the complete matching admin build and compiled backend.
-- MongoDB failures: inspect Node startup logs and verify the host permits
-  outbound TCP to the Atlas cluster.
+- PostgreSQL failures: run `npm run db:check`, verify `DATABASE_URL`,
+  database availability, credentials, and network access.
 - Browser CORS failure: configure both backend `FRONTEND_URL` and R2 bucket CORS.

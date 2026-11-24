@@ -18,9 +18,9 @@ export async function generateAndUploadCollagePreview(input: {
   selectedMerchantId: string;
 }): Promise<GeneratedCollagePreview> {
   const { collage, accountId, selectedMerchantId } = input;
-  if (!collage._id) throw new Error("Save the collage before generating a preview image.");
+  if (!collage.id) throw new Error("Save the collage before generating a preview image.");
   const rendered = await renderCollagePreview(collage);
-  const filename = `${collage._id}-preview.webp`;
+  const filename = `${collage.id}-preview.webp`;
   const scope: ProductScope = collage.scope;
   const merchantId = scope === "merchant" ? (collage.merchantId || selectedMerchantId) : null;
   const file = new File([rendered.blob], filename, { type: rendered.blob.type || "image/webp" });

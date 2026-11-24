@@ -14,8 +14,8 @@ test('product basic info accepts Photo Collage Print and rejects malformed value
 });
 
 test('variant validation checks dimensions, DPI, and case-insensitive SKU uniqueness', () => {
-  const base = { _id: 'new', name: 'Small', sku: 'SKU-1', price: 10, width: 8, height: 10, unit: 'inch', dpi: 300,
-    existingSkus: [{ _id: 'existing', sku: 'sku-1' }] };
+  const base = { id: 'new', name: 'Small', sku: 'SKU-1', price: 10, width: 8, height: 10, unit: 'inch', dpi: 300,
+    existingSkus: [{ id: 'existing', sku: 'sku-1' }] };
   const errors = validateVariant({ ...base, width: 0, dpi: 0 });
   assert.ok(errors.sku);
   assert.ok(errors.width);
@@ -25,11 +25,11 @@ test('variant validation checks dimensions, DPI, and case-insensitive SKU unique
 
 test('required variant options and renamed T-shirt keys stay in sync', () => {
   const definition: VariantOptionDefinition = {
-    _id: 'color-id', clientId: 'color-client', productId: 'product-id', name: 'Color', key: 'Color',
+    id: 'color-id', clientId: 'color-client', productId: 'product-id', name: 'Color', key: 'Color',
     required: true, groupBy: false, sortOrder: 1, createdAt: '', updatedAt: '',
   };
   const renamed = ensureTShirtVariantOptionDefinitions([definition], 'GarmentColor', 'Size', 'Color', 'Size');
-  assert.equal(renamed.find((item) => item._id === 'color-id')?.key, 'GarmentColor');
+  assert.equal(renamed.find((item) => item.id === 'color-id')?.key, 'GarmentColor');
   assert.equal(renamed.find((item) => item.key === 'Size')?.required, true);
   assert.ok(validateVariantOptions({ Size: 'M' }, renamed)['options.GarmentColor']);
   assert.deepEqual(validateVariantOptions({ GarmentColor: 'Black', Size: 'M' }, renamed), {});

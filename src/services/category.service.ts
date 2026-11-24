@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isUuid } from '../utils/uuid.js';
 import { ProductCategoryModel } from '../models/ProductCategory.js';
 import { ProductModel } from '../models/Product.js';
 import { ApiError } from '../middleware/errorHandler.js';
@@ -17,12 +17,12 @@ function normalizeScope(data: Record<string, unknown>) {
 async function normalizeRefs(data: Record<string, unknown>) {
   data.accountId = resolveAccountId(String(data.accountId ?? ''));
   if (data.scope === 'shared') data.merchantId = null;
-  if (data.merchantId && !Types.ObjectId.isValid(String(data.merchantId))) throw new ApiError(400, 'merchantId must be a valid MongoDB ObjectId.');
+  if (data.merchantId && !isUuid(String(data.merchantId))) throw new ApiError(400, 'merchantId must be a valid UUID.');
 }
 
 async function assertUniqueSlug(data: Record<string, unknown>, id?: string) {
   const query: Record<string, unknown> = { accountId: data.accountId, scope: data.scope, merchantId: data.scope === 'shared' ? null : data.merchantId, slug: data.slug };
-  if (id) query._id = { $ne: id };
+  if (id) query.id = { $ne: id };
   const existing = await ProductCategoryModel.findOne(query);
   if (existing) throw new ApiError(409, 'Category slug must be unique within account, scope, and merchant.');
 }
@@ -63,7 +63,7 @@ export async function duplicateCategory(id: string, includeProducts = false) {
   let products: unknown[] = [];
   if (includeProducts) {
     const sourceProducts = await ProductModel.find({ categoryId: id }).lean();
-    products = await ProductModel.insertMany(sourceProducts.map((product) => ({ ...stripIds(product), categoryId: copy._id, status: 'draft', name: `${product.name} Copy`, slug: `${product.slug}-copy-${Date.now()}` })));
+    products = await ProductModel.insertMany(sourceProducts.map((product: any) => ({ ...stripIds(product), categoryId: copy.id, status: 'draft', name: `${product.name} Copy`, slug: `${product.slug}-copy-${Date.now()}` })));
   }
   return { category: copy, products };
 }
@@ -73,7 +73,7 @@ function stripIds<T>(value: T): T {
   if (value && typeof value === 'object') {
     const output: Record<string, unknown> = {};
     for (const [key, child] of Object.entries(value)) {
-      if (key === '_id' || key === '__v') continue;
+      if (key === 'id' || key === '__v') continue;
       output[key] = stripIds(child);
     }
     return output as T;

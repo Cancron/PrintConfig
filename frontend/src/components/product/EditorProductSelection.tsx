@@ -28,9 +28,9 @@ export function EditorProductSelection({
     return products
       .filter(
         (item) =>
-          item._id !== currentProductId &&
+          item.id !== currentProductId &&
           item.status === 'Active' &&
-          !specificProductIds.includes(item._id)
+          !specificProductIds.includes(item.id)
       )
       .filter((item) =>
         !query
@@ -42,7 +42,7 @@ export function EditorProductSelection({
 
   const sameCategoryCount = products.filter(
     (item) =>
-      item._id !== currentProductId &&
+      item.id !== currentProductId &&
       item.status === 'Active' &&
       item.categoryId === categoryId
   ).length;
@@ -103,7 +103,7 @@ export function EditorProductSelection({
             {candidates.length ? (
               candidates.map((item) => (
                 <div
-                  key={item._id}
+                  key={item.id}
                   className="flex items-center justify-between gap-3 border-b border-gray-100 px-3 py-2 last:border-0"
                 >
                   <div className="min-w-0">
@@ -116,7 +116,7 @@ export function EditorProductSelection({
                     type="button"
                     title={`Add ${item.name}`}
                     aria-label={`Add ${item.name}`}
-                    onClick={() => onSpecificProductIdsChange([...specificProductIds, item._id])}
+                    onClick={() => onSpecificProductIdsChange([...specificProductIds, item.id])}
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-blue-600 hover:bg-blue-50"
                   >
                     <Plus size={17} />
@@ -132,7 +132,7 @@ export function EditorProductSelection({
               Selected products ({specificProductIds.length})
             </p>
             {specificProductIds.map((id, index) => {
-              const selected = products.find((item) => item._id === id);
+              const selected = products.find((item) => item.id === id);
               const unavailable = !selected || selected.status !== 'Active';
               return (
                 <div

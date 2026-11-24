@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isUuid } from '../utils/uuid.js';
 import { ImageAssetModel, IMAGE_MIME_TYPES } from '../models/ImageAsset.js';
 import { ImageFolderModel } from '../models/ImageFolder.js';
 import { ApiError } from '../middleware/errorHandler.js';
@@ -15,7 +15,7 @@ function normalizeAsset(payload: Record<string, unknown>) {
   if (payload.scope === 'shared') payload.merchantId = null;
   if (payload.scope !== 'shared' && payload.scope !== 'merchant') throw new ApiError(400, 'Image scope is required.');
   if (payload.scope === 'merchant' && !payload.merchantId) throw new ApiError(400, 'merchantId is required for merchant images.');
-  for (const key of ['merchantId', 'folderId'] as const) if (payload[key] && !Types.ObjectId.isValid(String(payload[key]))) throw new ApiError(400, `${key} must be a valid MongoDB ObjectId.`);
+  for (const key of ['merchantId', 'folderId'] as const) if (payload[key] && !isUuid(String(payload[key]))) throw new ApiError(400, `${key} must be a valid UUID.`);
   if (!payload.folderId) payload.folderId = null;
   if (!String(payload.name ?? '').trim()) throw new ApiError(400, 'Image name is required.');
   if (!String(payload.url ?? '').trim()) throw new ApiError(400, 'Image URL is required.');
@@ -57,9 +57,9 @@ export async function createUploadIntent(payload: Record<string, unknown>, authe
   const scope = payload.scope === 'merchant' ? 'merchant' : payload.scope === 'shared' ? 'shared' : '';
   if (!scope) throw new ApiError(400, 'Image scope is required.');
   const merchantId = scope === 'merchant' ? String(payload.merchantId ?? '') : '';
-  if (scope === 'merchant' && !Types.ObjectId.isValid(merchantId)) throw new ApiError(400, 'merchantId is required for merchant images.');
+  if (scope === 'merchant' && !isUuid(merchantId)) throw new ApiError(400, 'merchantId is required for merchant images.');
   const folderId = payload.folderId ? String(payload.folderId) : null;
-  if (folderId && !Types.ObjectId.isValid(folderId)) throw new ApiError(400, 'folderId must be a valid MongoDB ObjectId.');
+  if (folderId && !isUuid(folderId)) throw new ApiError(400, 'folderId must be a valid UUID.');
   const mimeType = String(payload.mimeType ?? '');
   if (!IMAGE_MIME_TYPES.includes(mimeType as typeof IMAGE_MIME_TYPES[number])) throw new ApiError(400, 'Unsupported image mimeType.');
   const sizeBytes = Number(payload.sizeBytes ?? 0);
@@ -68,7 +68,7 @@ export async function createUploadIntent(payload: Record<string, unknown>, authe
   let storagePath = '';
   const overwriteAssetId = String(payload.overwriteAssetId ?? '');
   if (overwriteAssetId) {
-    if (!Types.ObjectId.isValid(overwriteAssetId)) throw new ApiError(400, 'overwriteAssetId must be a valid MongoDB ObjectId.');
+    if (!isUuid(overwriteAssetId)) throw new ApiError(400, 'overwriteAssetId must be a valid UUID.');
     const asset = await ImageAssetModel.findById(overwriteAssetId);
     if (!asset || String(asset.accountId) !== accountId) throw new ApiError(404, 'Image asset to overwrite was not found.');
     storagePath = String(asset.storagePath);
@@ -108,7 +108,7 @@ export async function completeUpload(payload: Record<string, unknown>, authentic
   await assertFolderAvailable(assetPayload);
   const overwriteAssetId = String(payload.overwriteAssetId ?? '');
   if (overwriteAssetId) {
-    const updated = await ImageAssetModel.findOneAndUpdate({ _id: overwriteAssetId, accountId }, assetPayload, { new: true, runValidators: true });
+    const updated = await ImageAssetModel.findOneAndUpdate({ id: overwriteAssetId, accountId }, assetPayload, { new: true, runValidators: true });
     if (!updated) throw new ApiError(404, 'Image asset to update was not found.');
     return updated;
   }
@@ -128,12 +128,12 @@ export async function moveAsset(id: string, folderId?: string | null) {
   if (!asset) throw new ApiError(404, 'Image asset not found.');
   if (String(asset.folderId ?? '') === String(folderId ?? '')) throw new ApiError(400, 'Image is already in that folder.');
   if (folderId) {
-    if (!Types.ObjectId.isValid(folderId)) throw new ApiError(400, 'folderId must be a valid MongoDB ObjectId.');
+    if (!isUuid(folderId)) throw new ApiError(400, 'folderId must be a valid UUID.');
     const folder = await ImageFolderModel.findById(folderId);
     if (!folder || String(folder.accountId) !== String(asset.accountId) || folder.scope !== asset.scope || String(folder.merchantId ?? '') !== String(asset.merchantId ?? '')) throw new ApiError(400, 'Destination folder must use the same account and scope as the image.');
   }
   // TODO: A future improvement can move the Supabase object; current moves update library metadata only.
-  asset.folderId = folderId ? new Types.ObjectId(folderId) : null;
+  asset.folderId = folderId ? folderId : null;
   await asset.save();
   return asset;
 }
@@ -152,7 +152,7 @@ export async function deleteAsset(id: string) {
     }
   }
   try {
-    await ImageAssetModel.deleteOne({ _id: asset._id });
+    await ImageAssetModel.deleteOne({ id: asset.id });
   } catch (error) {
     throw new ApiError(500, `Image metadata deletion failed after Storage deletion: ${error instanceof Error ? error.message : 'Unknown database error'}`);
   }
