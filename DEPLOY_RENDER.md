@@ -2,7 +2,7 @@
 
 ## Backend With Embedded Admin
 
-Configure `backend/.env` using `backend/.env.example`. Use a real MongoDB URI,
+Configure `.env` using `.env.example`. Use a real MongoDB URI,
 a generated `JWT_SECRET`, the existing R2 bucket name, and public asset base URL.
 Set `FRONTEND_URL` to your admin/editor browser origins.
 
@@ -10,11 +10,11 @@ From the repository root:
 
 ```sh
 npm ci
-npm --prefix backend ci
-npm run build:deploy
+npm --prefix frontend ci
+npm run build
 ```
 
-Upload `backend/`, including `dist/` and `public/admin/`, without local
+Upload the application, including `dist/` and `frontend/dist/`, without local
 `node_modules`, local credentials, or diagnostic logs. Configure server secrets
 through the hosting environment, or a backend-only `.env` file.
 
@@ -39,25 +39,16 @@ If your host forwards a prefix such as `/printconfig`, set
 `API_BASE_PATH=/printconfig` before building and on the server. URLs become
 `/printconfig/admin/` and `/printconfig/api/health`.
 
-`npm run build:deploy` derives frontend asset, router, and API paths from this
-backend setting. Restart Node after deployment. The deployment build serves
-extensionless asset URLs through Express and stores files under
-`backend/public/admin/_assets`. Upload the entire build together.
-
-## Separate Frontend
-
-For separate static hosting, configure frontend `VITE_API_URL` with the API URL
-including `/api`, and `VITE_BASE_PATH` with its hosting prefix or an empty value.
-Run `npm run build` and deploy `dist/`. Configure an SPA fallback to `index.html`.
-The included `.htaccess` supports Apache-compatible static hosting.
+The frontend build derives asset, router, and API paths from this backend
+setting. Restart Node after deployment. Express serves the build directly from
+`frontend/dist`, including extensionless asset URLs for shared hosts.
+Upload the entire build together with `dist`.
 
 ## Render
 
-The example `render.yaml` defines `printconfig-api` and `printconfig-admin`.
-Service names are examples; renaming existing services requires a deliberate
-hosting change. Set frontend `VITE_API_URL` to the deployed API address and backend
-`FRONTEND_URL` to the frontend origin. Supply all environment values marked
-`sync: false`; keep secrets in backend environment settings only.
+The example `render.yaml` defines one backend web service that also serves the
+admin frontend. Supply all environment values marked `sync: false`; keep secrets
+in backend environment settings only.
 
 ## R2 Storage
 

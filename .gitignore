@@ -26,6 +26,6 @@ dist-ssr
 *.pem
 *.key
 
-mediaclip.json
 uploads/
-backend/public/admin/
+public/admin/
+frontend/dist/

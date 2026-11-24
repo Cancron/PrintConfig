@@ -35,11 +35,12 @@ are publicly addressable; private signed delivery is not implemented for custome
 
 ## Local Development
 
-Use Node.js 20.20.2 or newer and install dependencies separately in the repository root and backend:
+Use Node.js 20.20.2 or newer. The API is at the repository root and the admin
+frontend is in `frontend/`:
 
 ```sh
 npm ci
-npm --prefix backend ci
+npm --prefix frontend ci
 ```
 
 Direct dependencies are pinned, and both npm projects require releases to be at
@@ -49,16 +50,18 @@ projects. The print renderer's native binary (`@napi-rs/canvas`) and esbuild's
 platform binary are distributed as npm optional packages, so dependency
 installation does not fetch binaries from GitHub or other external hosts.
 
-Create local `.env` files from `.env.example` and `backend/.env.example`.
+Create `.env` from `.env.example`. Frontend-only overrides can be placed in
+`frontend/.env`.
 Configure MongoDB, a random `JWT_SECRET`, and R2 credentials in the backend only.
 For root hosting, leave `API_BASE_PATH` empty. Configure `FRONTEND_URL` with
 comma-separated browser origins allowed to call the API.
 
 ```sh
-npm run backend:dev
 npm run dev
+npm run frontend:dev
 ```
 
+Run these two commands in separate terminals from the repository root.
 The default frontend is `http://localhost:5173`; the API is
 `http://localhost:5000/api`, with health at `/api/health`.
 
@@ -68,7 +71,7 @@ The default frontend is `http://localhost:5173`; the API is
 | --- | --- |
 | `PORT` | HTTP listening port; default 5000. |
 | `API_BASE_PATH` | Optional externally forwarded application prefix, such as `/printconfig`. |
-| `ADMIN_STATIC_DIR` | Optional frontend build directory; default `backend/public/admin`. |
+| `ADMIN_STATIC_DIR` | Optional frontend build directory; default `frontend/dist`. |
 | `FRONTEND_URL` | Allowed browser origins; include deployed admin/editor origins. |
 | `MONGODB_URI` | MongoDB connection string. |
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Optional database name and separate credentials. |
@@ -80,29 +83,27 @@ The default frontend is `http://localhost:5173`; the API is
 | `R2_SIGNED_UPLOAD_TTL_SECONDS` | Upload URL expiry; default 900 seconds. |
 
 `CLOUDFLARE_TOKEN` is not used by normal storage operations. Keep it out of the
-frontend. Frontend settings are only `VITE_API_URL` and `VITE_BASE_PATH`.
+frontend. The production frontend base path and API URL are derived from the
+backend `API_BASE_PATH` during the build.
 Never put passwords, service-role keys, or signing secrets in `VITE_*` variables.
 
 ## Build and Deployment
 
-For a standalone frontend, `npm run build` creates `dist`. Set `VITE_BASE_PATH`
-and `VITE_API_URL` before building. `npm run backend:build` compiles the API.
-
-To deploy only the backend folder, run:
+From the repository root, run:
 
 ```sh
-npm run build:deploy
+npm run build
 ```
 
 This reads the backend `API_BASE_PATH`, builds the admin into
-`backend/public/admin`, and compiles the server into `backend/dist`.
+`frontend/dist`, and compiles the server into `dist`.
 With no prefix, URLs are `/admin/` and `/api`. With `/printconfig`, they become
 `/printconfig/admin/` and `/printconfig/api`.
 
 The deployment build uses extensionless asset URLs handled by Express to accommodate
 shared hosts that intercept file-extension requests. The physical asset folder is `_assets`.
-Upload generated `dist` and `public/admin` together. Install production dependencies
-on the target server with `npm ci --omit=dev`, then run `npm start` from `backend`.
+Upload generated `dist` and `frontend/dist` together. Install production dependencies
+on the target server with `npm ci --omit=dev`, then run `npm start` from the root.
 Never upload Windows `node_modules` to Linux: the renderer includes a native binary.
 Rebuild and restart when changing the deployment prefix.
 
@@ -112,13 +113,13 @@ See [DEPLOY_RENDER.md](DEPLOY_RENDER.md) for hosting and CORS configuration.
 
 ```sh
 npm run typecheck
-npm run backend:typecheck
-npm run lint
-npm --prefix backend run test:mongo
-npm --prefix backend run test:mongo-network
+npm run frontend:typecheck
+npm run frontend:lint
+npm run test:mongo
+npm run test:mongo-network
 ```
 
-MongoDB diagnostics write logs under `backend/logs` when run through these commands.
+MongoDB diagnostics write logs under `logs` when run through these commands.
 Network tests check DNS, TCP, and TLS; `test:mongo` also verifies authentication and ping.
 
 Jobs are persisted in MongoDB, but execution currently starts in the API process.

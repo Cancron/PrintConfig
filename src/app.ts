@@ -91,7 +91,7 @@ app.use('/api/collages', collageRoutes);
 
 const adminDirectory = process.env.ADMIN_STATIC_DIR
   ? path.resolve(process.env.ADMIN_STATIC_DIR)
-  : fileURLToPath(new URL('../public/admin/', import.meta.url));
+  : fileURLToPath(new URL('../frontend/dist/', import.meta.url));
 
 // Some shared hosts intercept URLs with file extensions before reaching Node.
 app.get('/admin/_assets/:assetKey', (req, res, next) => {
